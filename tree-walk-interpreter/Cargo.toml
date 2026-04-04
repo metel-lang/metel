@@ -15,3 +15,5 @@ pest_derive = "2"
 # Nicer error reporting with source context
 miette = { version = "7", features = ["fancy"] }
 thiserror = "2"
+pest-ast = "0.3.6"
+from-pest = "0.3.4"

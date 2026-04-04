@@ -96,16 +96,20 @@ expr             = { assign_expr }
 assign_expr      = { postfix_expr ~ assign_op ~ assign_expr | or_expr }
 assign_op        = { "+=" | "-=" | "*=" | "/=" | "%=" | ("=" ~ !"=") }
 
-or_expr          = { and_expr ~ ("||" ~ and_expr)* }
-and_expr         = { cmp_expr ~ ("&&" ~ cmp_expr)* }
+or_expr          = { and_expr ~ (or_op ~ and_expr)* }
+or_op            = { "||" }
+and_expr         = { cmp_expr ~ (and_op ~ cmp_expr)* }
+and_op           = { "&&" }
 cmp_expr         = { range_expr ~ (cmp_op ~ range_expr)? }
 cmp_op           = { "==" | "!=" | "<=" | ">=" | "<" | ">" }
 
 range_expr       = { add_expr ~ (range_op ~ add_expr)? }
 range_op         = { "..=" | ".." }
 
-add_expr         = { mul_expr ~ (("+"|"-") ~ mul_expr)* }
-mul_expr         = { cast_expr ~ (("*"|"/"|"%") ~ cast_expr)* }
+add_expr         = { mul_expr ~ (add_op ~ mul_expr)* }
+add_op           = { "+" | "-" }
+mul_expr         = { cast_expr ~ (mul_op ~ cast_expr)* }
+mul_op           = { "*" | "/" | "%" }
 cast_expr        = { unary_expr ~ ("as" ~ type_expr)* }
 unary_expr       = { ("!" | "-") ~ unary_expr | postfix_expr }
 

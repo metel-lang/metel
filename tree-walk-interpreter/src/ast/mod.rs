@@ -119,7 +119,14 @@ pub struct TraitMethod {
 
 // ── Statements ────────────────────────────────────────────────────────────────
 
-pub type Block = Vec<Decl>;
+/// A `{ decl* expr? }` block.  The optional `tail` is a bare expression
+/// (no semicolon) whose value is the value of the whole block — used by
+/// `if`-expressions, `loop`-expressions, closures, and similar.
+#[derive(Debug, Clone)]
+pub struct Block {
+    pub stmts: Vec<Decl>,
+    pub tail:  Option<Box<Expr>>,
+}
 
 #[derive(Debug, Clone)]
 pub enum Stmt {

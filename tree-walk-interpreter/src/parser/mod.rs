@@ -24,8 +24,10 @@ pub fn parse(source: &str, filename: &str) -> Result<Program, YolangError> {
             filename: filename.to_string(),
         }
     })?;
+    let ast = build_ast(pairs, filename)?;
 
-    build_ast(pairs, filename)
+    dbg!(ast.clone());
+    Ok(ast)
 }
 
 // ── Helper functions for spans and pair extraction ──────────────────────────
@@ -46,6 +48,8 @@ fn build_ast(pairs: Pairs<Rule>, filename: &str) -> Result<Program, YolangError>
     let mut inner = pairs.into_iter();
 
     while let Some(pair) = inner.next() {
+    
+        println!("Parsing decl: {:?}", pair.as_str());
         match pair.as_rule() {
             Rule::decl => {
                 program.push(parse_decl(pair.into_inner(), filename)?);
@@ -161,7 +165,7 @@ fn parse_fun_decl(pair: Pair<Rule>, filename: &str) -> Result<Decl, YolangError>
     let mut generics = vec![];
     let mut params = vec![];
     let mut return_type = None;
-    let mut body = vec![];
+    let mut body = Block { stmts: vec![], tail: None };
 
     while let Some(pair) = inner.next() {
         match pair.as_rule() {
@@ -442,18 +446,23 @@ fn parse_trait_method(mut pairs: Pairs<Rule>, filename: &str) -> Result<TraitMet
 // ── Block and statement parsing ─────────────────────────────────────────────
 
 fn parse_block(pairs: Pairs<Rule>, filename: &str) -> Result<Block, YolangError> {
-    let mut block = vec![];
+    let mut stmts = vec![];
+    let mut tail = None;
 
     for pair in pairs {
         match pair.as_rule() {
             Rule::decl => {
-                block.push(parse_decl(pair.into_inner(), filename)?);
+                stmts.push(parse_decl(pair.into_inner(), filename)?);
+            }
+            Rule::expr => {
+                // trailing bare expression — the value of the block
+                tail = Some(Box::new(parse_expr(pair.into_inner(), filename)?));
             }
             _ => {}
         }
     }
 
-    Ok(block)
+    Ok(Block { stmts, tail })
 }
 
 fn parse_stmt(mut pairs: Pairs<Rule>, filename: &str) -> Result<Stmt, YolangError> {
@@ -497,7 +506,6 @@ fn parse_stmt(mut pairs: Pairs<Rule>, filename: &str) -> Result<Stmt, YolangErro
 fn parse_match_expr(pair: Pair<Rule>, filename: &str) -> Result<Expr, YolangError> {
     let span = span_of(&pair, filename);
     let mut inner = pair.into_inner();
-    inner.next(); // skip "match"
     let scrutinee = parse_expr(inner.next().ok_or_else(|| YolangError::parse("Missing match scrutinee", &span))?.into_inner(), filename)?;
 
     let mut arms = vec![];
@@ -752,7 +760,7 @@ fn parse_expr_from_pair(pair: Pair<Rule>, filename: &str) -> Result<Expr, Yolang
             let mut inner = pair.into_inner();
             let mut params = vec![];
             let mut return_type = None;
-            let mut body = vec![];
+            let mut body = Block { stmts: vec![], tail: None };
 
             while let Some(p) = inner.next() {
                 match p.as_rule() {
@@ -852,10 +860,11 @@ where
     let first = inner.next().ok_or_else(|| YolangError::parse("Empty binary expr", &span))?;
     let mut expr = parse_next(first, filename)?;
 
-    // Iterate through operator-operand pairs
+    // The grammar emits named `add_op`, `mul_op`, `or_op`, `and_op` rules
+    // (see grammar.pest) so they appear as pairs here, alternating op/operand.
     while let Some(op_pair) = inner.next() {
         let op = parse_binary_op(&op_pair);
-        let operand = inner.next().ok_or_else(|| YolangError::parse("Missing operand", &span))?;
+        let operand = inner.next().ok_or_else(|| YolangError::parse("Missing RHS operand", &span))?;
         let rhs = parse_next(operand, filename)?;
         let op_span = span_of(&op_pair, filename);
         expr = Expr::BinOp(Box::new(expr), op, Box::new(rhs), op_span);
@@ -985,17 +994,22 @@ fn parse_cast_expr(pair: Pair<Rule>, filename: &str) -> Result<Expr, YolangError
 
 fn parse_unary_expr(pair: Pair<Rule>, filename: &str) -> Result<Expr, YolangError> {
     let span = span_of(&pair, filename);
+    let text = pair.as_str();
     let mut inner = pair.into_inner();
 
-    let first = inner.next().ok_or_else(|| YolangError::parse("Empty unary expr", &span))?;
-    let first_str = first.as_str();
+    let first_child = inner.next().ok_or_else(|| YolangError::parse("Empty unary expr", &span))?;
 
-    if first_str == "!" || first_str == "-" {
-        let op = parse_unary_op(first_str);
-        let expr = parse_unary_expr_item(inner.next().ok_or_else(|| YolangError::parse("Missing operand for unary", &span))?, filename)?;
-        Ok(Expr::UnaryOp(op, Box::new(expr), span))
+    // `"!" | "-"` are anonymous in the grammar, so pest doesn't emit them as
+    // named pairs. Detect the operator from the outer text instead.
+    if text.starts_with('!') || text.starts_with('-') {
+        let op_char = &text[..1];
+        let op = parse_unary_op(op_char);
+        // first_child is the inner unary_expr or postfix_expr
+        let operand = parse_unary_expr_item(first_child, filename)?;
+        Ok(Expr::UnaryOp(op, Box::new(operand), span))
     } else {
-        parse_postfix_expr_item(first, filename)
+        // No operator — just a postfix_expr wrapped in unary_expr
+        parse_postfix_expr_item(first_child, filename)
     }
 }
 
@@ -1020,50 +1034,78 @@ fn parse_postfix_op(base: Expr, pair: Pair<Rule>, filename: &str) -> Result<Expr
     let pair_str = pair.as_str();
     let mut inner = pair.into_inner();
 
+    // Dispatch by the first character of the postfix text, since pest emits
+    // the `postfix` rule as an anonymous choice with no sub-rule names.
     if pair_str.starts_with('(') {
-        // Function call
+        // Function call: `( arg_list? )`
         let mut args = vec![];
+        // inner may contain an arg_list node or individual expr nodes
         for p in inner {
-            if matches!(p.as_rule(), Rule::expr) {
-                args.push(parse_expr(p.into_inner(), filename)?);
+            match p.as_rule() {
+                Rule::arg_list => {
+                    for a in p.into_inner() {
+                        if matches!(a.as_rule(), Rule::expr) {
+                            args.push(parse_expr(a.into_inner(), filename)?);
+                        }
+                    }
+                }
+                Rule::expr => {
+                    args.push(parse_expr(p.into_inner(), filename)?);
+                }
+                _ => {}
             }
         }
         Ok(Expr::Call { callee: Box::new(base), args, span })
+
     } else if pair_str.starts_with('[') {
-        // Index
-        let index_expr = parse_expr(inner.next().ok_or_else(|| YolangError::parse("Missing index", &span))?.into_inner(), filename)?;
+        // Index: `[ expr ]`
+        let index_pair = inner.next().ok_or_else(|| YolangError::parse("Missing index expression", &span))?;
+        let index_expr = parse_expr(index_pair.into_inner(), filename)?;
         Ok(Expr::Index { object: Box::new(base), index: Box::new(index_expr), span })
+
     } else if pair_str == "?" {
         // Error propagation
         Ok(Expr::PropagateError { expr: Box::new(base), span })
-    } else if let Some(field_part) = pair_str.strip_prefix('.') {
-        // Field access, method call, or tuple access
-        if field_part.chars().all(|c| c.is_ascii_digit()) {
-            // Tuple access
-            let idx = field_part.parse::<usize>()
-                .map_err(|_| YolangError::parse("Invalid tuple index", &span))?;
-            Ok(Expr::TupleAccess { object: Box::new(base), index: idx, span })
-        } else if field_part.contains('(') {
-            // Method call
-            let method_name = field_part.split('(').next().unwrap_or(field_part).to_string();
-            let mut args = vec![];
-            for p in inner {
-                if matches!(p.as_rule(), Rule::expr) {
-                    args.push(parse_expr(p.into_inner(), filename)?);
+
+    } else {
+        // Dot postfix: field access, method call, or tuple index
+        // Grammar alternatives:
+        //   "." ~ decimal_int              → tuple access
+        //   "." ~ ident ~ ("(" ~ arg_list? ~ ")")?  → field or method
+        let first = inner.next().ok_or_else(|| YolangError::parse("Empty dot postfix", &span))?;
+
+        match first.as_rule() {
+            Rule::decimal_int => {
+                let idx = first.as_str().parse::<usize>()
+                    .map_err(|_| YolangError::parse("Invalid tuple index", &span))?;
+                Ok(Expr::TupleAccess { object: Box::new(base), index: idx, span })
+            }
+            Rule::ident => {
+                let name = first.as_str().to_string();
+                // Check if there's an arg_list following (method call)
+                let next = inner.next();
+                match next {
+                    Some(args_pair) if matches!(args_pair.as_rule(), Rule::arg_list) => {
+                        let mut args = vec![];
+                        for a in args_pair.into_inner() {
+                            if matches!(a.as_rule(), Rule::expr) {
+                                args.push(parse_expr(a.into_inner(), filename)?);
+                            }
+                        }
+                        Ok(Expr::MethodCall { receiver: Box::new(base), method: name, args, span })
+                    }
+                    // `"(" ~ arg_list? ~ ")"` with empty args: next is None but postfix text ends with `()`
+                    None if pair_str.ends_with("()") => {
+                        Ok(Expr::MethodCall { receiver: Box::new(base), method: name, args: vec![], span })
+                    }
+                    _ => {
+                        // Plain field access
+                        Ok(Expr::FieldAccess { object: Box::new(base), field: name, span })
+                    }
                 }
             }
-            Ok(Expr::MethodCall {
-                receiver: Box::new(base),
-                method: method_name,
-                args,
-                span,
-            })
-        } else {
-            // Field access
-            Ok(Expr::FieldAccess { object: Box::new(base), field: field_part.to_string(), span })
+            _ => Err(YolangError::parse("Unknown dot postfix form", &span)),
         }
-    } else {
-        Err(YolangError::parse("Unknown postfix operator", &span))
     }
 }
 
@@ -1110,42 +1152,96 @@ fn parse_pattern(pair: Pair<Rule>, filename: &str) -> Result<Pattern, YolangErro
     let span = span_of(&pair, filename);
 
     match pair.as_rule() {
+        // Unwrap the top-level `pattern` rule, which contains one alternative
         Rule::pattern => {
             let mut inner = pair.into_inner();
-            if let Some(p) = inner.next() {
-                parse_pattern(p, filename)
-            } else {
-                Err(YolangError::parse("Empty pattern", &span))
+            let inner_pair = inner.next().ok_or_else(|| YolangError::parse("Empty pattern", &span))?;
+            parse_pattern(inner_pair, filename)
+        }
+
+        // Wildcard: the grammar emits no named sub-rule; the text is "_"
+        // (matched as a raw string in the grammar alternative)
+        // pest emits this as... actually "_" is not a named rule, so it falls
+        // through to the `_` arm below where we check the text.
+
+        // nope literal — atomic rule with word-boundary guard
+        Rule::nope_lit => Ok(Pattern::Nope(span)),
+
+        // Tuple pattern: ( pattern, pattern, ... )
+        Rule::tuple_pattern => {
+            let mut pats = vec![];
+            for p in pair.into_inner() {
+                if matches!(p.as_rule(), Rule::pattern) {
+                    pats.push(parse_pattern(p, filename)?);
+                }
+            }
+            Ok(Pattern::Tuple(pats, span))
+        }
+
+        // Enum variant: Type::Variant or Type::Variant { field, field }
+        Rule::enum_pattern => {
+            let mut path = vec![];
+            let mut fields = vec![];
+            for p in pair.into_inner() {
+                match p.as_rule() {
+                    Rule::ident => path.push(p.as_str().to_string()),
+                    _ => {}
+                }
+            }
+            // The grammar: ident ~ "::" ~ ident ~ ("{" ~ ident ~ ("," ~ ident)* ~ "}")?
+            // All idents are collected above; first two form the path (Type::Variant),
+            // remaining idents (if any) are field bindings.
+            if path.len() > 2 {
+                fields = path.split_off(2);
+            }
+            Ok(Pattern::EnumVariant { path, fields, span })
+        }
+
+        // Literal pattern: float | int | string | bool
+        Rule::literal_pattern => {
+            let inner_pair = pair.into_inner().next()
+                .ok_or_else(|| YolangError::parse("Empty literal pattern", &span))?;
+            let text = inner_pair.as_str();
+            match inner_pair.as_rule() {
+                Rule::float_lit => {
+                    let v = text.parse::<f64>().map_err(|_| YolangError::parse("Invalid float pattern", &span))?;
+                    Ok(Pattern::Literal(Literal::Float(v), span))
+                }
+                Rule::int_lit => {
+                    let v = text.replace("_", "").parse::<i64>().map_err(|_| YolangError::parse("Invalid int pattern", &span))?;
+                    Ok(Pattern::Literal(Literal::Int(v), span))
+                }
+                Rule::string_lit => {
+                    let unquoted = &text[1..text.len() - 1];
+                    Ok(Pattern::Literal(Literal::Str(unescape_string(unquoted)), span))
+                }
+                Rule::bool_lit => Ok(Pattern::Literal(Literal::Bool(text == "true"), span)),
+                _ => Err(YolangError::parse("Unknown literal pattern", &span)),
             }
         }
+
+        // Binding pattern: a plain identifier
+        Rule::bind_pattern => {
+            let name = pair.into_inner().next()
+                .ok_or_else(|| YolangError::parse("Empty bind pattern", &span))?
+                .as_str().to_string();
+            Ok(Pattern::Binding(name, span))
+        }
+
+        // Wildcard: the grammar alternative `("_" ~ !(ASCII_ALPHANUMERIC | "_"))` is
+        // an anonymous expression inside `pattern`, so pest emits no named rule for it.
+        // We get here when the matched text is "_".
         _ => {
             let text = pair.as_str().trim();
             if text == "_" {
                 Ok(Pattern::Wildcard(span))
-            } else if text == "nope" {
-                Ok(Pattern::Nope(span))
-            } else if let Ok(value) = text.replace("_", "").parse::<i64>() {
-                Ok(Pattern::Literal(Literal::Int(value), span))
-            } else if text == "true" || text == "false" {
-                let value = text == "true";
-                Ok(Pattern::Literal(Literal::Bool(value), span))
-            } else if text.starts_with('"') && text.ends_with('"') {
-                let unquoted = &text[1..text.len() - 1];
-                Ok(Pattern::Literal(Literal::Str(unescape_string(unquoted)), span))
-            } else if text.contains(" { ") {
-                let parts: Vec<&str> = text.splitn(2, " { ").collect();
-                let path_str = parts[0];
-                let path = path_str.split("::").map(|s| s.to_string()).collect();
-                let fields_str = parts.get(1).copied().unwrap_or("").trim();
-                let fields_str = if fields_str.ends_with('}') { &fields_str[..fields_str.len() - 1] } else { fields_str };
-                let field_names = if fields_str.is_empty() { vec![] } else { fields_str.split(',').map(|s| s.trim().to_string()).collect::<Vec<_>>() };
-                let fields = field_names;
-                Ok(Pattern::EnumVariant { path, fields, span })
-            } else if text.contains("::") {
-                let parts = text.split("::").map(|s| s.to_string()).collect();
-                Ok(Pattern::EnumVariant { path: parts, fields: vec![], span })
             } else {
-                Ok(Pattern::Binding(text.to_string(), span))
+                Err(YolangError::ParseError {
+                    message: format!("Unknown pattern rule: {:?} (text: {:?})", pair.as_rule(), text),
+                    start: span.start,
+                    end: span.end,
+                    filename: span.filename,
+                })
             }
         }
     }
@@ -1248,23 +1344,31 @@ fn parse_type_path(pairs: Pairs<Rule>) -> Vec<String> {
 // ── Operator parsing ────────────────────────────────────────────────────────
 
 fn parse_binary_op(pair: &Pair<Rule>) -> BinOp {
-    match pair.as_str() {
-        "+" => BinOp::Add,
-        "-" => BinOp::Sub,
-        "*" => BinOp::Mul,
-        "/" => BinOp::Div,
-        "%" => BinOp::Rem,
-        "==" => BinOp::Eq,
-        "!=" => BinOp::Ne,
-        "<" => BinOp::Lt,
-        "<=" => BinOp::Le,
-        ">" => BinOp::Gt,
-        ">=" => BinOp::Ge,
-        "&&" | "and" => BinOp::And,
-        "||" | "or" => BinOp::Or,
-        ".." => BinOp::Range,
-        "..=" => BinOp::RangeInclusive,
-        _ => BinOp::Add, // fallback
+    match pair.as_rule() {
+        Rule::add_op => match pair.as_str() { "-" => BinOp::Sub, _ => BinOp::Add },
+        Rule::mul_op => match pair.as_str() { "/" => BinOp::Div, "%" => BinOp::Rem, _ => BinOp::Mul },
+        Rule::or_op  => BinOp::Or,
+        Rule::and_op => BinOp::And,
+        Rule::cmp_op => match pair.as_str() {
+            "==" => BinOp::Eq,
+            "!=" => BinOp::Ne,
+            "<=" => BinOp::Le,
+            ">=" => BinOp::Ge,
+            "<"  => BinOp::Lt,
+            _    => BinOp::Gt,
+        },
+        Rule::range_op => match pair.as_str() { "..=" => BinOp::RangeInclusive, _ => BinOp::Range },
+        // Fallback: try by text (used in fold_binary_expr for cmp/range)
+        _ => match pair.as_str() {
+            "+"  => BinOp::Add, "-"  => BinOp::Sub,
+            "*"  => BinOp::Mul, "/"  => BinOp::Div, "%" => BinOp::Rem,
+            "==" => BinOp::Eq,  "!=" => BinOp::Ne,
+            "<"  => BinOp::Lt,  "<=" => BinOp::Le,
+            ">"  => BinOp::Gt,  ">=" => BinOp::Ge,
+            "&&" => BinOp::And, "||" => BinOp::Or,
+            ".." => BinOp::Range, "..=" => BinOp::RangeInclusive,
+            _    => BinOp::Add,
+        },
     }
 }
 
