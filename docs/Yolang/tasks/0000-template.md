@@ -2,6 +2,8 @@
 
 **Status:** open
 
+**Epic:** epic-NNN-slug
+
 **Component:** interpreter | repl | parser | typechecker | evaluator | error-handling | spec
 
 **Spec Link:** `spec/Language Spec.md#Section-Name` or Backlog item reference

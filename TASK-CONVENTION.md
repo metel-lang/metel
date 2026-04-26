@@ -1,17 +1,44 @@
 # Task Management for Yolang
 
-Simple task tracking system. One file per unit of work.
+Two-level task organization: **Epics** (major features/milestones) contain **Tasks** (units of work). Folder structure reflects task state for easy navigation.
 
 ## Quick Reference
 
-**Create a task:** Copy `docs/Yolang/tasks/0000-template.md` → rename to `NNNN-slug.md`
+**Create an epic:** Make folder `docs/Yolang/tasks/epic-NNN-slug/` with subfolders `open/`, `in-progress/`, `done/`, `blocked/`
 
-**Update status:** Change `**Status:**` field (open → in-progress → done → blocked)
+**Create a task:** Copy `docs/Yolang/tasks/epic-NNN-slug/0000-template.md` → save to appropriate status folder → rename to `NNNN-slug.md`
 
-**When done:**
-1. Check all acceptance criteria
-2. Update spec section if it reveals ambiguities
-3. Mark status as `done`
+**Move task:** Change status by moving file to corresponding subfolder (or update `**Status:**` field for quick reference)
+
+**When done:** Check acceptance criteria → move to `done/` subfolder → update spec if needed
+
+## What Are Epics?
+
+An **epic** is a major language feature, subsystem milestone, or architectural component. Each epic:
+- Gets its own folder: `epic-NNN-slug` (e.g., `epic-001-typechecker`)
+- Contains related tasks organized by status
+- Has a high-level `EPIC.md` describing scope, goals, and dependencies
+- Typically spans multiple milestones or weeks of work
+
+**Example structure:**
+```
+docs/Yolang/tasks/
+├── epic-001-typechecker/
+│   ├── EPIC.md                          # Epic description and goals
+│   ├── open/
+│   │   └── 0001-typed-ast-nodes.md
+│   ├── in-progress/
+│   │   └── 0002-type-inference.md
+│   ├── done/
+│   │   └── 0003-basic-type-checking.md
+│   └── blocked/
+│       └── 0004-generics.md             # blocked by 0002
+│
+├── epic-002-error-recovery/
+│   ├── EPIC.md
+│   ├── open/
+│   └── done/
+```
 
 ## Task Fields
 
@@ -19,6 +46,7 @@ Simple task tracking system. One file per unit of work.
 # Task NNNN: Brief Title
 
 **Status:**      open | in-progress | done | blocked
+**Epic:**        epic-001-typechecker
 **Component:**   interpreter | repl | parser | typechecker | evaluator | error-handling | spec
 **Spec Link:**   spec/Language Spec.md#Section-Name (or Backlog item)
 **Blocked By:**  task IDs or "none"
@@ -37,8 +65,9 @@ What needs doing and why.
 
 ## Rules
 
-1. **Every task links to the spec** (or a backlog item if not yet speced)
-2. **Components:** Connect tasks to the subsystems they affect
+1. **Every task links to a spec** (or a backlog item if not yet speced)
+2. **Every task belongs to an epic** (via `**Epic:**` field)
+3. **Components:** Connect tasks to the subsystems they affect
    - `interpreter` — overall interpreter
    - `repl` — interactive shell
    - `parser` — parsing and grammar
@@ -46,26 +75,49 @@ What needs doing and why.
    - `evaluator` — runtime execution
    - `error-handling` — error messages and recovery
    - `spec` — spec work only
-3. **Status is honest:** If you haven't touched a task in days, mark it `blocked` with reason
-4. **Acceptance criteria are testable:** Not "improve error messages" but "error reports include X and Y"
+4. **Status is honest:** If you haven't touched a task in days, mark it `blocked` with reason
+5. **Acceptance criteria are testable:** Not "improve error messages" but "error reports include X and Y"
+6. **Folder structure mirrors status:** File location reflects true status (move file when status changes)
 
-## Current Tasks
+## Epics
 
-- `0001-error-recovery.md` — Error recovery in parser (in-progress)
-- `0002-no-match-error.md` — Better error messages (open, blocked by 0001)
-- `0003-repl-with-debug.md` — Add interactive REPL mode (open, blocked by 0001, 0002)
-- `0004-repl-debug-commands.md` — Debug commands for REPL (open, blocked by 0003)
+### Epic 001: Typechecker and Typed AST
+**Status:** open
+
+Build a complete type-checking system with an AST that carries type information throughout evaluation. This epic establishes the foundation for type safety and enables better error messages.
+
+**Goals:**
+- Implement a typed AST representation
+- Build a type inference engine
+- Create a type checker that validates programs before execution
+- Support basic types (int, bool, string, lists)
+
+**Current Tasks:**
+- `open/0001-typed-ast-nodes.md` — Define AST nodes with type annotations
+- `open/0002-type-inference.md` — Implement type inference rules
+- `open/0003-type-checker.md` — Build type validation pass
+- `open/0004-basic-types.md` — Support int, bool, string, list types
+
+**Blocked/Future:**
+- Generics and parametric polymorphism (depends on type-checker)
+- Type aliases and custom types
 
 ## Workflow
 
 ```
-1. Create task with status "open"
+1. Create or pick epic
    ↓
-2. Start work → status "in-progress"
+2. Create task in epic's open/ folder with status "open"
    ↓
-3. If you get stuck → status "blocked" (with reason)
+3. Start work → move to in-progress/ → set status "in-progress"
    ↓
-4. Finish → check criteria, update spec, status "done"
+4. If stuck → move to blocked/ → set status "blocked" (with reason)
+   ↓
+5. Finish → check criteria, move to done/, update spec, set status "done"
 ```
 
-That's it. See `docs/Yolang/tasks/README.md` for more details or `docs/Yolang/tasks/0000-template.md` to create a task.
+## See Also
+
+- `docs/Yolang/tasks/README.md` — More details
+- `docs/Yolang/tasks/epic-001-typechecker/EPIC.md` — Typechecker epic details
+- `docs/Yolang/tasks/0000-template.md` — Task template
