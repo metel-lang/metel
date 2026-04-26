@@ -1,7 +1,7 @@
 # Task 0007: Generic Function Type Checking
 
 **Status:** open  
-**Epic:** epic-002-generics  
+**Epic:** epic-003-generics  
 **Component:** typechecker  
 **Spec Link:** spec/Language Spec.md#Generic-Functions  
 **Blocked By:** 0005, 0006

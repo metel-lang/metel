@@ -1,8 +1,8 @@
-# Epic 002: Generics and Monomorphization
+# Epic 003: Generics and Monomorphization
 
 **Status:** open  
 **Started:** 2026-04-26  
-**Depends On:** Epic 001 (Typechecker and Typed AST)
+**Depends On:** Epic 002 (Evaluator)
 
 ## Overview
 

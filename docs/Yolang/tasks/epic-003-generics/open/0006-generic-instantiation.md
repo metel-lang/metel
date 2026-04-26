@@ -1,7 +1,7 @@
 # Task 0006: Generic Type Instantiation
 
 **Status:** open  
-**Epic:** epic-002-generics  
+**Epic:** epic-003-generics  
 **Component:** typechecker  
 **Spec Link:** spec/Language Spec.md#Generics  
 **Blocked By:** 0005

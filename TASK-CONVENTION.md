@@ -81,26 +81,68 @@ What needs doing and why.
 
 ## Epics
 
-### Epic 001: Typechecker and Typed AST
-**Status:** open
+The three core epics form the complete interpreter:
 
-Build a complete type-checking system with an AST that carries type information throughout evaluation. This epic establishes the foundation for type safety and enables better error messages.
+### Epic 001: Typechecker and Typed AST
+**Status:** open  
+**Depends On:** None (foundation)
+
+Build a complete type-checking system with an AST that carries type information throughout evaluation.
 
 **Goals:**
 - Implement a typed AST representation
 - Build a type inference engine
 - Create a type checker that validates programs before execution
-- Support basic types (int, bool, string, lists)
+- Support basic types (int, float, bool, string, array, unit, tuple)
 
-**Current Tasks:**
-- `open/0001-typed-ast-nodes.md` — Define AST nodes with type annotations
-- `open/0002-type-inference.md` — Implement type inference rules
-- `open/0003-type-checker.md` — Build type validation pass
-- `open/0004-basic-types.md` — Support int, bool, string, list types
+**Tasks:** 4 tasks (0001-0004)
+- `0001` — Typed AST node design and implementation
+- `0002` — Type inference engine
+- `0003` — Type checker validation pass
+- `0004` — Basic type system implementation
 
-**Blocked/Future:**
-- Generics and parametric polymorphism (depends on type-checker)
-- Type aliases and custom types
+---
+
+### Epic 002: Evaluator
+**Status:** open  
+**Depends On:** Epic 001 (Typechecker)
+
+Implement the runtime engine that executes fully typed programs, transforming TypedAST into running code.
+
+**Goals:**
+- Evaluate all expression types
+- Execute statements and control flow
+- Handle function definitions and calls
+- Support closures and first-class functions
+- Implement built-in functions
+
+**Tasks:** 4 tasks (0001-0004)
+- `0001` — Value representation and basic evaluation
+- `0002` — Expression evaluation (all 20 variants)
+- `0003` — Control flow and statement execution
+- `0004` — Function calls and closures
+
+---
+
+### Epic 003: Generics and Monomorphization
+**Status:** open  
+**Depends On:** Epic 002 (Evaluator)
+
+Add generic type support and compile-time specialization through monomorphization.
+
+**Goals:**
+- Support type parameters on functions and types
+- Implement type variable unification
+- Handle generic instantiation (explicit and implicit)
+- Specialize generics at compile time
+- Support recursive and nested generics
+
+**Tasks:** 5 tasks (0005-0009)
+- `0005` — Type variables and constraint system
+- `0006` — Generic type instantiation
+- `0007` — Generic function type checking
+- `0008` — Generic struct and enum type checking
+- `0009` — Monomorphization engine
 
 ## Workflow
 
@@ -116,8 +158,13 @@ Build a complete type-checking system with an AST that carries type information 
 5. Finish → check criteria, move to done/, update spec, set status "done"
 ```
 
+## Current Epics
+
+1. **Epic 001:** `docs/Yolang/tasks/epic-001-typechecker/EPIC.md`
+2. **Epic 002:** `docs/Yolang/tasks/epic-002-evaluator/EPIC.md`
+3. **Epic 003:** `docs/Yolang/tasks/epic-002-generics/EPIC.md` (folder naming note: still named epic-002-generics, but is conceptually Epic 003)
+
 ## See Also
 
 - `docs/Yolang/tasks/README.md` — More details
-- `docs/Yolang/tasks/epic-001-typechecker/EPIC.md` — Typechecker epic details
 - `docs/Yolang/tasks/0000-template.md` — Task template

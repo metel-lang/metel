@@ -1,10 +1,10 @@
 # Task 0005: Type Variables and Constraint System
 
 **Status:** open  
-**Epic:** epic-002-generics  
+**Epic:** epic-003-generics  
 **Component:** typechecker  
 **Spec Link:** spec/Language Spec.md#Generics  
-**Blocked By:** epic-001 task 0002
+**Blocked By:** epic-002 task 0004 (evaluator complete)
 
 ## What
 

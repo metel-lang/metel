@@ -1,7 +1,7 @@
 # Task 0009: Monomorphization Engine
 
 **Status:** open  
-**Epic:** epic-002-generics  
+**Epic:** epic-003-generics  
 **Component:** typechecker  
 **Spec Link:** spec/Language Spec.md#Monomorphization  
 **Blocked By:** 0006, 0007, 0008
