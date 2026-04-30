@@ -158,9 +158,9 @@ fn parse_enum_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<
 
 fn parse_impl_block(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<ImplBlock, YolangError> {
     let span = Span::of(&pair, filename);
-    let mut inner       = pair.into_inner();
+    let inner       = pair.into_inner();
     let mut trait_name  = None;
-    let mut target_type = None;
+    let target_type;
     let mut methods     = vec![];
 
     // Grammar: "impl" ~ (type_path ~ "for")? ~ type_expr ~ "{" ~ fun_decl* ~ "}"

@@ -1,7 +1,6 @@
 use crate::ast::Program;
 use crate::error::YolangError;
 use crate::typed_ast::TypedProgram;
-use crate::typeinference::{InferContext, Constraint, solve_constraints, resolve_type};
 
 /// Run the type checker over an untyped AST, producing a fully typed AST.
 /// All generic instantiations are monomorphised here.
@@ -36,7 +35,7 @@ use crate::typeinference::{InferContext, Constraint, solve_constraints, resolve_
 pub fn check(program: Program) -> Result<TypedProgram, YolangError> {
     // TODO: implement type checker phases
     // For now, create an inference context to show integration
-    let mut _ctx = InferContext::new();
+    // let mut _ctx = InferContext::new();
 
     // Phase 1: Collect declarations
     // _build_declaration_table(&program, &mut ctx)?;
