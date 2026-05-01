@@ -14,16 +14,16 @@ This folder contains the complete documentation for building Yolang's type infer
 
 ## The 8 Phases at a Glance
 
-| Phase | Component | Status |
-|-------|-----------|--------|
-| 1 | Type Variables | ✅ Complete |
-| 2 | InferType enum | → Start here |
-| 3 | Unification algorithm | Planned |
-| 4 | Substitution | Planned |
-| 5 | Constraints | Planned |
-| 6 | Type Schemes | Planned |
-| 7 | Inference Context | Planned |
-| 8 | Integration | Planned |
+| Phase | Component | Description |
+|-------|-----------|-------------|
+| 1 | Type Variables | Type variable generation and basic operations |
+| 2 | InferType enum | Types that may contain type variables |
+| 3 | Unification algorithm | Core algorithm for solving type equations |
+| 4 | Substitution | Representing and applying type variable bindings |
+| 5 | Constraints | Type relationships discovered during analysis |
+| 6 | Type Schemes | Let-polymorphism support |
+| 7 | Inference Context | State management for the inference process |
+| 8 | Integration | Connecting to the type checking pipeline |
 
 ## Key Files
 
@@ -50,11 +50,11 @@ Run specific phase:
 cargo test --test typeinference_tests phase_2
 ```
 
-## Status
+## Getting Started
 
-**Phase 1**: ✅ Complete (TypeVar & TypeVarGenerator)  
-**Next**: Phase 2 (InferType enum)  
-**Estimated**: 1-2 weeks total for full implementation  
+1. **New to type inference?** Start with [CONCEPTS.md](./CONCEPTS.md) for theoretical background
+2. **Ready to implement?** Follow the [GUIDE.md](./GUIDE.md) workflow
+3. **Need detailed specs?** Consult [ROADMAP.md](./ROADMAP.md) for each phase
 
 ---
 

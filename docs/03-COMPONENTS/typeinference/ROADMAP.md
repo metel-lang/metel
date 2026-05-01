@@ -1,42 +1,52 @@
-# Type Inference System: Step-by-Step Roadmap
+# Type Inference Implementation Roadmap
 
 ## Overview
 
-Build the type inference system incrementally with tests for each phase. This document shows the exact steps, test structure, and integration points.
-
-**Master Task**: Epic 001 Task - Build Type Inference System Step-by-Step  
-**Test File**: `tests/typeinference_tests.rs`  
-**Module**: `src/typeinference/mod.rs`  
+This roadmap breaks down the type inference system implementation into 8 incremental phases, each building on the previous ones. Each phase focuses on a specific component and includes complete test coverage.
 
 ---
 
-## Phase 1: Type Variables ✅
+## Phase 1: Type Variables
 
 **What**: Implement type variable generation and basic operations.
 
+**Definition**:
+```rust
+pub struct TypeVar(u32);
+
+pub struct TypeVarGenerator {
+    next_id: u32,
+}
+
+impl TypeVarGenerator {
+    pub fn fresh(&mut self) -> TypeVar {
+        let id = self.next_id;
+        self.next_id += 1;
+        TypeVar(id)
+    }
+}
+```
+
 **Tasks**:
-- [x] Create `TypeVar` struct: newtype wrapper around `u32`
-- [x] Implement `Display` for `TypeVar` (format as `?t0`, `?t1`, etc.)
-- [x] Create `TypeVarGenerator` for generating fresh type variables
-- [x] Implement ordering and hashing for `TypeVar`
+- Create `TypeVar` struct: newtype wrapper around `u32`
+- Implement `Display` for `TypeVar` (format as `?t0`, `?t1`, etc.)
+- Create `TypeVarGenerator` for generating fresh type variables
+- Implement ordering and hashing for `TypeVar`
 
-**Tests** (in `phase_1_type_variables`):
-- ✅ `test_type_var_creation`: Create type variables with different IDs
-- ✅ `test_type_var_display`: Display format is correct
-- ✅ `test_type_var_generator_fresh`: Generator produces unique variables
-- ✅ `test_type_var_generator_counter`: Counter increments correctly
-- ✅ `test_type_var_ordering`: Type variables can be ordered
-- ✅ `test_type_var_hashable`: Type variables can be used in HashSet/HashMap
-
-**Status**: ✅ Phase 1 Complete
+**Test Cases**:
+- Type variable creation with different IDs
+- Display format verification
+- Generator produces unique variables
+- Counter increments correctly
+- Type variables can be ordered and hashed
 
 ---
 
-## Phase 2: Types During Inference
+## Phase 2: Inference Types
 
 **What**: Represent types that may contain type variables (unlike `Type` which is concrete).
 
-**Definition** (add to `src/typeinference/mod.rs`):
+**Definition**:
 ```rust
 pub enum InferType {
     Concrete(Type),          // Resolved: Int, String, etc.
@@ -49,32 +59,15 @@ pub enum InferType {
 ```
 
 **Tasks**:
-- [ ] Define `InferType` enum with all variants
-- [ ] Implement `Display` for `InferType`
-- [ ] Add helper constructors: `int()`, `float()`, `bool()`, `str()`, `unit()`, `var()`
+- Define `InferType` enum with all variants
+- Implement `Display` for `InferType`
+- Add helper constructors: `int()`, `float()`, `bool()`, `str()`, `unit()`, `var()`
 
-**Tests** (add to `phase_2_infer_types`):
-```rust
-#[test]
-fn test_infer_type_concrete() { ... }
-
-#[test]
-fn test_infer_type_var() { ... }
-
-#[test]
-fn test_infer_type_function() { ... }
-
-#[test]
-fn test_infer_type_display() { ... }
-
-#[test]
-fn test_infer_type_constructors() { ... }
-```
-
-**Acceptance Criteria**:
-- [ ] Can create all InferType variants
-- [ ] Display output is correct and readable
-- [ ] Constructors work as expected
+**Test Cases**:
+- Create all InferType variants
+- Verify display output format
+- Test helper constructors
+- Nested type construction
 
 ---
 
@@ -94,57 +87,21 @@ unify(fun(?t0) -> ?t0, fun(Int) -> Int) → Success, bind ?t0 = Int
 ```
 
 **Tasks**:
-- [ ] Implement `unify(ty1: &InferType, ty2: &InferType) -> Result<Substitution, String>`
-- [ ] Handle concrete type unification (must be identical)
-- [ ] Handle type variable unification (bind if not occurs check violation)
-- [ ] Handle function type unification (unify parameter and return types)
-- [ ] Implement occurs check to prevent infinite types (`?t0 = List<?t0>`)
-- [ ] Handle composite types (tuple, array, named)
+- Implement `unify(ty1: &InferType, ty2: &InferType) -> Result<Substitution, String>`
+- Handle concrete type unification (must be identical)
+- Handle type variable unification (bind if not occurs check violation)
+- Handle function type unification (unify parameter and return types)
+- Implement occurs check to prevent infinite types (`?t0 = List<?t0>`)
+- Handle composite types (tuple, array, named)
 
-**Tests** (add to `phase_3_unification`):
-```rust
-#[test]
-fn test_unify_same_concrete() { 
-    // unify(Int, Int) → success
-}
-
-#[test]
-fn test_unify_different_concrete() {
-    // unify(Int, String) → error
-}
-
-#[test]
-fn test_unify_var_with_concrete() {
-    // unify(?t0, Int) → bind ?t0 = Int
-}
-
-#[test]
-fn test_unify_var_with_var() {
-    // unify(?t0, ?t1) → bind ?t0 = ?t1
-}
-
-#[test]
-fn test_unify_function_types() {
-    // unify(fun(?t0) -> ?t0, fun(Int) -> Int) → bind ?t0 = Int
-}
-
-#[test]
-fn test_unify_occurs_check() {
-    // unify(?t0, Array(?t0)) → error (infinite type)
-}
-
-#[test]
-fn test_unify_tuple_types() {
-    // unify((?t0, Int), (String, Int)) → bind ?t0 = String
-}
-```
-
-**Acceptance Criteria**:
-- [ ] Unifies identical concrete types
-- [ ] Rejects incompatible concrete types
-- [ ] Binds type variables correctly
-- [ ] Prevents infinite types (occurs check)
-- [ ] Works with nested/composite types
+**Test Cases**:
+- Unify identical concrete types
+- Reject incompatible concrete types
+- Unify variables with concrete types
+- Unify variables with variables
+- Unify complex function types
+- Occurs check prevention
+- Composite type unification
 
 ---
 
@@ -162,44 +119,18 @@ pub struct Substitution {
 ```
 
 **Tasks**:
-- [ ] Create `Substitution` struct with `HashMap<TypeVar, InferType>`
-- [ ] Implement `bind(var, ty)` to record a binding
-- [ ] Implement `lookup(var)` to find a binding
-- [ ] Implement `apply(ty)` to replace all variables in a type (recursively)
-- [ ] Implement `compose(other)` to combine two substitutions
+- Create `Substitution` struct with `HashMap<TypeVar, InferType>`
+- Implement `bind(var, ty)` to record a binding
+- Implement `lookup(var)` to find a binding
+- Implement `apply(ty)` to replace all variables in a type (recursively)
+- Implement `compose(other)` to combine two substitutions
 
-**Tests** (add to `phase_4_substitution`):
-```rust
-#[test]
-fn test_substitution_bind_and_lookup() { ... }
-
-#[test]
-fn test_substitution_apply_simple() {
-    // subst: ?t0 = Int
-    // apply to ?t0 → Int
-}
-
-#[test]
-fn test_substitution_apply_nested() {
-    // subst: ?t0 = Int, ?t1 = String
-    // apply to (?t0, ?t1) → (Int, String)
-}
-
-#[test]
-fn test_substitution_apply_recursive() {
-    // subst: ?t0 = fun(?t1) -> ?t1, ?t1 = Int
-    // apply to ?t0 → fun(Int) -> Int
-}
-
-#[test]
-fn test_substitution_compose() { ... }
-```
-
-**Acceptance Criteria**:
-- [ ] Bindings are stored and retrieved correctly
-- [ ] `apply()` recursively replaces all variables
-- [ ] Transitive bindings work (if ?t0 = ?t1 and ?t1 = Int, then ?t0 resolves to Int)
-- [ ] `compose()` combines substitutions correctly
+**Test Cases**:
+- Bind and lookup operations
+- Apply substitutions to simple types
+- Apply substitutions to nested types
+- Recursive substitution application
+- Substitution composition
 
 ---
 
@@ -219,47 +150,17 @@ pub struct Constraint {
 ```
 
 **Tasks**:
-- [ ] Create `Constraint` struct with left/right types and span
-- [ ] Implement constraint creation helper
-- [ ] Implement batch constraint solving: `solve_constraints(vec) -> Substitution`
-- [ ] Implement error reporting with source locations
+- Create `Constraint` struct with left/right types and span
+- Implement constraint creation helper
+- Implement batch constraint solving: `solve_constraints(vec) -> Substitution`
+- Implement error reporting with source locations
 
-**Tests** (add to `phase_5_constraints`):
-```rust
-#[test]
-fn test_constraint_creation() { ... }
-
-#[test]
-fn test_solve_single_constraint() {
-    // Constraint: ?t0 = Int
-    // Solve → substitution with ?t0 = Int
-}
-
-#[test]
-fn test_solve_multiple_constraints() {
-    // Constraints: ?t0 = Int, ?t1 = String, (?t0, ?t1) = (Int, String)
-    // Solve → success, all satisfied
-}
-
-#[test]
-fn test_solve_conflicting_constraints() {
-    // Constraints: ?t0 = Int, ?t0 = String
-    // Solve → error
-}
-
-#[test]
-fn test_solve_transitive_constraints() {
-    // Constraints: ?t0 = ?t1, ?t1 = Int
-    // Solve → ?t0 = Int, ?t1 = Int
-}
-```
-
-**Acceptance Criteria**:
-- [ ] Constraints can be created with span information
-- [ ] Single constraints are solved correctly
-- [ ] Multiple non-conflicting constraints solve together
-- [ ] Conflicting constraints produce errors
-- [ ] Transitive constraints work (chain of bindings)
+**Test Cases**:
+- Create constraints with span information
+- Solve single constraints
+- Solve multiple non-conflicting constraints
+- Handle conflicting constraints with errors
+- Transitive constraint resolution
 
 ---
 
@@ -281,43 +182,18 @@ pub struct TypeScheme {
 ```
 
 **Tasks**:
-- [ ] Create `TypeScheme` struct
-- [ ] Implement `generalize(ty, free_vars)` - identify which vars to quantify
-- [ ] Implement `instantiate(ctx)` - create fresh variables for each use
-- [ ] Add helper to collect free variables in a type
-- [ ] Display type schemes in readable form (`∀α. α → α`)
+- Create `TypeScheme` struct
+- Implement `generalize(ty, free_vars)` - identify which vars to quantify
+- Implement `instantiate(ctx)` - create fresh variables for each use
+- Add helper to collect free variables in a type
+- Display type schemes in readable form (`∀α. α → α`)
 
-**Tests** (add to `phase_6_type_schemes`):
-```rust
-#[test]
-fn test_type_scheme_generalization() {
-    // ty: fun(?t0) -> ?t0, free: {}
-    // generalize → scheme with quantified_vars = [?t0]
-}
-
-#[test]
-fn test_type_scheme_instantiation() {
-    // scheme: ∀?t0. fun(?t0) -> ?t0
-    // instantiate → fun(?t_fresh) -> ?t_fresh (different each time)
-}
-
-#[test]
-fn test_type_scheme_polymorphism() {
-    // Use same scheme twice:
-    // First: instantiate to fun(?t1) -> ?t1, unify ?t1 = Int
-    // Second: instantiate to fun(?t2) -> ?t2, unify ?t2 = String
-    // Both should succeed (same binding, different types!)
-}
-
-#[test]
-fn test_type_scheme_display() { ... }
-```
-
-**Acceptance Criteria**:
-- [ ] Generalization identifies quantified variables correctly
-- [ ] Instantiation creates fresh variables on each call
-- [ ] Same scheme can be instantiated to different types
-- [ ] Display format is readable
+**Test Cases**:
+- Generalize types with different free variable contexts
+- Instantiate schemes to fresh variables
+- Verify same scheme can instantiate to different types
+- Test polymorphic identity function example
+- Display format verification
 
 ---
 
@@ -337,45 +213,20 @@ pub struct InferContext {
 ```
 
 **Tasks**:
-- [ ] Create `InferContext` struct
-- [ ] Implement `fresh_var()` for generating type variables
-- [ ] Implement `bind_var()` for monomorphic bindings
-- [ ] Implement `bind_polymorphic()` for polymorphic bindings
-- [ ] Implement `lookup_var()` - auto-instantiates polymorphic bindings
-- [ ] Implement `add_constraint()` and `constraints()` getter
-- [ ] Implement substitution getters/setters
+- Create `InferContext` struct
+- Implement `fresh_var()` for generating type variables
+- Implement `bind_var()` for monomorphic bindings
+- Implement `bind_polymorphic()` for polymorphic bindings
+- Implement `lookup_var()` - auto-instantiates polymorphic bindings
+- Implement `add_constraint()` and `constraints()` getter
+- Implement substitution getters/setters
 
-**Tests** (add to `phase_7_inference_context`):
-```rust
-#[test]
-fn test_fresh_var_generation() { ... }
-
-#[test]
-fn test_monomorphic_binding() { ... }
-
-#[test]
-fn test_polymorphic_binding() { ... }
-
-#[test]
-fn test_lookup_monomorphic() { ... }
-
-#[test]
-fn test_lookup_polymorphic_instantiation() {
-    // Bind polymorphic scheme
-    // Lookup twice
-    // Should get different instantiations both times
-}
-
-#[test]
-fn test_constraint_collection() { ... }
-```
-
-**Acceptance Criteria**:
-- [ ] Type variables generated correctly
-- [ ] Bindings stored and retrieved
-- [ ] Polymorphic lookups auto-instantiate
-- [ ] Constraints collected properly
-- [ ] Substitution applied correctly
+**Test Cases**:
+- Fresh variable generation
+- Monomorphic variable binding and lookup
+- Polymorphic binding with automatic instantiation
+- Multiple lookups of same polymorphic binding produce different instances
+- Constraint collection and management
 
 ---
 
@@ -384,57 +235,54 @@ fn test_constraint_collection() { ... }
 **What**: Connect the inference system to the actual type checking pipeline.
 
 **Tasks**:
-- [ ] Update `typechecker::check()` to use the inference system
-- [ ] Implement expression constraint generation (walk AST)
-- [ ] Implement statement handling
-- [ ] Implement let-binding handling with automatic generalization
-- [ ] Integrate constraint solving
-- [ ] Generate typed AST from inference results
+- Update `typechecker::check()` to use the inference system
+- Implement expression constraint generation (walk AST)
+- Implement statement handling
+- Implement let-binding handling with automatic generalization
+- Integrate constraint solving
+- Generate typed AST from inference results
 
-**Tests** (integration tests):
+**Integration Points**:
 ```rust
-#[test]
-fn test_infer_literal() {
-    // Program: let x = 42;
-    // Infer x: Int
+fn infer_expr(expr: &Expr, ctx: &mut InferContext) -> InferType {
+    match expr {
+        Expr::Literal(lit) => infer_literal(lit),
+        Expr::Var(name) => ctx.lookup_var(name).unwrap_or_else(|| {
+            // Error: undefined variable
+        }),
+        Expr::Call { func, args } => {
+            let func_ty = infer_expr(func, ctx);
+            let arg_tys: Vec<_> = args.iter().map(|a| infer_expr(a, ctx)).collect();
+            let ret_ty = ctx.fresh_var();
+            let expected = InferType::Fun(arg_tys, Box::new(ret_ty.clone()));
+            ctx.add_constraint(func_ty, expected, expr.span());
+            ret_ty
+        }
+        // ... other expressions
+    }
 }
 
-#[test]
-fn test_infer_function_call() { ... }
-
-#[test]
-fn test_infer_polymorphic_use() {
-    // Program: let id = fun(x) { x };
-    //          let a = id(42);
-    //          let b = id("hi");
-    // Infer: a: Int, b: String, id: polymorphic
+fn infer_let_binding(name: String, rhs: Expr, ctx: &mut InferContext) {
+    let rhs_type = infer_expr(rhs, ctx);
+    ctx.bind_polymorphic(name, rhs_type);  // Automatic generalization
 }
 ```
 
----
-
-## Test Running
-
-Run tests with:
-```bash
-cd tree-walk-interpreter
-cargo test --test typeinference_tests
-```
-
-Or run specific phase:
-```bash
-cargo test --test typeinference_tests phase_1
-cargo test --test typeinference_tests phase_2
-# etc.
-```
+**Test Cases**:
+- Infer literal expressions
+- Infer variable references
+- Infer function calls
+- Polymorphic let-binding inference
+- Full program inference with multiple bindings
+- Error handling for type mismatches
 
 ---
 
 ## Implementation Order
 
-Follow this order to build understanding:
+Follow this order to build understanding incrementally:
 
-1. **Phase 1** ✅ - Type variables (foundation)
+1. **Phase 1** - Type variables (foundation)
 2. **Phase 2** - InferType (what we're inferring)
 3. **Phase 3** - Unification (core algorithm)
 4. **Phase 4** - Substitution (applying solutions)
@@ -443,18 +291,43 @@ Follow this order to build understanding:
 7. **Phase 7** - InferContext (state management)
 8. **Phase 8** - Integration (real world)
 
-Each phase builds on previous ones. Complete all tests before moving on.
+Each phase builds on previous ones. Complete all tests for each phase before moving on.
 
----
+## Test Structure
 
-## Notes
+All tests are organized in `tests/typeinference_tests.rs`:
 
-- Tests are organized by phase in `typeinference_tests.rs`
-- Add placeholder test functions as you go (`#[test] fn test_...() { todo!() }`)
-- Once implementation is done, remove `todo!()` and write assertions
-- Use descriptive test names that explain what's being tested
-- Include comments in tests explaining the test case
+```rust
+#[cfg(test)]
+mod phase_1_type_variables { ... }
 
----
+#[cfg(test)]
+mod phase_2_infer_types { ... }
 
-**Status**: Phase 1 complete, ready to start Phase 2.
+#[cfg(test)]
+mod phase_3_unification { ... }
+
+// ... etc for all phases
+```
+
+Run tests with:
+```bash
+# All tests
+cargo test --test typeinference_tests
+
+# Specific phase
+cargo test --test typeinference_tests phase_3
+
+# With output
+cargo test --test typeinference_tests phase_3 -- --nocapture
+```
+
+## Key Benefits
+
+This incremental approach provides:
+
+- **Understanding**: Each phase focuses on one concept
+- **Testing**: Every component is tested before integration
+- **Debugging**: Issues are caught early in small components
+- **Foundation**: Later phases build on tested infrastructure
+- **Learning**: Clear progression from simple to complex concepts

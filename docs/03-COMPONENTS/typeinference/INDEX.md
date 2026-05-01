@@ -56,11 +56,11 @@ Outside this folder:
 - Task tracking: See epic-001-typechecker tasks
 - Test runner: `cargo test --test typeinference_tests`
 
-## 📊 Current Status
+## 💯 Key Documents
 
-**Phase 1**: ✅ Complete (Type Variables)
-**Phase 2**: → Next (InferType enum)
-**Phases 3-8**: Planned
+**CONCEPTS.md**: Deep theoretical understanding of type inference
+**ROADMAP.md**: Complete implementation specification
+**GUIDE.md**: Step-by-step implementation workflow
 
 ---
 

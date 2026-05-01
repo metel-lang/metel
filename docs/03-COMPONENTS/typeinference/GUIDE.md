@@ -1,293 +1,305 @@
 # Type Inference Implementation Guide
 
-## Fresh Start
+## Overview
 
-You've chosen to build the type inference system step-by-step with tests. This is the right approach—it ensures you understand each piece deeply.
+This guide provides the step-by-step workflow for implementing Yolang's type inference system incrementally through 8 phases.
 
----
+## Implementation Workflow
 
-## 🚀 Quick Start
+### General Approach
 
-### 1. Understand the Full Picture
+Each phase follows the same pattern:
+
+1. **Read the specification** in ROADMAP.md for the phase
+2. **Examine test structure** in `tests/typeinference_tests.rs`
+3. **Implement in source** in `src/typeinference/mod.rs`
+4. **Write test assertions** replacing `todo!()` placeholders
+5. **Run and verify tests** until all pass
+6. **Move to next phase**
+
+### Phase Implementation Template
+
 ```bash
-# Read README.md (you are here)
-# Then read ROADMAP.md (5-10 min)
-```
-
-### 2. Check Phase 1 Tests Pass
-```bash
-cd tree-walk-interpreter
-cargo test --test typeinference_tests phase_1
-```
-
-Expected output:
-```
-test phase_1_type_variables::test_type_var_creation ... ok
-test phase_1_type_variables::test_type_var_display ... ok
-test phase_1_type_variables::test_type_var_generator_fresh ... ok
-test phase_1_type_variables::test_type_var_generator_counter ... ok
-test phase_1_type_variables::test_type_var_ordering ... ok
-test phase_1_type_variables::test_type_var_hashable ... ok
-
-test result: ok. 6 passed
-```
-
-### 3. Start Phase 2
-Open [ROADMAP.md](./ROADMAP.md) and follow Phase 2 section.
-
----
-
-## 📝 Implementation Workflow for Each Phase
-
-### Template: How to Do a Phase
-
-**1. Read the roadmap**
-```
+# 1. Read the roadmap
 → Open ROADMAP.md
-→ Find "Phase N: ___"
-→ Read "What", "Definition", "Tasks"
-```
+→ Find "Phase N: ___"  
+→ Read "What", "Definition", "Tasks", "Test Cases"
 
-**2. Examine test stubs**
-```
+# 2. Examine test stubs
 → Open tests/typeinference_tests.rs
 → Go to phase_N_xxx section
 → Look at test names and comments
+
+# 3. Implement in source
+→ Open src/typeinference/mod.rs
+→ Add your structs, enums, functions
+→ Implement Display, Debug as needed
+
+# 4. Write test assertions
+→ Replace todo!() with actual test code
+→ Follow test case specifications from roadmap
+
+# 5. Run tests
+→ cargo test --test typeinference_tests phase_N
+
+# 6. Debug and fix
+→ Read error messages carefully
+→ Use --nocapture for debugging output
+→ Add println!() statements if needed
+
+# 7. Verify completion
+→ All tests for the phase pass
+→ Move to next phase
 ```
 
-**3. Implement in src/typeinference/mod.rs**
-```rust
-// Add your code here
-pub struct MyNewType { ... }
-impl Display for MyNewType { ... }
-```
+## Test Structure and Usage
 
-**4. Implement test assertions**
-```rust
-// Replace todo!() with actual test code
-#[test]
-fn test_something() {
-    let result = my_function();
-    assert_eq!(result, expected);
-}
-```
-
-**5. Run tests**
-```bash
-cargo test --test typeinference_tests phase_N
-```
-
-**6. Fix any failures**
-- Debug implementation
-- Update test if needed
-- Re-run tests
-
-**7. Celebrate** ✅
-Move to next phase
-
----
-
-## 🧪 Test Structure
+### Test Organization
 
 All tests are in `tests/typeinference_tests.rs` organized by phase:
 
 ```rust
 #[cfg(test)]
-mod phase_1_type_variables { ... }   // ✅ Complete
+mod phase_1_type_variables {
+    // Phase 1 tests here
+}
 
 #[cfg(test)]
-mod phase_2_infer_types { ... }       // Next: Add your impl here
+mod phase_2_infer_types {
+    // Phase 2 tests here
+}
 
-#[cfg(test)]
-mod phase_3_unification { ... }
-
-#[cfg(test)]
-mod phase_4_substitution { ... }
-
-#[cfg(test)]
-mod phase_5_constraints { ... }
-
-#[cfg(test)]
-mod phase_6_type_schemes { ... }
-
-#[cfg(test)]
-mod phase_7_inference_context { ... }
-
-#[cfg(test)]
-mod phase_8_integration { ... }
+// ... etc for all 8 phases
 ```
 
 ### Running Tests
 
-**All tests**:
+**All tests:**
 ```bash
 cargo test --test typeinference_tests
 ```
 
-**Specific phase**:
+**Specific phase:**
 ```bash
 cargo test --test typeinference_tests phase_2
 ```
 
-**Specific test**:
+**Specific test:**
 ```bash
-cargo test --test typeinference_tests phase_2::test_infer_type_concrete
+cargo test --test typeinference_tests test_type_var_creation
 ```
 
-**With output**:
+**With debug output:**
 ```bash
 cargo test --test typeinference_tests phase_2 -- --nocapture
 ```
 
----
+### Test Development Pattern
 
-## 🔗 The 8 Phases at a Glance
+Tests are pre-structured with placeholders:
 
-| Phase | What | Key Type | Lines of Code |
-|-------|------|----------|---------------|
-| 1 | Type variables | `TypeVar` | ~50 |
-| 2 | Inference types | `InferType` | ~100 |
-| 3 | Unification | `unify()` fn | ~150 |
-| 4 | Substitution | `Substitution` | ~100 |
-| 5 | Constraints | `Constraint` | ~80 |
-| 6 | Type schemes | `TypeScheme` | ~150 |
-| 7 | Context | `InferContext` | ~200 |
-| 8 | Integration | expression walk | ~300 |
+```rust
+#[test]
+fn test_something() {
+    todo!("Implement this test")
+}
+```
 
-**Total**: ~1,130 lines of implementation + tests
+Replace `todo!()` with actual assertions:
 
----
+```rust
+#[test]
+fn test_something() {
+    let result = my_function();
+    assert_eq!(result, expected);
+    
+    // More specific assertions
+    assert!(condition);
+    assert_eq!(actual, expected);
+    assert_ne!(actual, unexpected);
+}
+```
 
-## 🎯 Success Criteria
+## Implementation Guidelines
 
-After completing each phase, you should be able to answer:
+### Code Structure
 
-**Phase 1**: 
-- How do you generate fresh type variables?
-- Why do type variables need unique IDs?
+All implementation goes in `src/typeinference/mod.rs`:
 
-**Phase 2**:
-- What's the difference between `Type` (concrete) and `InferType` (with variables)?
-- Why do you need both?
+```rust
+// Phase 1: Type Variables
+pub struct TypeVar(u32);
+pub struct TypeVarGenerator { /* ... */ }
 
-**Phase 3**:
-- How does unification work at a high level?
-- What's the occurs check and why does it matter?
+// Phase 2: Inference Types  
+pub enum InferType { /* ... */ }
 
-**Phase 4**:
-- What's a substitution and when do you apply it?
-- How do you compose two substitutions?
+// Phase 3: Unification
+pub fn unify(ty1: &InferType, ty2: &InferType) -> Result<Substitution, String> {
+    // Implementation
+}
 
-**Phase 5**:
-- What's a constraint and why collect them separately?
-- How do you solve multiple constraints together?
+// ... etc for all phases
+```
 
-**Phase 6**:
-- What's generalization and when does it happen?
-- What's instantiation and when does it happen?
+### Error Handling
 
-**Phase 7**:
-- What state does the inference context maintain?
-- How do monomorphic and polymorphic environments differ?
+Use `Result` types for operations that can fail:
 
-**Phase 8**:
-- How does the expression walker generate constraints?
-- How does constraint solving produce a typed AST?
+```rust
+pub fn unify(ty1: &InferType, ty2: &InferType) -> Result<Substitution, String> {
+    match (ty1, ty2) {
+        (InferType::Concrete(a), InferType::Concrete(b)) if a == b => {
+            Ok(Substitution::empty())
+        }
+        (InferType::Concrete(a), InferType::Concrete(b)) => {
+            Err(format!("Cannot unify {} with {}", a, b))
+        }
+        // ... other cases
+    }
+}
+```
 
----
+### Display Implementation
 
-## 💡 Tips for Understanding
+Implement readable `Display` for debugging:
 
-### When You Feel Lost
-1. Re-read the "What" section in ROADMAP.md
-2. Look at the examples in the roadmap
-3. Study the test cases—they show expected behavior
-4. Run tests with `--nocapture` to see error messages
+```rust
+impl std::fmt::Display for InferType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InferType::Concrete(ty) => write!(f, "{}", ty),
+            InferType::Var(var) => write!(f, "{}", var),
+            InferType::Fun(params, ret) => {
+                write!(f, "fun(")?;
+                for (i, param) in params.iter().enumerate() {
+                    if i > 0 { write!(f, ", ")?; }
+                    write!(f, "{}", param)?;
+                }
+                write!(f, ") -> {}", ret)
+            }
+            // ... other variants
+        }
+    }
+}
+```
+
+## Debugging Strategies
 
 ### When Tests Fail
-1. Read the error message carefully
-2. Check if your implementation matches the test's expectations
-3. Add `println!()` statements to debug
-4. Run a single test to focus: `cargo test phase_2::test_x -- --nocapture`
 
-### When You Have Questions
-- Look for "Key Concept" sections in ROADMAP.md
-- Check CONCEPTS.md for deep explanation of concepts
-- Read test comments—they often explain the intent
+1. **Read error messages carefully** - they often point to the exact issue
+2. **Run single test** to focus: `cargo test test_name -- --nocapture`  
+3. **Add debug output** with `println!` statements
+4. **Check test expectations** - ensure your implementation matches the test's assumptions
 
-### Building Intuition
-After each phase, think about:
-- **What problem does this solve?** (e.g., Phase 3 unification solves "how do I determine if ?t0 must be Int?")
-- **When would you use it?** (e.g., Substitution is applied after unification determines bindings)
-- **How does it connect to previous phases?**
+### Common Issues
 
----
+**Compilation errors:**
+- Missing imports (`use` statements)
+- Type mismatches
+- Missing trait implementations
 
-## 📚 Reference Documents
+**Logic errors:**
+- Incorrect algorithm implementation
+- Wrong test assertions
+- Edge cases not handled
 
-### In This Folder
-- **README.md** - Overview and navigation
-- **SETUP.md** - Current status and quick reference
-- **GUIDE.md** - This file (implementation workflow)
-- **ROADMAP.md** - Complete phase-by-phase specification
-- **CONCEPTS.md** - Deep dives (type schemes, etc.)
+**Test failures:**
+- Implementation doesn't match specification
+- Display format differences
+- Incorrect error handling
 
-### In Project
-- **src/typeinference/mod.rs** - Your implementation file
-- **src/lib.rs** - Module exports for tests
-- **tests/typeinference_tests.rs** - Test structure and stubs
-- **src/types/mod.rs** - The concrete `Type` enum (for reference)
-- **src/error/mod.rs** - The `YolangError` type (for error handling)
+### Debugging Example
 
----
+```rust
+#[test]
+fn test_unify_concrete_types() {
+    let ty1 = InferType::Concrete(Type::Int);
+    let ty2 = InferType::Concrete(Type::Int);
+    
+    println!("Unifying: {} with {}", ty1, ty2);
+    let result = unify(&ty1, &ty2);
+    println!("Result: {:?}", result);
+    
+    assert!(result.is_ok());
+}
+```
 
-## 🐛 Debugging Checklist
+## Phase-Specific Notes
 
-- [ ] Does the code compile? (`cargo build`)
-- [ ] Do the tests compile? (`cargo test --test typeinference_tests --no-run`)
-- [ ] Does one test pass? (Pick the simplest test)
-- [ ] Do all tests for this phase pass?
-- [ ] Does the next phase compile?
+### Phase 1: Type Variables
+- Focus on the newtype pattern and generator
+- Ensure Display format matches exactly: `?t0`, `?t1`, etc.
+- Implement Hash and Ord for use in collections
 
----
+### Phase 2: Inference Types
+- Start with simple variants, add complexity gradually
+- Helper constructors make tests easier to write
+- Display format should be readable and consistent
 
-## 🎓 Learning Outcomes
+### Phase 3: Unification
+- The core algorithm - take time to understand it
+- Occurs check is crucial for correctness
+- Handle all type variant combinations
 
-After completing this, you will understand:
+### Phase 4: Substitution
+- Apply substitutions recursively through type structure
+- Composition is key for combining multiple substitutions
+- Test transitive substitution carefully
 
-✅ How type inference works at each step  
-✅ The relationship between unification, substitution, and constraints  
-✅ How type variables represent unknowns  
-✅ How polymorphic types enable code reuse  
-✅ The Hindley-Milner algorithm basics  
-✅ How to test type system code  
+### Phase 5: Constraints
+- Collection pattern: generate constraints, then solve
+- Span information enables good error messages
+- Batch solving handles interdependencies
 
----
+### Phase 6: Type Schemes
+- Generalization identifies quantified variables
+- Instantiation creates fresh variables each time
+- Free variable analysis is the tricky part
 
-## 🚦 Current Status
+### Phase 7: Inference Context
+- State management for the entire inference process
+- Two environments: monomorphic and polymorphic
+- Automatic instantiation on lookup
 
-**Completed**:
-- ✅ Phase 1: Type Variables (6 tests passing)
+### Phase 8: Integration
+- Connect inference to AST walking
+- Generate constraints from expressions
+- Produce typed AST from results
 
-**Ready to start**:
-- ⏳ Phase 2: InferType enum
+## Success Criteria
 
-**Next**:
-- ⏳ Phase 3-8: Unification → Integration
+After each phase, you should be able to:
 
----
+- **Explain the concept** in your own words
+- **Run all tests** successfully for that phase  
+- **Understand the code** you've written
+- **See how it connects** to previous phases
 
-## What to Do Now
+Complete understanding is more important than speed. Take time to internalize each concept before moving forward.
 
-1. **Read** [ROADMAP.md](./ROADMAP.md) completely (understand all 8 phases)
-2. **Look at** the Phase 2 test stubs in `tests/typeinference_tests.rs`
-3. **Implement** Phase 2 in `src/typeinference/mod.rs`
-4. **Run** `cargo test --test typeinference_tests phase_2`
-5. **Verify** all tests pass
-6. **Repeat** for Phases 3-8
+## File Organization
 
-**Time estimate**: 1 week for thorough understanding, 2-3 days for implementation
+```
+tree-walk-interpreter/
+├── src/
+│   ├── typeinference/
+│   │   └── mod.rs           ← Your implementation
+│   └── lib.rs               ← Exports for tests
+└── tests/
+    └── typeinference_tests.rs   ← Test structure
+```
 
----
+All implementation goes in `mod.rs`. Tests import from there via `lib.rs`.
 
-**Good luck! You've got a solid plan. Let's build this properly.** 🚀
+## Integration Points
+
+The inference system connects to:
+
+- **AST** (`src/ast/mod.rs`) - source of expressions to infer
+- **Types** (`src/types/mod.rs`) - concrete type definitions  
+- **Typechecker** (`src/typechecker/mod.rs`) - final integration point
+- **Error** (`src/error/mod.rs`) - error reporting with source locations
+
+Phase 8 brings these together into a working type checker.
