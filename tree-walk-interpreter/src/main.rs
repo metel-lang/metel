@@ -49,13 +49,15 @@ fn run(source: &str, filename: &str, debug_ast: bool) -> Result<(), YolangError>
     // 1. Parse source → untyped AST
     let ast = parser::parse(source, filename)?;
 
+    if debug_ast {
+        println!("{:#?}", ast);
+        return Ok(());
+    }
+
     // 2. Type check → typed AST
     let typed_ast = typechecker::check(ast)?;
 
-    if debug_ast {
-        println!("{:#?}", typed_ast);
-        return Ok(());
-    }
+    
 
     // 3. Evaluate
     evaluator::evaluate(typed_ast)?;
