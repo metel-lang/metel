@@ -12,7 +12,7 @@ Source files use the `.yolo` extension.
 
 Yolang is a strongly typed, compiled language with a Rust-inspired type system. Its core design principles are:
 
-- **Strong static typing** with local type inference
+- **Strong static typing** with full Hindley-Milner type inference
 - **No classes** — data and behaviour are defined separately via structs, enums, and traits
 - **Algebraic data types** — enums with data-carrying variants and exhaustive pattern matching
 - **Explicit nullability** — absence of a value is represented by `Perhaps<T>` / `nope`, never by null
@@ -119,15 +119,19 @@ The unit type `()` is only written explicitly when needed as a type parameter (e
 
 ### 3.2 Type inference
 
-Types are inferred for local variable bindings. Type annotations are required at:
-- Function parameters and return types
+Types are inferred using the Hindley-Milner algorithm with let-polymorphism. Annotations are optional for all bindings, including function parameters and return types. They may be written explicitly for documentation or to restrict a binding to a less general type.
+
+Annotations are required only where there is no expression to infer from:
 - Struct and enum field types
 - Trait method signatures
 
 ```yolo
 let x = 42;           // inferred: Int
 let name = "Vlad";    // inferred: String
-let y: Float = 3.14;  // explicit annotation
+let y: Float = 3.14;  // explicit annotation (optional here)
+
+fun add(a: Int, b: Int) -> Int { a + b }   // annotated
+fun add(a, b) { a + b }                    // also valid; inferred from use
 ```
 
 ### 3.3 Tuples
@@ -248,7 +252,7 @@ fun add(a: Int, b: Int) -> Int {
 }
 ```
 
-Parameters always require type annotations. The return type follows `->`. If omitted, the function returns `()`. `return expr;` and bare `return;` are both valid.
+Parameter type annotations are optional when types can be inferred from context. The return type follows `->` and is also optional — a function with no return annotation and no `return expr;` returns `()`. `return expr;` and bare `return;` are both valid.
 
 ### 5.1 Associated functions
 
@@ -680,7 +684,7 @@ TraitDeclaration   → "trait" IDENTIFIER "{" TraitMethod* "}"
 TraitMethod        → "fun" IDENTIFIER "(" Params? ")" ( "->" Type )? ( Block | ";" )
 
 Params             → Param ( "," Param )*
-Param              → ( "mut" )? "self" | IDENTIFIER ":" Type
+Param              → ( "mut" )? "self" | IDENTIFIER ( ":" Type )?
 StructFields       → StructField ( "," StructField )* ","?
 StructField        → IDENTIFIER ":" Type
 EnumVariants       → EnumVariant ( "," EnumVariant )* ","?

@@ -334,6 +334,68 @@ let poly_id = fun(g) { g(g) };  // Would need ∀α. (∀β. β → β) → α �
 - Dependent types (types depending on values)
 - Effect systems (tracking side effects in types)
 
+### Arbitrary-Rank Types (Not Planned)
+
+> **Status**: Not planned for implementation. Documented here for reference.
+
+#### What rank means
+
+The *rank* of a type describes how deeply `∀` quantifiers can appear inside function argument types.
+
+- **Rank-0**: Monotype — no quantifiers at all. `Int`, `fun(Int) -> String`.
+- **Rank-1** (HM): `∀` only at the outermost level. `∀α. α → α`. When a rank-1 polymorphic function is passed as an argument, the caller first instantiates it to a monotype — the callee never sees the `∀`.
+- **Rank-2**: `∀` may appear once inside a function argument type. The callee, not the caller, chooses the type.
+- **Rank-N / arbitrary rank**: `∀` can appear at any depth.
+
+```
+-- Rank-1 (HM): id is instantiated before being passed
+applyInt : (Int -> Int) -> Int -> Int
+
+-- Rank-2: argument must be polymorphic; callee picks α
+applyToAny : (∀α. α → α) → (Int, Bool)
+
+-- Rank-3: the argument takes a rank-2 argument
+applyHigher : ((∀α. α → α) → Int) → Int
+```
+
+#### Why HM cannot handle rank-2
+
+In Algorithm W, every function argument is unified as a **monotype**. When the inferencer sees a call site it does not know, from the argument alone, whether the callee expects a polymorphic function — that information would have to flow backwards against the direction of inference. For rank ≥ 2, pure bottom-up inference is insufficient.
+
+Full System F (arbitrary-rank) type inference is **undecidable** (Girard 1972, Reynolds 1974).
+
+#### What rank-2 inference requires
+
+Rank-2 inference is decidable, but requires several additions beyond HM:
+
+1. **Richer type representation** — `Fun` argument types must be able to hold polytypes (`∀α. τ`), not just monotypes. In the current `Type` enum, `Fun(Vec<Type>, Box<Type>)` only holds monotypes; argument positions would need a `PolyType` wrapper.
+
+2. **Skolem (rigid) type variables** — When checking an expression against `∀α. τ`, the variable `α` is replaced by a fresh *skolem constant* that cannot be unified with anything. If a skolem variable escapes its lexical scope during unification, it is a type error.
+
+3. **Bidirectional type checking** — Pure bottom-up inference is replaced by two modes:
+   - `infer(env, expr) → Type`: synthesize a type with no expected type (equivalent to Algorithm W)
+   - `check(env, expr, expected)`: verify an expression has a specific expected type, enabling deep skolemization
+
+4. **Subsumption instead of plain unification** — At argument positions, Robinson unification is replaced by a *subsumption check*: `σ₁ ≼ σ₂` meaning "σ₁ is at least as polymorphic as σ₂". `∀α. α → α` subsumes `Int → Int`; the reverse does not hold.
+
+5. **Mandatory annotations at rank-2 sites** — The inferencer cannot discover that an argument should be polymorphic without a hint. Rank-2 argument types must be annotated explicitly by the programmer.
+
+#### Implementation impact
+
+The following changes would be needed if rank-2 were ever pursued:
+
+| Component | Current state | Change required |
+|---|---|---|
+| `types/mod.rs` | `Fun(Vec<Type>, Box<Type>)` — monotypes only | `Fun(Vec<ArgType>, Box<Type>)` where `ArgType` may be a polytype |
+| `typeinference/mod.rs` | `TypeVar` (flexible only) | Add `SkolemVar` (rigid, non-unifiable) with scope escape checking |
+| Inference algorithm | Planned as Algorithm W | Extend with bidirectional `check` mode alongside `infer` |
+| Unification | Planned as Robinson unification | Add `subsumes` entry point for argument positions |
+| Parser / AST | No higher-rank annotation syntax | Syntax and AST nodes for rank-2 argument annotations |
+
+The bidirectional extension is additive: `infer` mode is Algorithm W, and `check` mode is layered on top. A system designed with the `ArgType` alias in place would limit the refactor surface when upgrading.
+
+The reference algorithm is Peyton Jones et al., *Practical Type Inference for Arbitrary-Rank Types* (JFP 2007), which is the basis for GHC's `RankNTypes` extension.
+
 ## Error Handling
 
 Type errors in Hindley-Milner systems typically arise from:

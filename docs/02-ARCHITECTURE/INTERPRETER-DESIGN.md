@@ -152,7 +152,7 @@ Generics exist only in the type checker as `TypeVar(u32)` unification variables.
 
 Responsibilities:
 1. **Name resolution** — resolve all identifiers to their declarations
-2. **Type inference** — infer types for `let`/`mut` bindings using Hindley-Milner-style unification (local only; function boundaries are always explicitly annotated)
+2. **Type inference** — infer types for all bindings using Hindley-Milner inference with let-polymorphism; annotations are permitted everywhere but required nowhere (except struct/enum fields and trait method signatures)
 3. **Type checking** — verify every expression is used consistently with its type
 4. **Trait checking** — verify that trait bounds on generic parameters are satisfied at every call site
 5. **Monomorphisation** — for each generic function/type instantiation, produce a concrete specialisation and record it in a monomorphisation table
