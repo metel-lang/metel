@@ -29,7 +29,7 @@ inference before a final `Type` is known.
 `Substitution` struct (`HashMap<TypeVar, InferType>`) with `bind`, `lookup`,
 `apply` (recursive replacement), and `compose`.
 
-### Phase 4 — Unification
+### Phase 4 — Unification ✓
 Core algorithm: given two `InferType`s, produce a `Substitution` that makes them
 equal, or error. Includes occurs check to prevent infinite types.
 
@@ -70,13 +70,13 @@ constraints, solve, and produce a `TypedProgram`.
 - [x] `compose(other) -> Substitution`
 - [x] `phase_3_substitution` tests pass
 
-### Phase 4 — Unification
-- [ ] `unify(a: &InferType, b: &InferType) -> Result<Substitution, YolangError>`
-- [ ] Concrete types must be identical to unify
-- [ ] Variable binds to any type (occurs check first)
-- [ ] Function, tuple, array, named types unify component-wise
-- [ ] Occurs check prevents `?t0 = Array(?t0)`
-- [ ] `phase_4_unification` tests pass
+### Phase 4 — Unification ✓
+- [x] `unify(a: &InferType, b: &InferType) -> Result<Substitution, YolangError>`
+- [x] Concrete types must be identical to unify
+- [x] Variable binds to any type (occurs check first)
+- [x] Function, tuple, array, named types unify component-wise
+- [x] Occurs check prevents `?t0 = Array(?t0)`
+- [x] `phase_4_unification` tests pass
 
 ### Phase 5 — Constraints
 - [ ] `Constraint { lhs: InferType, rhs: InferType, span: Span }`

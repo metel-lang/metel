@@ -296,10 +296,175 @@ mod phase_3_substitution {
     }
 }
 
-// Placeholder for Phase 4 tests
 #[cfg(test)]
 mod phase_4_unification {
-    // TODO: Add unification tests here
+    use yolang::typeinference::{unify, InferType, TypeVar};
+
+    #[test]
+    fn test_unify_identical_concrete() {
+        let s = unify(&InferType::int(), &InferType::int()).unwrap();
+        assert_eq!(s.apply(&InferType::int()), InferType::int());
+    }
+
+    #[test]
+    fn test_unify_incompatible_concrete() {
+        assert!(unify(&InferType::int(), &InferType::bool()).is_err());
+        assert!(unify(&InferType::str(), &InferType::float()).is_err());
+    }
+
+    #[test]
+    fn test_unify_var_with_concrete() {
+        let s = unify(&InferType::var(TypeVar(0)), &InferType::int()).unwrap();
+        assert_eq!(s.apply(&InferType::var(TypeVar(0))), InferType::int());
+    }
+
+    #[test]
+    fn test_unify_concrete_with_var() {
+        let s = unify(&InferType::bool(), &InferType::var(TypeVar(1))).unwrap();
+        assert_eq!(s.apply(&InferType::var(TypeVar(1))), InferType::bool());
+    }
+
+    #[test]
+    fn test_unify_var_with_var() {
+        let s = unify(&InferType::var(TypeVar(0)), &InferType::var(TypeVar(1))).unwrap();
+        // One of them should resolve to the other
+        let result = s.apply(&InferType::var(TypeVar(0)));
+        let other = s.apply(&InferType::var(TypeVar(1)));
+        assert_eq!(result, other);
+    }
+
+    #[test]
+    fn test_unify_var_with_itself() {
+        let s = unify(&InferType::var(TypeVar(0)), &InferType::var(TypeVar(0))).unwrap();
+        // Empty substitution — no binding needed
+        assert_eq!(s.apply(&InferType::var(TypeVar(0))), InferType::var(TypeVar(0)));
+    }
+
+    #[test]
+    fn test_unify_function_types() {
+        // fun(?t0) -> ?t0  with  fun(Int) -> Int  => ?t0 = Int
+        let a = InferType::Fun(
+            vec![InferType::var(TypeVar(0))],
+            Box::new(InferType::var(TypeVar(0))),
+        );
+        let b = InferType::Fun(vec![InferType::int()], Box::new(InferType::int()));
+        let s = unify(&a, &b).unwrap();
+        assert_eq!(s.apply(&InferType::var(TypeVar(0))), InferType::int());
+    }
+
+    #[test]
+    fn test_unify_function_arity_mismatch() {
+        let a = InferType::Fun(vec![InferType::int()], Box::new(InferType::bool()));
+        let b = InferType::Fun(
+            vec![InferType::int(), InferType::int()],
+            Box::new(InferType::bool()),
+        );
+        assert!(unify(&a, &b).is_err());
+    }
+
+    #[test]
+    fn test_unify_function_return_type() {
+        // fun(Int) -> ?t0  with  fun(Int) -> Bool  => ?t0 = Bool
+        let a = InferType::Fun(vec![InferType::int()], Box::new(InferType::var(TypeVar(0))));
+        let b = InferType::Fun(vec![InferType::int()], Box::new(InferType::bool()));
+        let s = unify(&a, &b).unwrap();
+        assert_eq!(s.apply(&InferType::var(TypeVar(0))), InferType::bool());
+    }
+
+    #[test]
+    fn test_unify_array_types() {
+        // ?t0[]  with  Int[]  => ?t0 = Int
+        let a = InferType::Array(Box::new(InferType::var(TypeVar(0))));
+        let b = InferType::Array(Box::new(InferType::int()));
+        let s = unify(&a, &b).unwrap();
+        assert_eq!(s.apply(&InferType::var(TypeVar(0))), InferType::int());
+    }
+
+    #[test]
+    fn test_unify_array_element_mismatch() {
+        let a = InferType::Array(Box::new(InferType::int()));
+        let b = InferType::Array(Box::new(InferType::bool()));
+        assert!(unify(&a, &b).is_err());
+    }
+
+    #[test]
+    fn test_unify_tuple_types() {
+        // (?t0, Bool)  with  (Int, Bool)  => ?t0 = Int
+        let a = InferType::Tuple(vec![InferType::var(TypeVar(0)), InferType::bool()]);
+        let b = InferType::Tuple(vec![InferType::int(), InferType::bool()]);
+        let s = unify(&a, &b).unwrap();
+        assert_eq!(s.apply(&InferType::var(TypeVar(0))), InferType::int());
+    }
+
+    #[test]
+    fn test_unify_tuple_length_mismatch() {
+        let a = InferType::Tuple(vec![InferType::int()]);
+        let b = InferType::Tuple(vec![InferType::int(), InferType::bool()]);
+        assert!(unify(&a, &b).is_err());
+    }
+
+    #[test]
+    fn test_unify_named_types() {
+        // List<?t0>  with  List<Int>  => ?t0 = Int
+        let a = InferType::Named("List".to_string(), vec![InferType::var(TypeVar(0))]);
+        let b = InferType::Named("List".to_string(), vec![InferType::int()]);
+        let s = unify(&a, &b).unwrap();
+        assert_eq!(s.apply(&InferType::var(TypeVar(0))), InferType::int());
+    }
+
+    #[test]
+    fn test_unify_named_type_name_mismatch() {
+        let a = InferType::Named("List".to_string(), vec![InferType::int()]);
+        let b = InferType::Named("Set".to_string(), vec![InferType::int()]);
+        assert!(unify(&a, &b).is_err());
+    }
+
+    #[test]
+    fn test_unify_incompatible_shapes() {
+        // Fun vs Array
+        let a = InferType::Fun(vec![InferType::int()], Box::new(InferType::bool()));
+        let b = InferType::Array(Box::new(InferType::int()));
+        assert!(unify(&a, &b).is_err());
+
+        // Tuple vs Concrete
+        assert!(unify(
+            &InferType::Tuple(vec![InferType::int()]),
+            &InferType::int()
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn test_occurs_check_array() {
+        // ?t0 = ?t0[]  — should fail
+        let a = InferType::var(TypeVar(0));
+        let b = InferType::Array(Box::new(InferType::var(TypeVar(0))));
+        assert!(unify(&a, &b).is_err());
+    }
+
+    #[test]
+    fn test_occurs_check_function() {
+        // ?t0 = fun(?t0) -> Int  — should fail
+        let a = InferType::var(TypeVar(0));
+        let b = InferType::Fun(vec![InferType::var(TypeVar(0))], Box::new(InferType::int()));
+        assert!(unify(&a, &b).is_err());
+    }
+
+    #[test]
+    fn test_unify_multi_var_function() {
+        // fun(?t0, ?t1) -> ?t0  with  fun(Int, Bool) -> Int  => ?t0=Int, ?t1=Bool
+        let a = InferType::Fun(
+            vec![InferType::var(TypeVar(0)), InferType::var(TypeVar(1))],
+            Box::new(InferType::var(TypeVar(0))),
+        );
+        let b = InferType::Fun(
+            vec![InferType::int(), InferType::bool()],
+            Box::new(InferType::int()),
+        );
+        let s = unify(&a, &b).unwrap();
+        assert_eq!(s.apply(&InferType::var(TypeVar(0))), InferType::int());
+        assert_eq!(s.apply(&InferType::var(TypeVar(1))), InferType::bool());
+    }
 }
 
 // Placeholder for Phase 5 tests

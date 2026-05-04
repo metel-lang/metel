@@ -185,3 +185,92 @@ impl Substitution {
         result
     }
 }
+
+// ── Phase 4: Unification ──────────────────────────────────────────────────────
+
+/// Returns true if `var` appears anywhere inside `ty`.
+/// Used by the occurs check to prevent infinite types like `?t0 = Array<?t0>`.
+fn occurs_in(var: TypeVar, ty: &InferType) -> bool {
+    match ty {
+        InferType::Concrete(_) => false,
+        InferType::Var(v) => *v == var,
+        InferType::Fun(params, ret) => {
+            params.iter().any(|p| occurs_in(var, p)) || occurs_in(var, ret)
+        }
+        InferType::Tuple(ts) => ts.iter().any(|t| occurs_in(var, t)),
+        InferType::Array(t) => occurs_in(var, t),
+        InferType::Named(_, args) => args.iter().any(|a| occurs_in(var, a)),
+    }
+}
+
+/// Bind `var` to `ty`, failing if the occurs check would create an infinite type.
+fn bind_var(var: TypeVar, ty: &InferType) -> Result<Substitution, YolangError> {
+    if let InferType::Var(v) = ty {
+        if *v == var {
+            return Ok(Substitution::new());
+        }
+    }
+    if occurs_in(var, ty) {
+        return Err(YolangError::internal(format!(
+            "occurs check failed: {} occurs in {}",
+            var, ty
+        )));
+    }
+    let mut s = Substitution::new();
+    s.bind(var, ty.clone());
+    Ok(s)
+}
+
+/// Unify two inference types, returning a substitution that makes them equal.
+///
+/// Returns an error if the types are structurally incompatible or if the occurs
+/// check detects an infinite type.
+pub fn unify(a: &InferType, b: &InferType) -> Result<Substitution, YolangError> {
+    match (a, b) {
+        (InferType::Concrete(t1), InferType::Concrete(t2)) => {
+            if t1 == t2 {
+                Ok(Substitution::new())
+            } else {
+                Err(YolangError::internal(format!("cannot unify {} with {}", a, b)))
+            }
+        }
+        (InferType::Var(v), _) => bind_var(*v, b),
+        (_, InferType::Var(v)) => bind_var(*v, a),
+        (InferType::Fun(params1, ret1), InferType::Fun(params2, ret2)) => {
+            if params1.len() != params2.len() {
+                return Err(YolangError::internal(format!("cannot unify {} with {}", a, b)));
+            }
+            let mut subst = Substitution::new();
+            for (p1, p2) in params1.iter().zip(params2.iter()) {
+                let s = unify(&subst.apply(p1), &subst.apply(p2))?;
+                subst = subst.compose(&s);
+            }
+            let s = unify(&subst.apply(ret1), &subst.apply(ret2))?;
+            Ok(subst.compose(&s))
+        }
+        (InferType::Tuple(ts1), InferType::Tuple(ts2)) => {
+            if ts1.len() != ts2.len() {
+                return Err(YolangError::internal(format!("cannot unify {} with {}", a, b)));
+            }
+            let mut subst = Substitution::new();
+            for (t1, t2) in ts1.iter().zip(ts2.iter()) {
+                let s = unify(&subst.apply(t1), &subst.apply(t2))?;
+                subst = subst.compose(&s);
+            }
+            Ok(subst)
+        }
+        (InferType::Array(t1), InferType::Array(t2)) => unify(t1, t2),
+        (InferType::Named(n1, args1), InferType::Named(n2, args2)) => {
+            if n1 != n2 || args1.len() != args2.len() {
+                return Err(YolangError::internal(format!("cannot unify {} with {}", a, b)));
+            }
+            let mut subst = Substitution::new();
+            for (a1, a2) in args1.iter().zip(args2.iter()) {
+                let s = unify(&subst.apply(a1), &subst.apply(a2))?;
+                subst = subst.compose(&s);
+            }
+            Ok(subst)
+        }
+        _ => Err(YolangError::internal(format!("cannot unify {} with {}", a, b))),
+    }
+}
