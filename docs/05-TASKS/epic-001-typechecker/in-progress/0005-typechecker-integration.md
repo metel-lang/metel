@@ -145,10 +145,40 @@ silently producing wrong types.
 
 ## Testing
 
-Tests are `.yolo` source files in `tests/test_programs/` run through the full
-`parse() → check()` pipeline. Each file is named after its stage and what it
-tests. Negative tests (expected type errors) use a `// ERROR` comment convention
-to be defined when the test harness is set up.
+### Test programs
+
+`.yolo` source files live in `tests/test_programs/inference/` and are run through
+the full `parse() → check()` pipeline. Ten programs already exist covering the
+scenarios for Stage 1:
+
+| File | Scenario |
+|---|---|
+| `01_literals.yolo` | Each primitive literal infers its concrete type |
+| `02_annotations.yolo` | Explicit annotations unified with inferred value type |
+| `03_arithmetic.yolo` | BinOp and UnaryOp constraints, comparisons produce `Bool` |
+| `04_functions.yolo` | Function declarations, body vs return type, call sites |
+| `05_nested_calls.yolo` | Type propagation through chained function calls |
+| `06_let_polymorphism.yolo` | Unannotated param → generalized scheme → independent instantiations |
+| `07_forward_reference.yolo` | Pre-pass allows calling a function declared later in the file |
+| `08_mut_bindings.yolo` | `mut` infers identically to `let` |
+| `09_chained_arithmetic.yolo` | Transitive constraint resolution through nested expressions |
+| `10_scoping.yolo` | Parameter scopes isolated between functions |
+
+### Test harness
+
+`tests/typeinference_tests.rs` contains a `programs_tests` module with one test
+per `.yolo` file. The `load_and_check` helper reads the file, parses it, and calls
+`check()`. Each test currently asserts `check()` returns `Ok` (parse is verified
+as a side-effect). Each test has a `// TODO` block documenting which inferred
+types to assert once `check()` is implemented.
+
+Run the program tests with:
+```bash
+cargo test --test typeinference_tests programs_tests
+```
+
+Negative tests (expected type errors) use a `// ERROR` comment convention to be
+defined when the test harness is extended for Stage 1.
 
 ## Open Questions
 
