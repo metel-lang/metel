@@ -215,6 +215,24 @@ fun largest<T>(a: T, b: T) -> T where T: Comparable { ... }
 fun largest<T: Comparable>(a: T, b: T) -> T { ... }  // inline form
 ```
 
+### 3.7 The Never type (`!`)
+
+`!` (Never) is the bottom type — the type of an expression that never produces a value because it diverges (runs forever, panics, or exits). A `loop` with no reachable `break` has type `!`:
+
+```yolo
+let x: ! = loop { };         // runs forever — type is !
+let y: ! = loop { panic!(); };
+```
+
+Because `!` coerces to every type, it can appear where any type is expected:
+
+```yolo
+let result: Int = loop { break 42; };  // break gives the loop type Int
+let diverge: Int = loop { };           // ! coerces to Int — dead code after
+```
+
+`!` is not a type users write in practice; it appears as an inferred type when the typechecker determines a branch or expression cannot return. It is the type of `return` and `panic!` expressions as well.
+
 ---
 
 ## 4. Variables
@@ -633,6 +651,11 @@ let result = loop {
     if (condition) { break value; }
 };
 ```
+
+**Typing rules:**
+
+- `loop { break expr; }` has type `T` where `expr: T`. All `break` arms must produce the same type.
+- `loop { }` — a loop with no reachable `break` — has type `!` (Never). See [§3.7](#37-the-never-type-).
 
 ### 12.6 Break and continue
 

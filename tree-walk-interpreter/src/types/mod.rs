@@ -7,6 +7,9 @@ pub enum Type {
     Bool,
     Str,
     Unit,
+    /// The bottom type `!`. Produced by expressions that never return (infinite
+    /// loops with no reachable `break`, `return`, `panic!`). Coerces to any type.
+    Never,
     Tuple(Vec<Type>),
     Array(Box<Type>),
     Fun(Vec<Type>, Box<Type>),
@@ -35,6 +38,7 @@ impl std::fmt::Display for Type {
             Type::Bool => write!(f, "Bool"),
             Type::Str => write!(f, "String"),
             Type::Unit => write!(f, "()"),
+            Type::Never => write!(f, "!"),
             Type::Tuple(ts) => {
                 write!(f, "(")?;
                 for (i, t) in ts.iter().enumerate() {

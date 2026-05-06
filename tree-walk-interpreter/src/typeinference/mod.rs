@@ -65,6 +65,9 @@ pub enum InferType {
     Concrete(Type),
     /// An unknown type represented by a type variable.
     Var(TypeVar),
+    /// The bottom type `!` — produced by diverging expressions (infinite loops with
+    /// no reachable `break`, `return`, `panic!`). Unifies with any type.
+    Never,
     /// A function type with parameter types and a return type.
     Fun(Vec<InferType>, Box<InferType>),
     /// A tuple type.
@@ -81,6 +84,7 @@ impl InferType {
     pub fn bool() -> Self { InferType::Concrete(Type::Bool) }
     pub fn str() -> Self { InferType::Concrete(Type::Str) }
     pub fn unit() -> Self { InferType::Concrete(Type::Unit) }
+    pub fn never() -> Self { InferType::Never }
     pub fn var(v: TypeVar) -> Self { InferType::Var(v) }
 }
 
@@ -89,6 +93,7 @@ impl std::fmt::Display for InferType {
         match self {
             InferType::Concrete(t) => write!(f, "{}", t),
             InferType::Var(v) => write!(f, "{}", v),
+            InferType::Never => write!(f, "!"),
             InferType::Fun(params, ret) => {
                 write!(f, "fun(")?;
                 for (i, p) in params.iter().enumerate() {
@@ -149,7 +154,7 @@ impl Substitution {
     /// Recursively replace all type variables in `ty` using this substitution.
     pub fn apply(&self, ty: &InferType) -> InferType {
         match ty {
-            InferType::Concrete(_) => ty.clone(),
+            InferType::Concrete(_) | InferType::Never => ty.clone(),
             InferType::Var(v) => match self.bindings.get(v) {
                 Some(resolved) => self.apply(resolved),
                 None => ty.clone(),
@@ -192,7 +197,7 @@ impl Substitution {
 /// Used by the occurs check to prevent infinite types like `?t0 = Array<?t0>`.
 fn occurs_in(var: TypeVar, ty: &InferType) -> bool {
     match ty {
-        InferType::Concrete(_) => false,
+        InferType::Concrete(_) | InferType::Never => false,
         InferType::Var(v) => *v == var,
         InferType::Fun(params, ret) => {
             params.iter().any(|p| occurs_in(var, p)) || occurs_in(var, ret)
@@ -227,6 +232,8 @@ fn bind_var(var: TypeVar, ty: &InferType) -> Result<Substitution, YolangError> {
 /// check detects an infinite type.
 pub fn unify(a: &InferType, b: &InferType) -> Result<Substitution, YolangError> {
     match (a, b) {
+        // Never is the bottom type — it coerces to any type.
+        (InferType::Never, _) | (_, InferType::Never) => Ok(Substitution::new()),
         (InferType::Concrete(t1), InferType::Concrete(t2)) => {
             if t1 == t2 {
                 Ok(Substitution::new())
@@ -315,7 +322,7 @@ pub fn solve_constraints(constraints: Vec<Constraint>) -> Result<Substitution, Y
 /// Collect all type variables that appear free in `ty`.
 pub fn free_vars(ty: &InferType) -> HashSet<TypeVar> {
     match ty {
-        InferType::Concrete(_) => HashSet::new(),
+        InferType::Concrete(_) | InferType::Never => HashSet::new(),
         InferType::Var(v) => [*v].into(),
         InferType::Fun(params, ret) => {
             let mut vars = free_vars(ret);

@@ -118,6 +118,7 @@ silently producing wrong types.
 - `Expr::FieldAccess`
 - `Expr::StructLiteral`
 - `Stmt::For`, `Stmt::ForIn`, `Stmt::Loop`
+- `Type::Never` / `InferType::Never`: loops with no reachable `break` infer to `!`; `!` coerces to any type (subtype of everything)
 - **Tests:** `tests/test_programs/phase8_stage4_*.yolo`
 
 ## Acceptance Criteria
@@ -203,9 +204,7 @@ when bounds are involved.
 an error. Do we special-case it, require an annotation, or introduce a default?
 
 ### `loop` expression type
-A `loop { break 42; }` has type `Int`. A loop that never breaks has type
-"never" (`!`). We don't currently have a `Type::Never` variant. Do we add one,
-or treat non-breaking loops as `Unit` for now?
+**Resolved.** A `loop { break 42; }` has type `Int`. A loop that never breaks has type `!` (Never). `Type::Never` and `InferType::Never` variants will be added in Stage 4. `!` coerces to any type, so it acts as the bottom of the type lattice during unification.
 
 ### Block return type vs `return` statement
 A block's type is its tail expression, or `Unit` if none. But a block can also
