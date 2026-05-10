@@ -1,8 +1,8 @@
 # ADR-0002: Inference Pass Structure
 
-**Status:** proposed  
+**Status:** accepted  
 **Date:** 2026-05-07  
-**Related:** [ADR-0001 — TypeRegistry Structure and Location](./ADR-0001-type-registry.md)
+**Related:** [ADR-0001 — TypeRegistry Structure and Location](ADR-0001-type-registry.md)
 
 ## Context
 
@@ -123,13 +123,36 @@ local constraints accumulated so far, get a concrete type, and build the
 
 ## Decision
 
-*(pending — status: proposed)*
+**Chosen: Option C — two-pass with re-derivation**
+
+Pass 1 produces `(Substitution, SchemeEnv)`. The `Substitution` maps all type variables to their solved concrete types. The `SchemeEnv` holds the generalised type schemes for let-bound functions, which the substitution alone cannot represent (a polymorphic function's type variable is never pinned to a single concrete type).
+
+Pass 2 walks the AST again, re-derives each node's concrete type by applying the same structural type rules as Pass 1 but with `Substitution`/`SchemeEnv` as a lookup table instead of a constraint emitter — no unification, no occurs check, no fresh variable generation. It builds `TypedExpr`/`TypedDecl` nodes directly.
+
+**Consistent with ADR-0001 inject philosophy:** the initial variable environment (top-level function type variables) is also produced by the pre-pass and injected into `InferContext::new`, not mutated into context after construction. The full construction sequence is:
+
+```rust
+let (type_registry, initial_env) = pre_pass(&program);
+let mut ctx = InferContext::new(type_registry, initial_env);
+let (substitution, scheme_env) = infer(&program, &mut ctx)?;
+let typed_program = construct(&program, &substitution, &scheme_env)?;
+```
+
+Function hoisting (spec §4.3) is handled in Pass 1 only: at each block entry, the inference walk scans the block's direct `FunDecl`s and registers them with fresh type variables before visiting any other statement. Pass 2 needs no hoisting — all types are resolved and lookups go through `SchemeEnv`/`Substitution` regardless of declaration order.
+
+Option C over Option A because it requires no `NodeId` fields on AST nodes — a significant structural change to the AST with no other benefit. Over Option B because it requires no skeleton tree (a third tree-shaped representation alongside the untyped AST and `TypedAST`). The "re-runs inference logic" cost is lower than it appears: Pass 2 applies structural type rules to already-concrete types, which is trivial compared to Pass 1's constraint solving.
 
 ## Consequences
 
-*(to be filled in once decision is accepted)*
+- Pass 1 (`infer`) returns `(Substitution, SchemeEnv)`, not a `TypedAST`
+- Pass 2 (`construct`) takes the untyped AST plus `(Substitution, SchemeEnv)` and produces `TypedAST`
+- `InferContext::new` takes `(TypeRegistry, InitialEnv)` — no post-construction mutation of pre-pass state
+- `SchemeEnv` must be threaded through Pass 2 alongside `Substitution` to handle polymorphic call sites
+- AST nodes require no `NodeId` fields
+- If a type rule changes, both passes need a matching update — mitigated by sharing structural type-rule functions where possible
+- Function hoisting logic lives entirely in Pass 1; Pass 2 is order-independent
 
 ## References
 
 - Task: [0005 — Typechecker Integration](../05-TASKS/epic-001-typechecker/in-progress/0005-typechecker-integration.md) (open question: Pass 1 → Pass 2 type transfer)
-- ADR: [ADR-0001 — TypeRegistry Structure and Location](./ADR-0001-type-registry.md) (inject philosophy; decision here is downstream of that one)
+- ADR: [ADR-0001 — TypeRegistry Structure and Location](ADR-0001-type-registry.md) (inject philosophy; decision here is downstream of that one)

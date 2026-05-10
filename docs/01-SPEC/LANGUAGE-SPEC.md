@@ -260,6 +260,28 @@ counter += 1;   // compound assignment
 
 Variables are lexically scoped. Each block `{ }` introduces a new scope. Inner scopes can shadow outer variables.
 
+`let` and `mut` declarations are sequential — a binding is visible only from its declaration point to the end of its containing block.
+
+`fun` declarations are hoisted to the top of their containing block. All `fun` declarations in a block are mutually visible to each other and to all other statements in that block, regardless of declaration order. This enables forward references and mutual recursion at any nesting level.
+
+Hoisting is block-local: a `fun` declared in an inner block is not visible in the outer block. Normal lexical scoping applies across block boundaries — inner blocks see outer declarations, outer blocks do not see inner declarations.
+
+```yolo
+fun a() { b(); }        // OK — b is hoisted within this block
+fun b() { a(); }        // OK — mutual recursion at top level
+
+fun outer() {
+    inner();            // OK — inner is hoisted within outer's block
+
+    fun inner() {
+        helper();       // OK — helper is hoisted within inner's block
+        fun helper() { }
+    }
+
+    helper();           // ERROR — helper is scoped to inner's block
+}
+```
+
 ---
 
 ## 5. Functions

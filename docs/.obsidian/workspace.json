@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "interpreter/DESIGN.md",
+                "file": "06-DECISIONS/closed/ADR-0001-type-registry.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "DESIGN"
+              "title": "ADR-0001-type-registry"
             }
           }
         ]
@@ -185,6 +185,8 @@
   },
   "active": "0e75aa3b1ffecbda",
   "lastOpenFiles": [
+    "06-DECISIONS/closed/ADR-0002-inference-pass-structure.md",
+    "06-DECISIONS/closed/ADR-0001-type-registry.md",
     "PROCESS.md",
     "spec/Language Spec.md",
     "decisions/README.md.tmp.5.1775313369961",

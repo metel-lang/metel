@@ -1,8 +1,8 @@
 # ADR-0001: TypeRegistry Structure and Location
 
-**Status:** proposed  
+**Status:** accepted  
 **Date:** 2026-05-07  
-**Related:** [ADR-0002 — Inference Pass Structure](./ADR-0002-inference-pass-structure.md) (the inject philosophy here extends to the var env and affects pass structure)  
+**Related:** [ADR-0002 — Inference Pass Structure](ADR-0002-inference-pass-structure.md) (the inject philosophy here extends to the var env and affects pass structure)  
 
 ## Context
 
@@ -167,11 +167,22 @@ takes ownership of it.
 
 ## Decision
 
-*(pending — status: proposed)*
+**Structure: Option A — `TypeDef` enum with typed lookup methods**  
+**Location: Option B — Pre-built and injected**
+
+The `TypeDef` enum approach over flat maps because every real caller (struct literal, field access, enum variant pattern) needs typed data, not just existence — so the indirection cost is zero in practice. The lookup methods encapsulate span-aware error production, keeping inference call sites clean. The Epic 003 upgrade path is a single change inside `TypeRegistry` with no call-site impact.
+
+The pre-built and injected approach over a field on `InferContext` because the registry is immutable after the pre-pass; embedding it in a mutably-borrowed struct misrepresents that invariant and creates borrow-checker friction if any lookup method ever returns a reference. Injection makes the construction sequence explicit and allows the registry to be unit-tested in isolation.
+
+The two choices reflect a consistent design philosophy: the pre-pass produces fully-resolved, immutable state; `InferContext` consumes it and is responsible only for constraint accumulation and scope management.
 
 ## Consequences
 
-*(to be filled in once decision is accepted)*
+- The typechecker entry point has a two-step construction sequence: `build_registry(&program)` → `InferContext::new(registry)`
+- `InferContext::new` signature changes to accept a `TypeRegistry`
+- The registry is read-only for the entire inference walk — no mutations after construction
+- Epic 003: extend `StructInfo`/`EnumInfo` field types from `InferType` to `TypeScheme`; `field_type` gains instantiation logic; call sites unchanged
+- Epic 004: add `impls` to `StructInfo`/`EnumInfo` or a parallel `ImplTable`; registry structure accommodates either without restructuring
 
 ## References
 

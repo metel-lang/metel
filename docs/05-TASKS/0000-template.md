@@ -5,7 +5,7 @@
 **Component:** interpreter | repl | parser | typechecker | evaluator | error-handling | spec  
 **Spec Link:** `../01-SPEC/LANGUAGE-SPEC.md#Section-Name` or Backlog item reference  
 **Blocked By:** none  
-**Decisions:** none | [ADR-NNNN](../../06-DECISIONS/ADR-NNNN-slug.md)
+**Decisions:** none | [ADR-NNNN](../../06-DECISIONS/open/ADR-NNNN-slug.md)
 
 ## What
 

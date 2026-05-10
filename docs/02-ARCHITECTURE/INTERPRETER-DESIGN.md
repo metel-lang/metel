@@ -1,6 +1,6 @@
 # Yoloscript Interpreter Design
 
-> See [ADR-0004 — Interpreter Architecture](../06-DECISIONS/ADR-0004-interpreter-architecture.md) for the rationale behind the architectural choices made here.
+> See [ADR-0004 — Interpreter Architecture](../06-DECISIONS/closed/ADR-0004-interpreter-architecture.md) for the rationale behind the architectural choices made here.
 
 ---
 

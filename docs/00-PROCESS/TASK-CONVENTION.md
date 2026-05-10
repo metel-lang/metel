@@ -115,3 +115,5 @@ See `docs/06-DECISIONS/README.md` for the full ADR workflow.
 - `docs/05-TASKS/0000-template.md` — Task template
 - `docs/06-DECISIONS/README.md` — ADR process and index
 - `docs/06-DECISIONS/ADR-0000-template.md` — ADR template
+- `docs/06-DECISIONS/open/` — proposed ADRs (decision pending)
+- `docs/06-DECISIONS/closed/` — accepted, rejected, or superseded ADRs

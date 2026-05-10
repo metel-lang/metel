@@ -433,7 +433,7 @@ Update the task file with progress:
 
 ### If Spec is Unclear
 1. Check `BACKLOG.md` for open questions
-2. Look at decision records in `docs/06-DECISIONS/`
+2. Look at decision records in `docs/06-DECISIONS/closed/` (accepted) or `docs/06-DECISIONS/open/` (pending)
 3. If still unclear, mark it in task notes
 
 ### If Tests Keep Failing

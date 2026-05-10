@@ -43,11 +43,16 @@ with fresh type variables in the `InferContext`. This allows forward references
 and mutual recursion. Concrete types are unified during the inference pass when
 the bodies are walked.
 
-The pre-pass runs **recursively at every block entry**, not only at the top
-level. When inference enters a block, it first scans the block's `FunDecl`s and
-registers them before visiting any other statement. This ensures that functions
-declared inside a block are mutually visible to each other, consistent with the
-language spec, which places no limit on function visibility based on scope depth.
+The pre-pass runs **at every block entry**, not only at the top level. When
+inference enters a block, it first scans that block's direct `FunDecl`s and
+registers them before visiting any other statement. This makes all `fun`
+declarations in the block mutually visible to each other and to all other
+statements in that block, regardless of declaration order (see spec §4.3).
+
+Hoisting is block-local: only the direct `FunDecl`s of the current block are
+registered — nested blocks are not scanned. A `fun` declared in an inner block
+is not visible in the outer block; normal lexical scoping applies across block
+boundaries.
 
 ### Type Conversion Rules
 
@@ -213,7 +218,7 @@ it on `InferContext`, or pass it as an explicit parameter to block/statement
 inference.
 
 ### Struct and enum type registry
-See [ADR-0001](../../../06-DECISIONS/ADR-0001-type-registry.md) — structure and
+See [ADR-0001](../../../06-DECISIONS/closed/ADR-0001-type-registry.md) — structure and
 location of the `TypeRegistry`. Decision pending; Stage 4 cannot begin until it
 is accepted.
 
@@ -225,9 +230,9 @@ the exact convention is undefined. Options: (a) a comment on the line that error
 written.
 
 ### Pass 1 → Pass 2 type transfer — or single-pass?
-See [ADR-0002](../../../06-DECISIONS/ADR-0002-inference-pass-structure.md) —
+See [ADR-0002](../../../06-DECISIONS/closed/ADR-0002-inference-pass-structure.md) —
 pass structure and how per-node types are surfaced between passes. Also depends
-on [ADR-0001](../../../06-DECISIONS/ADR-0001-type-registry.md): if the "inject"
+on [ADR-0001](../../../06-DECISIONS/closed/ADR-0001-type-registry.md): if the "inject"
 philosophy is adopted for `TypeRegistry` it extends to the initial var env,
 which affects which pass structure is most natural. Decision pending; Stage 2
 architecture should not be finalised until both ADRs are accepted.

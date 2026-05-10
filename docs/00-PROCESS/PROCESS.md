@@ -32,7 +32,7 @@ When a backlog item is resolved, its entry is removed from the backlog and the f
 
 ---
 
-### 3. `docs/06-DECISIONS/ADR-NNNN-slug.md` — why a non-obvious choice was made
+### 3. `docs/06-DECISIONS/` — why a non-obvious choice was made
 
 Decision records capture the reasoning behind choices that were not obvious or that had meaningful alternatives. They are written once and never modified (superseded decisions get a new record).
 
