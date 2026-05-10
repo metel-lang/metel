@@ -382,12 +382,11 @@ fn construct_program(
 fn construct_decl(decl: &Decl, ctx: &mut ConstructCtx) -> Result<TypedDecl, YoloscriptError> {
     match decl {
         Decl::Let(ld) => {
-            let value = construct_expr(&ld.value, ctx)?;
-            let ty = if let Some(ann) = &ld.type_ann {
-                resolved_to_type(&type_expr_to_infer(ann), ctx.subst, &ld.span)?
-            } else {
-                value.ty().clone()
-            };
+            let expected_ty = ld.type_ann.as_ref()
+                .map(|ann| resolved_to_type(&type_expr_to_infer(ann), ctx.subst, &ld.span))
+                .transpose()?;
+            let value = construct_expr(&ld.value, expected_ty.as_ref(), ctx)?;
+            let ty = expected_ty.unwrap_or_else(|| value.ty().clone());
             ctx.bind(&ld.name, ty);
             Ok(TypedDecl::Let(TypedLetDecl {
                 name: ld.name.clone(), type_ann: ld.type_ann.clone(),
@@ -395,12 +394,11 @@ fn construct_decl(decl: &Decl, ctx: &mut ConstructCtx) -> Result<TypedDecl, Yolo
             }))
         }
         Decl::Mut(md) => {
-            let value = construct_expr(&md.value, ctx)?;
-            let ty = if let Some(ann) = &md.type_ann {
-                resolved_to_type(&type_expr_to_infer(ann), ctx.subst, &md.span)?
-            } else {
-                value.ty().clone()
-            };
+            let expected_ty = md.type_ann.as_ref()
+                .map(|ann| resolved_to_type(&type_expr_to_infer(ann), ctx.subst, &md.span))
+                .transpose()?;
+            let value = construct_expr(&md.value, expected_ty.as_ref(), ctx)?;
+            let ty = expected_ty.unwrap_or_else(|| value.ty().clone());
             ctx.bind(&md.name, ty);
             Ok(TypedDecl::Mut(TypedMutDecl {
                 name: md.name.clone(), type_ann: md.type_ann.clone(),
@@ -460,7 +458,7 @@ fn construct_block(block: &Block, ctx: &mut ConstructCtx) -> Result<TypedBlock, 
         stmts.push(construct_decl(stmt, ctx)?);
     }
     let tail = match &block.tail {
-        Some(e) => Some(Box::new(construct_expr(e, ctx)?)),
+        Some(e) => Some(Box::new(construct_expr(e, None, ctx)?)),
         None    => None,
     };
     Ok(TypedBlock { stmts, tail, span: block.span.clone() })
@@ -468,10 +466,10 @@ fn construct_block(block: &Block, ctx: &mut ConstructCtx) -> Result<TypedBlock, 
 
 fn construct_stmt(stmt: &Stmt, ctx: &mut ConstructCtx) -> Result<TypedStmt, YoloscriptError> {
     match stmt {
-        Stmt::Expr(e) => Ok(TypedStmt::Expr(construct_expr(e, ctx)?)),
+        Stmt::Expr(e) => Ok(TypedStmt::Expr(construct_expr(e, None, ctx)?)),
         Stmt::Return(r) => {
             let value = match &r.value {
-                Some(e) => Some(construct_expr(e, ctx)?),
+                Some(e) => Some(construct_expr(e, None, ctx)?),
                 None    => None,
             };
             Ok(TypedStmt::Return(TypedReturnStmt { value, span: r.span.clone() }))
@@ -480,10 +478,10 @@ fn construct_stmt(stmt: &Stmt, ctx: &mut ConstructCtx) -> Result<TypedStmt, Yolo
     }
 }
 
-fn construct_expr(expr: &Expr, ctx: &mut ConstructCtx) -> Result<TypedExpr, YoloscriptError> {
+fn construct_expr(expr: &Expr, expected_ty: Option<&Type>, ctx: &mut ConstructCtx) -> Result<TypedExpr, YoloscriptError> {
     match expr {
         Expr::Literal(lit, span) => {
-            let ty = construct_literal_type(lit, ctx, span)?;
+            let ty = construct_literal_type(lit, expected_ty, span)?;
             Ok(TypedExpr::Literal(lit.clone(), ty, span.clone()))
         }
         Expr::Ident(name, span) => {
@@ -500,18 +498,19 @@ fn construct_expr(expr: &Expr, ctx: &mut ConstructCtx) -> Result<TypedExpr, Yolo
     }
 }
 
-fn construct_literal_type(lit: &Literal, _ctx: &ConstructCtx, span: &Span) -> Result<Type, YoloscriptError> {
+
+fn construct_literal_type(lit: &Literal, expected_ty: Option<&Type>, span: &Span) -> Result<Type, YoloscriptError> {
     match lit {
         Literal::Int(_)   => Ok(Type::Int),
         Literal::Float(_) => Ok(Type::Float),
         Literal::Bool(_)  => Ok(Type::Bool),
         Literal::Str(_)   => Ok(Type::Str),
         Literal::Unit     => Ok(Type::Unit),
-        // nope's type is Perhaps<?t0>; ?t0 must have been resolved during Pass 1.
-        // The annotation on the enclosing binding gives us the concrete type.
-        // We propagate the resolved type from the subst via the expected type path.
-        // If unresolved, Pass 1 already produced E0002 before we reach here.
-        Literal::Nope     => Err(YoloscriptError::type_error(
+        // nope's type cannot be re-derived from the literal alone. Pass 2 must receive
+        // the expected type from the enclosing binding's annotation (propagated via
+        // construct_expr's expected_ty parameter). If no annotation, E0002 — but Pass 1
+        // should have already caught the unannotated case via an unresolved type var.
+        Literal::Nope     => expected_ty.cloned().ok_or_else(|| YoloscriptError::type_error(
             ErrorCode::E0002,
             "cannot infer type of `nope`; add a type annotation",
             span,
@@ -526,8 +525,8 @@ fn construct_binop(
     span: &Span,
     ctx: &mut ConstructCtx,
 ) -> Result<TypedExpr, YoloscriptError> {
-    let lhs = construct_expr(lhs, ctx)?;
-    let rhs = construct_expr(rhs, ctx)?;
+    let lhs = construct_expr(lhs, None, ctx)?;
+    let rhs = construct_expr(rhs, None, ctx)?;
     let ty = match op {
         BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => lhs.ty().clone(),
         BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => Type::Bool,
@@ -543,7 +542,7 @@ fn construct_unaryop(
     span:    &Span,
     ctx:     &mut ConstructCtx,
 ) -> Result<TypedExpr, YoloscriptError> {
-    let operand = construct_expr(operand, ctx)?;
+    let operand = construct_expr(operand, None, ctx)?;
     let ty = match op {
         UnaryOp::Neg => operand.ty().clone(),
         UnaryOp::Not => Type::Bool,

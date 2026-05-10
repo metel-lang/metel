@@ -6,7 +6,7 @@
 
 ## Context
 
-The current two-pass design in task 0005 is:
+The two-pass design implemented in epic-005 is:
 
 - **Pass 1 — Inference**: walk the AST with `InferContext`, emit constraints,
   return `InferType`s, solve all constraints at the end with `ctx.solve()`
@@ -154,5 +154,5 @@ Option C over Option A because it requires no `NodeId` fields on AST nodes — a
 
 ## References
 
-- Task: [0005 — Typechecker Integration](../05-TASKS/epic-001-typechecker/in-progress/0005-typechecker-integration.md) (open question: Pass 1 → Pass 2 type transfer)
+- Epic: [Epic 005 — Typechecker Integration](../05-TASKS/epic-005-typechecker-integration/EPIC.md) (implements this pass structure across Stages 1–4)
 - ADR: [ADR-0001 — TypeRegistry Structure and Location](ADR-0001-type-registry.md) (inject philosophy; decision here is downstream of that one)

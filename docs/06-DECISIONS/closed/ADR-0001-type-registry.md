@@ -6,7 +6,7 @@
 
 ## Context
 
-Stage 4 of task 0005 needs to type-check `StructLiteral`, `FieldAccess`, and
+Task 0004 of epic-005 (Stage 4) needs to type-check `StructLiteral`, `FieldAccess`, and
 enum variant patterns in `match`. All three require knowing the field and variant
 types of user-defined types at inference time — information that currently exists
 only in the raw `StructDecl`/`EnumDecl` AST nodes and is not accessible during
@@ -186,7 +186,7 @@ The two choices reflect a consistent design philosophy: the pre-pass produces fu
 
 ## References
 
-- Task: [0005 — Typechecker Integration](../05-TASKS/epic-001-typechecker/in-progress/0005-typechecker-integration.md) (Stage 4, open question: struct and enum type registry)
+- Task: [0004 — Stage 4: Advanced Expressions](../05-TASKS/epic-005-typechecker-integration/open/0004-stage4-advanced-expressions.md) (Stage 4: struct/enum type registry needed for StructLiteral, FieldAccess, Match)
 - Task: [0006 — Mutable Binding Tracking](../05-TASKS/epic-001-typechecker/open/0006-mutable-binding-tracking.md) (related InferContext changes)
 - Epic: [Epic 003 — Generics](../05-TASKS/epic-003-generics/EPIC.md) (will extend field types to TypeScheme)
 - Epic: [Epic 004 — Traits](../05-TASKS/epic-004-traits/EPIC.md) (will add impl storage to registry)

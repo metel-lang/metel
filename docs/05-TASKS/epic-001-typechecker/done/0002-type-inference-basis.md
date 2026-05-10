@@ -11,7 +11,7 @@
 Implement the foundational Hindley-Milner type inference engine in `src/typeinference/`.
 Built across 7 incremental phases — each phase fully tested before the next begins.
 
-Integration with the typechecker pipeline is handled in task 0005.
+Integration with the typechecker pipeline is handled in epic-005.
 
 Implementation notes and worked examples for each phase live in
 `docs/03-COMPONENTS/typeinference/ROADMAP.md`.
@@ -102,4 +102,4 @@ and poly environments, constraint accumulator.
 
 - Run phase tests with: `cargo test --test typeinference_tests phase_N`
 - All 80 tests across phases 1–7 pass
-- Phase 8 (integration) is tracked in task 0005
+- Phase 8 (integration) is tracked in epic-005

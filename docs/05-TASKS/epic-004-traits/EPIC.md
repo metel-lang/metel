@@ -215,7 +215,7 @@ These are **placeholders** — create detailed tasks only when ready to implemen
 ## Integration Points
 
 - **Type Checker (Epic 001):** Already has type table; add trait table. Note: Epic 001
-  (task 0005) stubs `Expr::Cast` with a `YoloscriptError::Internal` "not yet supported"
+  (epic-005) stubs `Expr::Cast` with a `YoloscriptError::Internal` "not yet supported"
   error. This epic is responsible for implementing cast validation once trait-based
   `From` resolution is available.
 - **Generic Monomorphization (Epic 003):** Respect trait bounds when specializing
