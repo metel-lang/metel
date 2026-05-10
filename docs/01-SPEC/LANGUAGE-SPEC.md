@@ -453,6 +453,13 @@ impl Shape {
 
 `Perhaps<T>` is the built-in optional type. There is no null — all absence is expressed via `Perhaps<T>`.
 
+The type of `nope` is `Perhaps<T>` for some `T` that must be determinable from context. If no context constrains `T` — for example, a bare `let x = nope` with no annotation and no subsequent use that pins the element type — the program is a type error. An explicit annotation is required in that case:
+
+```yolo
+let x = nope;              // ERROR: cannot infer type of `nope`
+let x: Perhaps<Int> = nope; // OK
+```
+
 ```yolo
 let result: Perhaps<Int> = nope;
 let value: Perhaps<Int> = 42;

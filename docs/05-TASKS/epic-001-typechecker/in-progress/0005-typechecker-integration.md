@@ -23,36 +23,55 @@ programs in `tests/test_programs/`.
 
 ## Architecture
 
-### Two-Pass Design
+### Two-Pass Design (ADR-0002: Option C — re-derivation)
 
-**Pass 1 — Inference**: Walk the AST with `InferContext`, emitting constraints
-and returning `InferType`s. Solve all constraints at the end with `ctx.solve()`.
+The full construction sequence is:
 
-**Pass 2 — Construction**: Walk the AST again with the final `Substitution`,
-converting `InferType → Type` and building `TypedExpr` / `TypedDecl` nodes.
+```rust
+let (type_registry, initial_env) = pre_pass(&program);
+let mut ctx = InferContext::new(type_registry, initial_env);
+let (substitution, scheme_env) = infer(&program, &mut ctx)?;
+let typed_program = construct(&program, &substitution, &scheme_env)?;
+```
 
-> **Optimization note**: The two-pass approach visits the AST twice. A future
-> optimization is to carry a "pending typed node" alongside the `InferType`
-> during pass 1 (substituting the final type in-place after solving), avoiding
-> the second traversal. Not worth the complexity now.
+**Pre-pass** — produces a `TypeRegistry` (struct/enum field types) and an
+`InitialEnv` (top-level function type variables). Both are injected into
+`InferContext::new`; neither is mutated after construction.
 
-### Pre-Pass — Function Registration
+**Pass 1 — Inference (`infer`)**: Walk the AST with `InferContext`, emitting
+constraints. Solve all constraints at the end. Returns `(Substitution, SchemeEnv)`.
+The `Substitution` maps all type variables to their solved concrete types.
+The `SchemeEnv` holds the generalised type schemes for let-bound functions
+(polymorphic functions are never pinned to a single concrete type in the
+substitution alone).
 
-Before inference begins, scan all top-level `FunDecl`s and register their names
-with fresh type variables in the `InferContext`. This allows forward references
-and mutual recursion. Concrete types are unified during the inference pass when
-the bodies are walked.
+**Pass 2 — Construction (`construct`)**: Walk the AST again with
+`(Substitution, SchemeEnv)` as lookup tables. Re-derives each node's concrete
+type by applying the same structural type rules as Pass 1, but with no
+unification, no occurs check, and no fresh variable generation. Builds
+`TypedExpr`/`TypedDecl` nodes directly. `SchemeEnv` is threaded through to
+handle polymorphic call sites.
 
-The pre-pass runs **at every block entry**, not only at the top level. When
-inference enters a block, it first scans that block's direct `FunDecl`s and
-registers them before visiting any other statement. This makes all `fun`
-declarations in the block mutually visible to each other and to all other
-statements in that block, regardless of declaration order (see spec §4.3).
+### Pre-Pass — Function Registration and Registry
 
-Hoisting is block-local: only the direct `FunDecl`s of the current block are
-registered — nested blocks are not scanned. A `fun` declared in an inner block
-is not visible in the outer block; normal lexical scoping applies across block
-boundaries.
+The pre-pass has two responsibilities:
+
+1. **TypeRegistry** (ADR-0001: `TypeDef` enum, pre-built and injected): scan
+   all `StructDecl`/`EnumDecl`s, convert field types from `TypeExpr` to
+   `InferType`, and store in a `TypeRegistry`. The registry is read-only for
+   the entire inference walk.
+
+2. **InitialEnv / function hoisting**: scan all top-level `FunDecl`s and
+   register their names with fresh type variables. This allows forward references
+   and mutual recursion. Concrete types are unified during Pass 1 when the bodies
+   are walked.
+
+Within Pass 1, hoisting continues **at every block entry**: when inference enters
+a block, it first scans that block's direct `FunDecl`s and registers them before
+visiting any other statement. This makes all `fun` declarations in the block
+mutually visible regardless of declaration order (spec §4.3). Hoisting is
+block-local — nested blocks are not scanned. Pass 2 needs no hoisting; all types
+are resolved via `Substitution`/`SchemeEnv` regardless of declaration order.
 
 ### Type Conversion Rules
 
@@ -144,6 +163,7 @@ return "not yet supported" regardless of stage:
 ## Acceptance Criteria
 
 ### Stage 1
+- [ ] `ErrorCode` enum added to `src/error/mod.rs`; `TypeError` carries a code; `type_error()` updated
 - [ ] `TypeExpr → InferType` conversion covers all annotation forms
 - [ ] `InferType → Type` conversion errors on unresolved variables
 - [ ] Pre-pass registers all top-level function names
@@ -203,39 +223,66 @@ defined when the test harness is extended for Stage 1.
 
 ## Open Questions
 
-### `Nope` literal type
-`Literal::Nope` is Yoloscript's null/None equivalent. Its type should be
-`Perhaps(?t0)` for a fresh `?t0` — making it polymorphic. But this means a bare
-`let x = Nope` leaves `?t0` unresolved, which under the current rules would be
-an error. Do we special-case it, require an annotation, or introduce a default?
+### ~~`Nope` literal type~~ ✓ resolved
+`nope` infers to `Perhaps<?t0>` with a fresh `?t0`. If `?t0` is still unresolved
+after constraint solving, it is a type error — the user must provide an explicit
+annotation (e.g. `let x: Perhaps<Int> = nope`). No special-casing or defaulting.
+Spec updated: §8.
 
-### Block return type vs `return` statement
-A block's type is its tail expression, or `Unit` if none. But a block can also
-exit early via `return`. The inferred type of the block tail and the type of
-`return` values must both unify with the function's declared return type. How do
-we thread the expected return type through the inference context? Options: store
-it on `InferContext`, or pass it as an explicit parameter to block/statement
-inference.
+### ~~Block return type vs `return` statement~~ ✓ resolved
+`InferContext` gains a `current_return_type: Option<InferType>` field. When
+inference enters a `FunDecl` body, it is set to the declared return type (or a
+fresh type variable if unannotated) and restored to the previous value on exit.
+`return expr` unifies `infer(expr)` with `ctx.current_return_type`. The tail
+expression of the body is unified with it as well. Outside any function (top-level
+expressions) the field is `None` and `return` is a type error.
 
-### Struct and enum type registry
-See [ADR-0001](../../../06-DECISIONS/closed/ADR-0001-type-registry.md) — structure and
-location of the `TypeRegistry`. Decision pending; Stage 4 cannot begin until it
-is accepted.
+### ~~Struct and enum type registry~~ ✓ resolved by ADR-0001
+`TypeDef` enum with typed lookup methods; pre-built and injected into
+`InferContext::new`. See [ADR-0001](../../../06-DECISIONS/closed/ADR-0001-type-registry.md).
 
-### Negative test convention
-The task says `.yolo` files with expected errors use a `// ERROR` comment, but
-the exact convention is undefined. Options: (a) a comment on the line that errors
-(`// ERROR: cannot unify`), (b) a file-level annotation (`// EXPECT_ERROR`), or
-(c) a separate `.error` sidecar file. Needs a decision before negative tests are
-written.
+### ~~Negative test convention~~ ✓ resolved
+Per-line `// ERROR[EXXXX]` comments keyed on error codes, not message strings.
+Message strings are volatile (wording improves over time); codes are stable.
 
-### Pass 1 → Pass 2 type transfer — or single-pass?
-See [ADR-0002](../../../06-DECISIONS/closed/ADR-0002-inference-pass-structure.md) —
-pass structure and how per-node types are surfaced between passes. Also depends
-on [ADR-0001](../../../06-DECISIONS/closed/ADR-0001-type-registry.md): if the "inject"
-philosophy is adopted for `TypeRegistry` it extends to the initial var env,
-which affects which pass structure is most natural. Decision pending; Stage 2
-architecture should not be finalised until both ADRs are accepted.
+```yolo
+let x = nope;           // ERROR[E0002]
+let y: Int = "hello";   // ERROR[E0001]
+```
+
+An optional human-readable hint may follow the code — the harness ignores it:
+
+```yolo
+let x = nope;           // ERROR[E0002] annotation required
+```
+
+**Initial error codes (coarse-grained; extend as new categories emerge):**
+
+| Code  | Category |
+|-------|----------|
+| E0001 | Type mismatch — cannot unify two incompatible types |
+| E0002 | Annotation required — type variable left unresolved after solving |
+| E0003 | Undefined name — identifier not found in scope |
+| E0004 | Arity mismatch — wrong number of arguments at a call site |
+| E0005 | Invalid operand types — operator applied to wrong types |
+
+**Harness logic** for any `.yolo` test file:
+1. Scan source lines for `// ERROR[EXXXX]`; record `(line_number, code)`.
+2. Run `check()`.
+3. If annotations found: assert `Err`; assert the error's code and line number
+   match one of the annotated pairs.
+4. If no annotations: assert `Ok`.
+
+**Prerequisite:** `YoloscriptError::TypeError` must carry an `ErrorCode` field
+before any negative tests can be written. Add `ErrorCode` enum to
+`src/error/mod.rs` and update `TypeError` and `type_error()` accordingly as
+part of Stage 1.
+
+### ~~Pass 1 → Pass 2 type transfer — or single-pass?~~ ✓ resolved by ADR-0002
+Two-pass with re-derivation (Option C). Pass 1 returns `(Substitution, SchemeEnv)`;
+Pass 2 re-derives types structurally with no constraint emission. Pre-pass
+produces `(TypeRegistry, InitialEnv)` injected into `InferContext::new`. See
+[ADR-0002](../../../06-DECISIONS/closed/ADR-0002-inference-pass-structure.md).
 
 ### Multiple error reporting
 `solve_constraints` currently stops at the first unification failure. A better
