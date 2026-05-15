@@ -1,0 +1,3 @@
+// Stage 4 negative: assigning the wrong type to a mut binding is E0001
+mut x = 0;
+x = true; // ERROR[E0001]

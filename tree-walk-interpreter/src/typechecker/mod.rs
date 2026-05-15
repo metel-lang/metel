@@ -13,8 +13,9 @@ type SchemeEnv = HashMap<String, TypeScheme>;
 pub fn check(program: Program) -> Result<TypedProgram, YoloscriptError> {
     let mut ctx = InferContext::new();
 
-    // Pre-pass: hoist top-level function names so forward references work.
+    // Pre-pass: hoist names so forward references and mutual recursion work.
     hoist_fun_decls(&program.decls, &mut ctx);
+    hoist_struct_and_impl_decls(&program.decls, &mut ctx);
 
     // Pass 1: walk AST, emit constraints, collect function generalizations.
     let mut fun_generalizations: Vec<FunGeneralization> = vec![];
@@ -29,8 +30,12 @@ pub fn check(program: Program) -> Result<TypedProgram, YoloscriptError> {
         scheme_env.insert(fg.name, scheme);
     }
 
+    // Build concrete struct/method environments for Pass 2.
+    let concrete_struct_env = build_concrete_struct_env(&ctx.struct_env, &subst)?;
+    let concrete_method_env = build_concrete_method_env(&ctx.method_env, &subst)?;
+
     // Pass 2: re-derive concrete types and build TypedAST.
-    construct_program(&program, &subst, &scheme_env)
+    construct_program(&program, &subst, &scheme_env, concrete_struct_env, concrete_method_env)
 }
 
 // ── Function generalisation record ────────────────────────────────────────────
@@ -50,10 +55,83 @@ fn hoist_fun_decls(decls: &[Decl], ctx: &mut InferContext) {
         if let Decl::Fun(fun) = decl {
             if fun.generics.is_empty() {
                 let fresh = ctx.fresh_var();
-                ctx.bind_mono(&fun.name, fresh);
+                ctx.bind_mono(&fun.name, fresh, false);
             }
         }
     }
+}
+
+/// Register struct field shapes and impl method types so that forward
+/// references to fields and methods work across declaration order.
+fn hoist_struct_and_impl_decls(decls: &[Decl], ctx: &mut InferContext) {
+    for decl in decls {
+        match decl {
+            Decl::Struct(sd) => {
+                let fields = sd.fields.iter()
+                    .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann)))
+                    .collect();
+                ctx.register_struct_fields(sd.name.clone(), fields);
+            }
+            Decl::Impl(ib) if ib.trait_name.is_none() => {
+                let target_name = match &ib.target_type {
+                    TypeExpr::Named(name, args) if args.is_empty() => name.clone(),
+                    _ => continue,
+                };
+                for method in &ib.methods {
+                    let mut param_types = vec![];
+                    for p in &method.params {
+                        let pt = if p.name == "self" {
+                            InferType::Named(target_name.clone(), vec![])
+                        } else if let Some(ann) = &p.type_ann {
+                            type_expr_to_infer(ann)
+                        } else {
+                            ctx.fresh_var()
+                        };
+                        param_types.push(pt);
+                    }
+                    let ret_ty = method.return_type.as_ref()
+                        .map(type_expr_to_infer)
+                        .unwrap_or_else(InferType::unit);
+                    ctx.register_method(
+                        target_name.clone(),
+                        method.name.clone(),
+                        InferType::Fun(param_types, Box::new(ret_ty)),
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn build_concrete_struct_env(
+    struct_env: &HashMap<String, Vec<(String, InferType)>>,
+    subst: &Substitution,
+) -> Result<HashMap<String, Vec<(String, Type)>>, YoloscriptError> {
+    let dummy = Span::new(0, 0, "");
+    struct_env.iter()
+        .map(|(name, fields)| {
+            let concrete = fields.iter()
+                .map(|(fname, fty)| Ok((fname.clone(), infer_type_to_type(&subst.apply(fty), &dummy)?)))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok((name.clone(), concrete))
+        })
+        .collect()
+}
+
+fn build_concrete_method_env(
+    method_env: &HashMap<String, HashMap<String, InferType>>,
+    subst: &Substitution,
+) -> Result<HashMap<String, HashMap<String, Type>>, YoloscriptError> {
+    let dummy = Span::new(0, 0, "");
+    method_env.iter()
+        .map(|(type_name, methods)| {
+            let concrete = methods.iter()
+                .map(|(mname, mty)| Ok((mname.clone(), infer_type_to_type(&subst.apply(mty), &dummy)?)))
+                .collect::<Result<HashMap<_, _>, _>>()?;
+            Ok((type_name.clone(), concrete))
+        })
+        .collect()
 }
 
 // ── Pass 1: type inference ────────────────────────────────────────────────────
@@ -73,27 +151,39 @@ fn infer_decl(
     decl: &Decl,
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
-) -> Result<(), YoloscriptError> {
+) -> Result<InferType, YoloscriptError> {
     match decl {
         Decl::Let(ld) => {
             let val_ty = infer_expr(&ld.value, ctx, fun_generalizations)?;
             if let Some(ann) = &ld.type_ann {
                 ctx.add_constraint(val_ty.clone(), type_expr_to_infer(ann), ld.span.clone());
             }
-            ctx.bind_mono(&ld.name, val_ty);
-            Ok(())
+            ctx.bind_mono(&ld.name, val_ty, false);
+            Ok(InferType::unit())
         }
         Decl::Mut(md) => {
             let val_ty = infer_expr(&md.value, ctx, fun_generalizations)?;
             if let Some(ann) = &md.type_ann {
                 ctx.add_constraint(val_ty.clone(), type_expr_to_infer(ann), md.span.clone());
             }
-            ctx.bind_mono(&md.name, val_ty);
-            Ok(())
+            ctx.bind_mono(&md.name, val_ty, true);
+            Ok(InferType::unit())
         }
-        Decl::Fun(fd) => infer_fun_decl(fd, ctx, fun_generalizations),
-        Decl::Struct(_) | Decl::Enum(_) | Decl::Trait(_) => Ok(()),
-        Decl::Impl(_) => Err(YoloscriptError::internal("impl blocks not yet supported")),
+        Decl::Fun(fd) => { infer_fun_decl(fd, ctx, fun_generalizations)?; Ok(InferType::unit()) }
+        Decl::Struct(_) | Decl::Enum(_) | Decl::Trait(_) => Ok(InferType::unit()),
+        Decl::Impl(ib) => {
+            if ib.trait_name.is_some() {
+                return Err(YoloscriptError::internal("trait impl blocks not yet supported"));
+            }
+            let target_name = match &ib.target_type {
+                TypeExpr::Named(name, args) if args.is_empty() => name.clone(),
+                _ => return Err(YoloscriptError::internal("generic impl blocks not yet supported")),
+            };
+            for method in &ib.methods {
+                infer_impl_method(method, &target_name, ctx, fun_generalizations)?;
+            }
+            Ok(InferType::unit())
+        }
         Decl::Stmt(stmt) => infer_stmt(stmt, ctx, fun_generalizations),
     }
 }
@@ -127,7 +217,7 @@ fn infer_fun_decl(
 
     ctx.push_scope();
     for (param, pt) in fun.params.iter().zip(param_types.iter()) {
-        ctx.bind_mono(&param.name, pt.clone());
+        ctx.bind_mono(&param.name, pt.clone(), false);
     }
 
     let saved_ret = ctx.push_return_type(ret_ty.clone());
@@ -158,6 +248,48 @@ fn infer_fun_decl(
     Ok(())
 }
 
+fn infer_impl_method(
+    method: &FunDecl,
+    target_name: &str,
+    ctx: &mut InferContext,
+    fun_generalizations: &mut Vec<FunGeneralization>,
+) -> Result<(), YoloscriptError> {
+    if !method.generics.is_empty() {
+        return Err(YoloscriptError::internal(format!(
+            "generic method `{}` not yet supported", method.name
+        )));
+    }
+    let self_ty = InferType::Named(target_name.to_string(), vec![]);
+    let param_types: Vec<InferType> = method.params.iter().map(|p| {
+        if p.name == "self" {
+            self_ty.clone()
+        } else if let Some(ann) = &p.type_ann {
+            type_expr_to_infer(ann)
+        } else {
+            ctx.fresh_var()
+        }
+    }).collect();
+    let ret_ty = method.return_type.as_ref()
+        .map(type_expr_to_infer)
+        .unwrap_or_else(InferType::unit);
+
+    ctx.push_scope();
+    for (p, pt) in method.params.iter().zip(param_types.iter()) {
+        ctx.bind_mono(&p.name, pt.clone(), p.mutable);
+    }
+    let saved_ret = ctx.push_return_type(ret_ty.clone());
+    let body_ty = infer_block(&method.body, ctx, fun_generalizations)?;
+    ctx.add_constraint(body_ty, ret_ty.clone(), method.body.span.clone());
+    ctx.pop_return_type(saved_ret);
+    ctx.pop_scope();
+
+    let partial_subst = ctx.solve()?;
+    let fun_ty = InferType::Fun(param_types, Box::new(ret_ty));
+    let resolved_fun_ty = partial_subst.apply(&fun_ty);
+    ctx.register_method(target_name.to_string(), method.name.clone(), resolved_fun_ty);
+    Ok(())
+}
+
 fn infer_block(
     block: &Block,
     ctx: &mut InferContext,
@@ -165,12 +297,13 @@ fn infer_block(
 ) -> Result<InferType, YoloscriptError> {
     ctx.push_scope();
     hoist_fun_decls(&block.stmts, ctx);
+    let mut last_stmt_ty = InferType::unit();
     for stmt in &block.stmts {
-        infer_decl(stmt, ctx, fun_generalizations)?;
+        last_stmt_ty = infer_decl(stmt, ctx, fun_generalizations)?;
     }
     let ty = match &block.tail {
         Some(tail) => infer_expr(tail, ctx, fun_generalizations)?,
-        None       => InferType::unit(),
+        None       => last_stmt_ty,
     };
     ctx.pop_scope();
     Ok(ty)
@@ -180,9 +313,9 @@ fn infer_stmt(
     stmt: &Stmt,
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
-) -> Result<(), YoloscriptError> {
+) -> Result<InferType, YoloscriptError> {
     match stmt {
-        Stmt::Expr(e) => { infer_expr(e, ctx, fun_generalizations)?; Ok(()) }
+        Stmt::Expr(e) => { infer_expr(e, ctx, fun_generalizations)?; Ok(InferType::unit()) }
         Stmt::Return(r) => {
             let ret_ty = match &r.value {
                 Some(e) => infer_expr(e, ctx, fun_generalizations)?,
@@ -191,13 +324,20 @@ fn infer_stmt(
             if let Some(expected) = ctx.current_return_type().cloned() {
                 ctx.add_constraint(ret_ty, expected, r.span.clone());
             }
-            Ok(())
+            Ok(InferType::never())
         }
+        Stmt::Break(bs) => {
+            if let Some(e) = &bs.value {
+                infer_expr(e, ctx, fun_generalizations)?;
+            }
+            Ok(InferType::never())
+        }
+        Stmt::Continue(_) => Ok(InferType::never()),
         Stmt::While(ws) => {
             let cond_ty = infer_expr(&ws.condition, ctx, fun_generalizations)?;
             ctx.add_constraint(cond_ty, InferType::bool(), ws.span.clone());
             infer_block(&ws.body, ctx, fun_generalizations)?;
-            Ok(())
+            Ok(InferType::unit())
         }
         _ => Err(YoloscriptError::internal("statement not yet supported")),
     }
@@ -279,7 +419,143 @@ fn infer_expr(
                 }
             }
         }
+        Expr::Assign { target, op, value, span } => {
+            let target_ty = match target {
+                AssignTarget::Ident(name, target_span) => {
+                    ctx.lookup_for_write(name, target_span)?
+                }
+                AssignTarget::Index { object, index, span: target_span } => {
+                    let obj_ty   = infer_expr(object, ctx, fun_generalizations)?;
+                    let idx_ty   = infer_expr(index,  ctx, fun_generalizations)?;
+                    ctx.add_constraint(idx_ty, InferType::int(), target_span.clone());
+                    let elem_var = ctx.fresh_var();
+                    ctx.add_constraint(obj_ty, InferType::Array(Box::new(elem_var.clone())), target_span.clone());
+                    elem_var
+                }
+                AssignTarget::FieldAccess { object, field, span: target_span } => {
+                    let obj_ty = infer_expr(object, ctx, fun_generalizations)?;
+                    let obj_ty = ctx.solve()?.apply(&obj_ty);
+                    let struct_name = named_type_name(&obj_ty).ok_or_else(|| {
+                        YoloscriptError::type_error(
+                            ErrorCode::E0002,
+                            "cannot infer struct type for field assignment; add a type annotation",
+                            target_span,
+                        )
+                    })?;
+                    let fields = ctx.get_struct_fields(&struct_name)
+                        .ok_or_else(|| YoloscriptError::type_error(
+                            ErrorCode::E0003,
+                            format!("unknown type `{struct_name}`"),
+                            target_span,
+                        ))?
+                        .clone();
+                    fields.iter()
+                        .find(|(n, _)| n == field)
+                        .map(|(_, ty)| ty.clone())
+                        .ok_or_else(|| YoloscriptError::type_error(
+                            ErrorCode::E0003,
+                            format!("no field `{field}` on `{struct_name}`"),
+                            target_span,
+                        ))?
+                }
+            };
+            let value_ty = infer_expr(value, ctx, fun_generalizations)?;
+            match op {
+                AssignOp::Assign => {
+                    ctx.add_constraint(target_ty, value_ty, span.clone());
+                }
+                AssignOp::AddAssign | AssignOp::SubAssign
+                | AssignOp::MulAssign | AssignOp::DivAssign | AssignOp::RemAssign => {
+                    let result = ctx.fresh_var();
+                    ctx.add_constraint(target_ty, result.clone(), span.clone());
+                    ctx.add_constraint(value_ty, result, span.clone());
+                }
+            }
+            Ok(InferType::unit())
+        }
+        Expr::FieldAccess { object, field, span } => {
+            let obj_ty = infer_expr(object, ctx, fun_generalizations)?;
+            let obj_ty = ctx.solve()?.apply(&obj_ty);
+            let struct_name = named_type_name(&obj_ty).ok_or_else(|| YoloscriptError::type_error(
+                ErrorCode::E0002,
+                "cannot infer struct type for field access; add a type annotation",
+                span,
+            ))?;
+            let fields = ctx.get_struct_fields(&struct_name)
+                .ok_or_else(|| YoloscriptError::type_error(
+                    ErrorCode::E0003,
+                    format!("unknown type `{struct_name}`"),
+                    span,
+                ))?;
+            fields.iter()
+                .find(|(n, _)| n == field)
+                .map(|(_, ty)| ty.clone())
+                .ok_or_else(|| YoloscriptError::type_error(
+                    ErrorCode::E0003,
+                    format!("no field `{field}` on `{struct_name}`"),
+                    span,
+                ))
+        }
+        Expr::MethodCall { receiver, method, args, span } => {
+            let recv_ty = infer_expr(receiver, ctx, fun_generalizations)?;
+            let recv_ty = ctx.solve()?.apply(&recv_ty);
+            let struct_name = named_type_name(&recv_ty).ok_or_else(|| YoloscriptError::type_error(
+                ErrorCode::E0002,
+                "cannot infer receiver type for method call; add a type annotation",
+                span,
+            ))?;
+            let method_ty = ctx.get_method_type(&struct_name, method)
+                .cloned()
+                .ok_or_else(|| YoloscriptError::type_error(
+                    ErrorCode::E0003,
+                    format!("no method `{method}` on `{struct_name}`"),
+                    span,
+                ))?;
+            let arg_tys: Vec<InferType> = args.iter()
+                .map(|a| infer_expr(a, ctx, fun_generalizations))
+                .collect::<Result<_, _>>()?;
+            let ret_var = ctx.fresh_var();
+            let expected = InferType::Fun(
+                std::iter::once(recv_ty).chain(arg_tys).collect(),
+                Box::new(ret_var.clone()),
+            );
+            ctx.add_constraint(method_ty, expected, span.clone());
+            Ok(ret_var)
+        }
+        Expr::StructLiteral { path, fields, span } => {
+            let struct_name = path.last()
+                .ok_or_else(|| YoloscriptError::internal("empty path in struct literal"))?
+                .clone();
+            let expected_fields = ctx.get_struct_fields(&struct_name)
+                .ok_or_else(|| YoloscriptError::type_error(
+                    ErrorCode::E0003,
+                    format!("unknown struct `{struct_name}`"),
+                    span,
+                ))?
+                .clone();
+            // Every provided field must exist on the struct.
+            for (name, expr) in fields {
+                let decl_ty = expected_fields.iter()
+                    .find(|(n, _)| n == name)
+                    .map(|(_, ty)| ty.clone())
+                    .ok_or_else(|| YoloscriptError::type_error(
+                        ErrorCode::E0003,
+                        format!("no field `{name}` on `{struct_name}`"),
+                        span,
+                    ))?;
+                let expr_ty = infer_expr(expr, ctx, fun_generalizations)?;
+                ctx.add_constraint(expr_ty, decl_ty, span.clone());
+            }
+            Ok(InferType::Named(struct_name, vec![]))
+        }
         _ => Err(YoloscriptError::internal("expression not yet supported")),
+    }
+}
+
+fn named_type_name(ty: &InferType) -> Option<String> {
+    match ty {
+        InferType::Named(name, _) => Some(name.clone()),
+        _ => None,
     }
 }
 
@@ -418,11 +694,18 @@ struct ConstructCtx<'a> {
     subst:      &'a Substitution,
     scheme_env: &'a SchemeEnv,
     env:        Vec<HashMap<String, Type>>,
+    struct_env: HashMap<String, Vec<(String, Type)>>,
+    method_env: HashMap<String, HashMap<String, Type>>,
 }
 
 impl<'a> ConstructCtx<'a> {
-    fn new(subst: &'a Substitution, scheme_env: &'a SchemeEnv) -> Self {
-        Self { subst, scheme_env, env: vec![HashMap::new()] }
+    fn new(
+        subst:      &'a Substitution,
+        scheme_env: &'a SchemeEnv,
+        struct_env: HashMap<String, Vec<(String, Type)>>,
+        method_env: HashMap<String, HashMap<String, Type>>,
+    ) -> Self {
+        Self { subst, scheme_env, env: vec![HashMap::new()], struct_env, method_env }
     }
 
     fn push_scope(&mut self) { self.env.push(HashMap::new()); }
@@ -441,8 +724,10 @@ fn construct_program(
     program:    &Program,
     subst:      &Substitution,
     scheme_env: &SchemeEnv,
+    struct_env: HashMap<String, Vec<(String, Type)>>,
+    method_env: HashMap<String, HashMap<String, Type>>,
 ) -> Result<TypedProgram, YoloscriptError> {
-    let mut ctx = ConstructCtx::new(subst, scheme_env);
+    let mut ctx = ConstructCtx::new(subst, scheme_env, struct_env, method_env);
 
     // Hoist resolved function types so forward references work in Pass 2.
     for decl in &program.decls {
@@ -497,7 +782,7 @@ fn construct_decl(decl: &Decl, ctx: &mut ConstructCtx) -> Result<TypedDecl, Yolo
             name: ed.name.clone(), generics: ed.generics.clone(),
             variants: ed.variants.clone(), span: ed.span.clone(),
         })),
-        Decl::Impl(_) => Err(YoloscriptError::internal("impl blocks not yet supported")),
+        Decl::Impl(ib)   => construct_impl_decl(ib, ctx),
         Decl::Trait(td)  => Ok(TypedDecl::Trait(TypedTraitDecl {
             name: td.name.clone(), methods: td.methods.clone(), span: td.span.clone(),
         })),
@@ -535,6 +820,58 @@ fn construct_fun_decl(fun: &FunDecl, ctx: &mut ConstructCtx) -> Result<TypedDecl
         params: fun.params.clone(), return_type: fun.return_type.clone(),
         body, span: fun.span.clone(),
     }))
+}
+
+fn construct_impl_decl(ib: &ImplBlock, ctx: &mut ConstructCtx) -> Result<TypedDecl, YoloscriptError> {
+    if ib.trait_name.is_some() {
+        return Err(YoloscriptError::internal("trait impl blocks not yet supported"));
+    }
+    let target_name = match &ib.target_type {
+        TypeExpr::Named(name, _) => name.clone(),
+        _ => return Err(YoloscriptError::internal("generic impl blocks not yet supported")),
+    };
+    let methods = ib.methods.iter()
+        .map(|m| construct_impl_method(m, &target_name, ctx))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(TypedDecl::Impl(TypedImplBlock {
+        trait_name:  ib.trait_name.clone(),
+        target_type: ib.target_type.clone(),
+        methods,
+        span: ib.span.clone(),
+    }))
+}
+
+fn construct_impl_method(method: &FunDecl, target_name: &str, ctx: &mut ConstructCtx) -> Result<TypedFunDecl, YoloscriptError> {
+    let self_ty = Type::Named(target_name.to_string(), vec![]);
+    let param_types: Vec<Type> = method.params.iter()
+        .map(|p| {
+            if p.name == "self" {
+                Ok(self_ty.clone())
+            } else {
+                p.type_ann.as_ref()
+                    .map(|ann| resolved_to_type(&type_expr_to_infer(ann), ctx.subst, &p.span))
+                    .unwrap_or_else(|| Err(YoloscriptError::type_error(
+                        ErrorCode::E0002,
+                        format!("parameter `{}` needs a type annotation", p.name),
+                        &p.span,
+                    )))
+            }
+        })
+        .collect::<Result<_, _>>()?;
+    ctx.push_scope();
+    for (p, ty) in method.params.iter().zip(param_types.iter()) {
+        ctx.bind(&p.name, ty.clone());
+    }
+    let typed_block = construct_block(&method.body, ctx)?;
+    ctx.pop_scope();
+    Ok(TypedFunDecl {
+        name:        method.name.clone(),
+        generics:    method.generics.clone(),
+        params:      method.params.clone(),
+        return_type: method.return_type.clone(),
+        body:        FunBody::Typed(typed_block),
+        span:        method.span.clone(),
+    })
 }
 
 fn construct_block(block: &Block, ctx: &mut ConstructCtx) -> Result<TypedBlock, YoloscriptError> {
@@ -647,6 +984,78 @@ fn construct_expr(expr: &Expr, expected_ty: Option<&Type>, ctx: &mut ConstructCt
                 else_branch,
                 ty,
                 span: span.clone(),
+            })
+        }
+        Expr::Assign { target, op, value, span } => {
+            let typed_value = construct_expr(value, None, ctx)?;
+            Ok(TypedExpr::Assign {
+                target: target.clone(),
+                op: op.clone(),
+                value: Box::new(typed_value),
+                ty: Type::Unit,
+                span: span.clone(),
+            })
+        }
+        Expr::FieldAccess { object, field, span } => {
+            let typed_obj = construct_expr(object, None, ctx)?;
+            let struct_name = match typed_obj.ty() {
+                Type::Named(name, _) => name.clone(),
+                t => return Err(YoloscriptError::internal(
+                    format!("field access on non-struct type {t}")
+                )),
+            };
+            let field_ty = ctx.struct_env.get(&struct_name)
+                .and_then(|fs| fs.iter().find(|(n, _)| n == field))
+                .map(|(_, ty)| ty.clone())
+                .ok_or_else(|| YoloscriptError::internal(
+                    format!("no field `{field}` on `{struct_name}`")
+                ))?;
+            Ok(TypedExpr::FieldAccess {
+                object: Box::new(typed_obj),
+                field:  field.clone(),
+                ty:     field_ty,
+                span:   span.clone(),
+            })
+        }
+        Expr::MethodCall { receiver, method, args, span } => {
+            let typed_receiver = construct_expr(receiver, None, ctx)?;
+            let struct_name = match typed_receiver.ty() {
+                Type::Named(name, _) => name.clone(),
+                t => return Err(YoloscriptError::internal(
+                    format!("method call on non-struct type {t}")
+                )),
+            };
+            let method_fun_ty = ctx.method_env.get(&struct_name)
+                .and_then(|m| m.get(method.as_str()))
+                .cloned()
+                .ok_or_else(|| YoloscriptError::internal(
+                    format!("no method `{method}` on `{struct_name}`")
+                ))?;
+            let typed_args: Vec<TypedExpr> = args.iter()
+                .map(|a| construct_expr(a, None, ctx))
+                .collect::<Result<_, _>>()?;
+            let ret_ty = match method_fun_ty {
+                Type::Fun(_, ret) => *ret,
+                _ => return Err(YoloscriptError::internal("method type is not a function")),
+            };
+            Ok(TypedExpr::MethodCall {
+                receiver: Box::new(typed_receiver),
+                method:   method.clone(),
+                args:     typed_args,
+                ty:       ret_ty,
+                span:     span.clone(),
+            })
+        }
+        Expr::StructLiteral { path, fields, span } => {
+            let struct_name = path.last().unwrap().clone();
+            let typed_fields: Vec<(String, TypedExpr)> = fields.iter()
+                .map(|(name, expr)| Ok((name.clone(), construct_expr(expr, None, ctx)?)))
+                .collect::<Result<_, _>>()?;
+            Ok(TypedExpr::StructLiteral {
+                path:   path.clone(),
+                fields: typed_fields,
+                ty:     Type::Named(struct_name, vec![]),
+                span:   span.clone(),
             })
         }
         _ => Err(YoloscriptError::internal("expression not yet supported in construct")),

@@ -212,10 +212,69 @@ mod tests {
         check_file(&format!("{}/stage3_03_if_as_block_tail.yolo", test_dir()));
     }
 
+    #[test]
+    fn stage4_assign() {
+        check_file(&format!("{}/stage4_01_assign.yolo", test_dir()));
+    }
+
+    #[test]
+    fn stage4_return_diverges() {
+        check_file(&format!("{}/stage4_02_return_diverges.yolo", test_dir()));
+    }
+
+    #[test]
+    fn stage4_index_assign() {
+        check_file(&format!("{}/stage4_03_index_assign.yolo", test_dir()));
+    }
+
     // ── Stage 4 negative tests ────────────────────────────────────────────────
 
     #[test]
     fn stage4_neg_if_no_else_non_unit() {
         check_file(&format!("{}/stage3_neg_07_if_no_else_non_unit.yolo", test_dir()));
+    }
+
+    #[test]
+    fn stage4_neg_assign_to_let() {
+        check_file(&format!("{}/stage4_neg_01_assign_to_let.yolo", test_dir()));
+    }
+
+    #[test]
+    fn stage4_neg_assign_undeclared() {
+        check_file(&format!("{}/stage4_neg_02_assign_undeclared.yolo", test_dir()));
+    }
+
+    #[test]
+    fn stage4_neg_assign_type_mismatch() {
+        check_file(&format!("{}/stage4_neg_03_assign_type_mismatch.yolo", test_dir()));
+    }
+
+    #[test]
+    fn stage4_neg_index_assign_type_mismatch() {
+        check_file(&format!("{}/stage4_neg_04_index_assign_type_mismatch.yolo", test_dir()));
+    }
+
+    // ── Stage 5 positive tests ────────────────────────────────────────────────
+
+    #[test]
+    fn stage5_structs_and_methods() {
+        check_file(&format!("{}/stage5_01_structs_and_methods.yolo", test_dir()));
+    }
+
+    // ── Stage 5 negative tests ────────────────────────────────────────────────
+
+    #[test]
+    fn stage5_neg_struct_field_type_mismatch() {
+        check_file(&format!("{}/stage5_neg_01_struct_field_type_mismatch.yolo", test_dir()));
+    }
+
+    #[test]
+    fn stage5_neg_unknown_field() {
+        check_file(&format!("{}/stage5_neg_02_unknown_field.yolo", test_dir()));
+    }
+
+    #[test]
+    fn stage5_neg_method_arg_type_mismatch() {
+        check_file(&format!("{}/stage5_neg_03_method_arg_type_mismatch.yolo", test_dir()));
     }
 }

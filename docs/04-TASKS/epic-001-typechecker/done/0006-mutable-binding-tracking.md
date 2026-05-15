@@ -1,6 +1,6 @@
 # Task 0006: Mutable Binding Tracking and Assignment Type Checking
 
-**Status:** open  
+**Status:** done  
 **Epic:** epic-001-typechecker  
 **Component:** typechecker  
 **Spec Link:** docs/01-SPEC/LANGUAGE-SPEC.md#41-immutable-bindings-let  
@@ -46,12 +46,18 @@ It performs three checks in sequence:
 
 ## Acceptance Criteria
 
-- [ ] `mono_env` entries are `(InferType, bool)`; all existing read call sites updated with no behaviour change
-- [ ] `bind_mono` gains an `is_mutable: bool` parameter; callers updated (`Decl::Let` → `false`, `Decl::Mut` → `true`, function params → `false`)
-- [ ] `lookup_for_write` is implemented and returns the three errors above
-- [ ] `Stmt::Assign` with plain `=` type-checks correctly
-- [ ] `Stmt::Assign` with compound operators (`+=`, `-=`, `*=`, `/=`, `%=`) type-checks correctly
-- [ ] Assigning to a `let` binding produces a `YoloscriptError::TypeError`
-- [ ] Assigning to an undeclared name produces a `YoloscriptError::TypeError`
-- [ ] Type mismatch on the right-hand side produces a `YoloscriptError::TypeError`
-- [ ] All Stage 1 test programs still pass
+- [x] `mono_env` entries are `(InferType, bool)`; all existing read call sites updated with no behaviour change
+- [x] `bind_mono` gains an `is_mutable: bool` parameter; callers updated (`Decl::Let` → `false`, `Decl::Mut` → `true`, function params → `false`)
+- [x] `lookup_for_write` is implemented and returns the three errors above (E0003 for undeclared, E0006 for immutable)
+- [x] `Expr::Assign` with plain `=` type-checks correctly (`stage4_01_assign.yolo`)
+- [x] `Expr::Assign` with compound operators (`+=`, `-=`, `*=`, `/=`, `%=`) type-checks correctly
+- [x] Assigning to a `let` binding produces E0006 (`stage4_neg_01_assign_to_let.yolo`)
+- [x] Assigning to an undeclared name produces E0003 (`stage4_neg_02_assign_undeclared.yolo`)
+- [x] Type mismatch on the right-hand side produces E0001 (`stage4_neg_03_assign_type_mismatch.yolo`)
+- [x] All 126 prior tests still pass; 4 new tests added (130 total)
+
+## Notes
+
+Assignment is `Expr::Assign` in the AST (not `Stmt::Assign` as the task originally described).
+E0006 (assignment to immutable binding) was added to `error/mod.rs` as part of this task.
+`ConstructCtx` in Pass 2 does not track mutability — checks are complete after Pass 1.

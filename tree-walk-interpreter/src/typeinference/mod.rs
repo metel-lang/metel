@@ -403,10 +403,12 @@ pub fn instantiate(scheme: &TypeScheme, gen: &mut TypeVarGenerator) -> InferType
 /// `poly_env` is flat — polymorphic bindings are top-level only.
 pub struct InferContext {
     var_gen: TypeVarGenerator,
-    mono_env: Vec<HashMap<String, InferType>>,
+    mono_env: Vec<HashMap<String, (InferType, bool)>>,
     poly_env: HashMap<String, TypeScheme>,
     constraints: Vec<Constraint>,
     current_return_type: Option<InferType>,
+    pub struct_env: HashMap<String, Vec<(String, InferType)>>,
+    pub method_env: HashMap<String, HashMap<String, InferType>>,
 }
 
 impl InferContext {
@@ -417,7 +419,25 @@ impl InferContext {
             poly_env: HashMap::new(),
             constraints: Vec::new(),
             current_return_type: None,
+            struct_env: HashMap::new(),
+            method_env: HashMap::new(),
         }
+    }
+
+    pub fn register_struct_fields(&mut self, name: String, fields: Vec<(String, InferType)>) {
+        self.struct_env.insert(name, fields);
+    }
+
+    pub fn register_method(&mut self, type_name: String, method_name: String, fun_ty: InferType) {
+        self.method_env.entry(type_name).or_default().insert(method_name, fun_ty);
+    }
+
+    pub fn get_struct_fields(&self, name: &str) -> Option<&Vec<(String, InferType)>> {
+        self.struct_env.get(name)
+    }
+
+    pub fn get_method_type(&self, type_name: &str, method_name: &str) -> Option<&InferType> {
+        self.method_env.get(type_name)?.get(method_name)
     }
 
     /// Enter a new lexical scope (e.g. a function body or block).
@@ -438,9 +458,10 @@ impl InferContext {
         InferType::Var(self.var_gen.fresh())
     }
 
-    /// Bind a name to a monomorphic type in the current scope (e.g. a function parameter).
-    pub fn bind_mono(&mut self, name: impl Into<String>, ty: InferType) {
-        self.mono_env.last_mut().unwrap().insert(name.into(), ty);
+    /// Bind a name to a monomorphic type in the current scope.
+    /// `is_mutable` is `true` for `mut` bindings, `false` for `let` bindings and parameters.
+    pub fn bind_mono(&mut self, name: impl Into<String>, ty: InferType, is_mutable: bool) {
+        self.mono_env.last_mut().unwrap().insert(name.into(), (ty, is_mutable));
     }
 
     /// Bind a name to a polymorphic type scheme (e.g. a let-binding).
@@ -450,14 +471,34 @@ impl InferContext {
 
     /// Look up a name. Polymorphic bindings are automatically instantiated with
     /// fresh variables; monomorphic bindings are searched innermost-scope-first.
-    /// Poly env takes precedence over mono env.
+    /// Poly env takes precedence over mono env. Returns the type only (not mutability).
     pub fn lookup(&mut self, name: &str) -> Option<InferType> {
         if let Some(scheme) = self.poly_env.get(name).cloned() {
             Some(instantiate(&scheme, &mut self.var_gen))
         } else {
             self.mono_env.iter().rev()
                 .find_map(|scope| scope.get(name))
-                .cloned()
+                .map(|(ty, _)| ty.clone())
+        }
+    }
+
+    /// Look up a name for writing (assignment). Returns the binding's type on success.
+    /// Errors:
+    ///   - E0003 if the name is not in scope
+    ///   - E0006 if the binding is immutable (`let` or parameter)
+    pub fn lookup_for_write(&self, name: &str, span: &Span) -> Result<InferType, YoloscriptError> {
+        match self.mono_env.iter().rev().find_map(|scope| scope.get(name)) {
+            None => Err(YoloscriptError::type_error(
+                crate::error::ErrorCode::E0003,
+                format!("use of undeclared variable `{name}`"),
+                span,
+            )),
+            Some((_, false)) => Err(YoloscriptError::type_error(
+                crate::error::ErrorCode::E0006,
+                format!("cannot assign to immutable binding `{name}`"),
+                span,
+            )),
+            Some((ty, true)) => Ok(ty.clone()),
         }
     }
 
@@ -466,7 +507,7 @@ impl InferContext {
     pub fn env_free_vars(&self) -> HashSet<TypeVar> {
         self.mono_env.iter()
             .flat_map(|scope| scope.values())
-            .flat_map(free_vars)
+            .flat_map(|(ty, _)| free_vars(ty))
             .collect()
     }
 

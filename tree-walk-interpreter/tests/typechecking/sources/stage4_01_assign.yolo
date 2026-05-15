@@ -1,0 +1,30 @@
+// Stage 4: assignment type checking (positive cases)
+//
+// Plain `=` and all compound operators on mut bindings.
+
+fun counter() {
+    mut n = 0;
+    n = 10;
+    n += 5;
+    n -= 3;
+    n *= 2;
+    n /= 4;
+    n %= 3;
+}
+
+fun accumulate(start: Int) -> Int {
+    mut total = start;
+    total += 100;
+    total += 200;
+    total
+}
+
+fun reassign_string() {
+    mut s: String = "hello";
+    s = "world";
+}
+
+fun reassign_bool() {
+    mut flag = true;
+    flag = false;
+}

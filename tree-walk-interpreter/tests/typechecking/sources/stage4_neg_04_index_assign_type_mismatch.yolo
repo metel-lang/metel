@@ -1,0 +1,6 @@
+// Negative: assigning a value of the wrong type to an array element.
+
+fun bad(arr: Int[]) -> Int[] {
+    arr[0] = true; // ERROR[E0001]
+    arr
+}

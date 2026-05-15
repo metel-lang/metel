@@ -1,0 +1,7 @@
+// Negative: wrong type for a struct field in a struct literal.
+
+struct Counter {
+    value: Int,
+}
+
+let c = Counter { value: true }; // ERROR[E0001]

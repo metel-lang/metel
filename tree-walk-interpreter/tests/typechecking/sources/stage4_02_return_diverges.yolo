@@ -1,0 +1,34 @@
+// Stage 4: blocks whose only exit is `return` have type Never,
+// which unifies with any expected return type.
+
+// Single return — no tail expression
+fun double(x: Int) -> Int {
+    return x * 2;
+}
+
+// Multiple return paths — no tail expression
+fun sign(n: Int) -> String {
+    if (n > 0) {
+        return "positive";
+    }
+    if (n < 0) {
+        return "negative";
+    }
+    return "zero";
+}
+
+// Early return + tail expression
+fun abs_val(x: Int) -> Int {
+    if (x < 0) {
+        return 0 - x;
+    }
+    x
+}
+
+// Void function with explicit return
+fun maybe_skip(flag: Bool) -> Bool {
+    if (flag) {
+        return false;
+    }
+    true
+}

@@ -1,0 +1,19 @@
+// Stage 4: assignment to array elements via index targets.
+
+// Plain assignment
+fun zero_first(arr: Int[]) -> Int[] {
+    arr[0] = 0;
+    arr
+}
+
+// Compound assignment
+fun bump(arr: Int[]) -> Int[] {
+    arr[0] += 10;
+    arr
+}
+
+// Index expression evaluated at runtime
+fun set_at(arr: Int[], i: Int, v: Int) -> Int[] {
+    arr[i] = v;
+    arr
+}

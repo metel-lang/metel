@@ -1,0 +1,14 @@
+// Negative: wrong type passed as a method argument.
+
+struct Counter {
+    value: Int,
+}
+
+impl Counter {
+    fun add(self, other: Counter) -> Int {
+        self.value + other.value
+    }
+}
+
+let c = Counter { value: 5 };
+let total = c.add(42); // ERROR[E0001]

@@ -9,6 +9,7 @@ pub enum ErrorCode {
     E0003, // Undefined name
     E0004, // Arity mismatch
     E0005, // Invalid operand types
+    E0006, // Assignment to immutable binding
 }
 
 impl std::fmt::Display for ErrorCode {
@@ -19,6 +20,7 @@ impl std::fmt::Display for ErrorCode {
             ErrorCode::E0003 => write!(f, "E0003"),
             ErrorCode::E0004 => write!(f, "E0004"),
             ErrorCode::E0005 => write!(f, "E0005"),
+            ErrorCode::E0006 => write!(f, "E0006"),
         }
     }
 }
