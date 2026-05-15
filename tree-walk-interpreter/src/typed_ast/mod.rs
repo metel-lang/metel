@@ -105,8 +105,6 @@ pub enum TypedStmt {
     While(TypedWhileStmt),
     For(TypedForStmt),
     ForIn(TypedForInStmt),
-    Loop(TypedLoopStmt),
-    Match(TypedMatchExpr),
     Return(TypedReturnStmt),
     Break(TypedBreakStmt),
     Continue(Span),
@@ -141,12 +139,6 @@ pub struct TypedForInStmt {
     pub iterable: TypedExpr,
     pub body:     TypedBlock,
     pub span:     Span,
-}
-
-#[derive(Debug, Clone)]
-pub struct TypedLoopStmt {
-    pub body: TypedBlock,
-    pub span: Span,
 }
 
 #[derive(Debug, Clone)]

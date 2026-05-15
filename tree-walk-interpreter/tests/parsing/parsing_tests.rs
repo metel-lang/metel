@@ -39,3 +39,6 @@ fn test_09_casting_and_generics() { run("09_casting_and_generics.yolo"); }
 
 #[test]
 fn test_10_comprehensive() { run("10_comprehensive.yolo"); }
+
+#[test]
+fn test_11_block_expr_stmts() { run("11_block_expr_stmts.yolo"); }

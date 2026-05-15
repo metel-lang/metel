@@ -314,8 +314,6 @@ fn parse_stmt(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Stmt,
         Rule::while_stmt   => Ok(Stmt::While(parse_while_stmt(inner, filename)?)),
         Rule::for_stmt     => Ok(Stmt::For(parse_for_stmt(inner, filename)?)),
         Rule::for_in_stmt  => Ok(Stmt::ForIn(parse_for_in_stmt(inner, filename)?)),
-        Rule::loop_stmt    => Ok(Stmt::Loop(parse_loop_stmt(inner, filename)?)),
-        Rule::match_stmt   => Ok(Stmt::Match(parse_match_expr(inner, filename)?)),
         Rule::return_stmt  => Ok(Stmt::Return(parse_return_stmt(inner, filename)?)),
         Rule::break_stmt   => Ok(Stmt::Break(parse_break_stmt(inner, filename)?)),
         Rule::continue_stmt => Ok(Stmt::Continue(Span::of(&inner, filename))),
@@ -432,7 +430,6 @@ fn parse_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Expr,
         Rule::tuple_or_paren => parse_tuple_or_paren(pair, filename),
         Rule::array_lit     => parse_array_lit(pair, filename),
         Rule::match_expr    => Ok(Expr::Match(parse_match_expr(pair, filename)?)),
-        Rule::match_stmt    => Ok(Expr::Match(parse_match_expr(pair, filename)?)),
         Rule::if_expr       => parse_if_expr(pair, filename),
         Rule::loop_expr     => parse_loop_expr(pair, filename),
         Rule::closure_expr  => parse_closure_expr(pair, filename),
@@ -988,10 +985,16 @@ fn parse_block(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Bloc
                 let inner = p.into_inner().next()
                     .ok_or_else(|| YoloscriptError::internal("block_item: missing inner rule"))?;
                 match inner.as_rule() {
-                    Rule::if_stmt_item => {
-                        let if_pair = inner.into_inner().next()
-                            .ok_or_else(|| YoloscriptError::internal("if_stmt_item: missing if_expr"))?;
-                        stmts.push(Decl::Stmt(Stmt::Expr(parse_if_expr(if_pair, filename)?)));
+                    Rule::block_expr_stmt => {
+                        let expr_pair = inner.into_inner().next()
+                            .ok_or_else(|| YoloscriptError::internal("block_expr_stmt: missing expr"))?;
+                        let expr = match expr_pair.as_rule() {
+                            Rule::if_expr    => parse_if_expr(expr_pair, filename)?,
+                            Rule::match_expr => Expr::Match(parse_match_expr(expr_pair, filename)?),
+                            Rule::loop_expr  => parse_loop_expr(expr_pair, filename)?,
+                            r => return Err(YoloscriptError::internal(format!("block_expr_stmt: unexpected rule {r:?}"))),
+                        };
+                        stmts.push(Decl::Stmt(Stmt::Expr(expr)));
                     }
                     Rule::decl => stmts.push(parse_decl(inner, filename)?),
                     r => return Err(YoloscriptError::internal(format!("block_item: unexpected rule {r:?}"))),
@@ -1035,14 +1038,6 @@ fn parse_trait_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result
     Ok(TraitDecl { name, methods, span })
 }
 
-fn parse_loop_stmt(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<LoopStmt, YoloscriptError> {
-    let span = Span::of(&pair, filename);
-    let body = parse_block(
-        pair.into_inner().next().ok_or_else(|| YoloscriptError::internal("loop_stmt: expected body"))?,
-        filename,
-    )?;
-    Ok(LoopStmt { body, span })
-}
 
 fn unescape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());

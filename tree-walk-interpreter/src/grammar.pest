@@ -63,8 +63,6 @@ stmt = {
     while_stmt
   | for_stmt
   | for_in_stmt
-  | loop_stmt
-  | match_stmt
   | return_stmt
   | break_stmt
   | continue_stmt
@@ -72,12 +70,12 @@ stmt = {
 }
 
 block      = { "{" ~ block_item* ~ expr? ~ "}" }
-// block_item wraps each statement-level item. if_stmt_item handles `if` in
-// statement position without a trailing `;`: it matches only when the `if`
-// expression is NOT immediately followed by the closing `}` of the block,
-// leaving that case for the tail `expr?`.
-block_item   = { if_stmt_item | decl }
-if_stmt_item = { if_expr ~ !"}" }
+// block_item wraps each statement-level item. block_expr_stmt handles `if`,
+// `match`, and `loop` in statement position without a trailing `;`: it matches
+// only when the expression is NOT immediately followed by the closing `}` of
+// the block, leaving that case for the tail `expr?`.
+block_item      = { block_expr_stmt | decl }
+block_expr_stmt = { (if_expr | match_expr | loop_expr) ~ !"}" }
 expr_stmt  = { expr ~ ";" }
 
 while_stmt = { "while" ~ "(" ~ expr ~ ")" ~ block }
@@ -86,8 +84,6 @@ for_stmt   = { "for" ~ "(" ~ for_init ~ expr? ~ ";" ~ expr? ~ ")" ~ block }
 for_init   = { mut_decl | expr_stmt | ";" }
 
 for_in_stmt  = { "for" ~ "(" ~ "let" ~ ident ~ "in" ~ expr ~ ")" ~ block }
-loop_stmt    = { "loop" ~ block }
-match_stmt   = { "match" ~ expr ~ "{" ~ match_arm ~ ("," ~ match_arm)* ~ ","? ~ "}" }
 
 return_stmt   = { "return" ~ expr? ~ ";" }
 break_stmt    = { "break" ~ expr? ~ ";" }

@@ -170,7 +170,7 @@ Rule::if_expr => {
 
 This keeps `Expr::If.else_branch: Option<Block>` with no special chain variant in the AST or typed AST.
 
-### Files changed
+### Files changed (task 0007)
 
 - `src/grammar.pest` — removed `if_stmt`; updated `if_expr` to optional else; added `block_item` and `if_stmt_item`
 - `src/ast/mod.rs` — removed `Stmt::If`, `IfStmt`, `ElseBranch`; changed `Expr::If.else_branch` to `Option<Block>`
@@ -178,14 +178,33 @@ This keeps `Expr::If.else_branch: Option<Block>` with no special chain variant i
 - `src/parser/mod.rs` — removed `parse_if_stmt`; updated `parse_if_expr` for optional else and `else if` desugaring; updated `parse_block` for `block_item`/`if_stmt_item`
 - `src/typechecker/mod.rs` — removed `infer_if_stmt`, `construct_if_stmt`; updated `infer_expr` and `construct_expr` for `Expr::If` with `Option<Block>`
 
+### Generalisation to match and loop (task 0008, 2026-05-15)
+
+After task 0007 landed, `match` and `loop` still had the identical split (`match_stmt`/`match_expr` and `loop_stmt`/`loop_expr`), which meant they also could never appear as block tails. The `if_stmt_item` rule was generalised into a single `block_expr_stmt` covering all three constructs:
+
+```pest
+block_item      = { block_expr_stmt | decl }
+block_expr_stmt = { (if_expr | match_expr | loop_expr) ~ !"}" }
+```
+
+`match_stmt` and `loop_stmt` were removed from the grammar and from the AST (`Stmt::Match`, `Stmt::Loop`, `LoopStmt`, `TypedStmt::Match`, `TypedStmt::Loop`, `TypedLoopStmt` all deleted). In statement position, `match` and `loop` now produce `Stmt::Expr(Expr::Match(…))` and `Stmt::Expr(Expr::Loop(…))` — the same pattern as `if`.
+
+Files changed (task 0008):
+- `src/grammar.pest` — removed `match_stmt`, `loop_stmt`; replaced `if_stmt_item` with `block_expr_stmt`
+- `src/ast/mod.rs` — removed `Stmt::Match`, `Stmt::Loop`, `LoopStmt`
+- `src/typed_ast/mod.rs` — removed `TypedStmt::Match`, `TypedStmt::Loop`, `TypedLoopStmt`
+- `src/parser/mod.rs` — removed `Rule::match_stmt`/`Rule::loop_stmt` from `parse_stmt`; removed `parse_loop_stmt`; updated `parse_block` to dispatch `Rule::block_expr_stmt`
+- `tests/parsing/sources/11_block_expr_stmts.yolo` — new parsing test covering all three constructs as block tails and as statement-position items
+
 ## Consequences
 
-- `Stmt::If`, `IfStmt`, `ElseBranch`, `TypedStmt::If`, and `TypedIfStmt` are removed
-- Grammar: `if_stmt` rule deleted; `if_expr` gains optional else (`("else" ~ (if_expr | block))?`); `block` uses `block_item*` with a negative-lookahead `if_stmt_item` to avoid requiring semicolons
-- Parser: all `if` constructs produce `Expr::If`; statement position wraps it in `Stmt::Expr` (no semicolon required)
-- Typechecker: `infer_if_stmt` and `construct_if_stmt` removed; `infer_expr`/`construct_expr` for `Expr::If` handle the optional `else_branch`; no-else `if` produces `Unit` and requires the then-branch to also produce `Unit`
+- `Stmt::If`, `IfStmt`, `ElseBranch`, `TypedStmt::If`, and `TypedIfStmt` are removed (task 0007)
+- `Stmt::Match`, `Stmt::Loop`, `LoopStmt`, `TypedStmt::Match`, `TypedStmt::Loop`, and `TypedLoopStmt` are removed (task 0008)
+- Grammar: `if_stmt`, `match_stmt`, `loop_stmt` rules deleted; `block` uses `block_item*` with a single `block_expr_stmt` negative-lookahead rule covering `if`, `match`, and `loop`; no semicolons required for any of these in statement position
+- Parser: all `if`, `match`, and `loop` constructs produce expressions; statement position wraps them in `Stmt::Expr`
+- Typechecker: `infer_if_stmt` and `construct_if_stmt` removed; `infer_expr`/`construct_expr` for `Expr::If` handle the optional `else_branch`; no-else `if` produces `Unit`
 - Evaluator: `Expr::If` with absent else branch evaluates to unit when the condition is false
-- `if` used directly as a block tail now type-checks correctly — the `fun max` pattern works without a `let` workaround
+- `if`, `match`, and `loop` can all be used directly as block tail expressions
 
 ## References
 

@@ -179,8 +179,6 @@ pub enum Stmt {
     While(WhileStmt),
     For(ForStmt),
     ForIn(ForInStmt),
-    Loop(LoopStmt),
-    Match(MatchExpr),
     Return(ReturnStmt),
     Break(BreakStmt),
     Continue(Span),
@@ -220,11 +218,6 @@ pub struct ForInStmt {
 
 
 
-#[derive(Debug, Clone)]
-pub struct LoopStmt {
-    pub body: Block,
-    pub span: Span,
-}
 
 
 #[derive(Debug, Clone)]

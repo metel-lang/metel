@@ -1,0 +1,75 @@
+// 11 — Block-expression statements: match and loop as block tails and statements
+//
+// Exercises the block_expr_stmt grammar rule, which allows `if`, `match`, and
+// `loop` to appear either in statement position (no trailing `;`) or as the
+// tail expression of a block.  Previously, `match_stmt` and `loop_stmt` were
+// separate grammar rules that prevented these constructs from ever appearing
+// as block tails.
+
+enum Color { Red, Green, Blue }
+
+// match as a block tail — the function body returns the match result directly
+fun color_name(c: Color) -> String {
+    match c {
+        Color::Red   => "red",
+        Color::Green => "green",
+        Color::Blue  => "blue",
+    }
+}
+
+// loop as a block tail — the function body returns the loop result directly
+fun first_positive(arr: Int[]) -> Int {
+    mut i = 0;
+    loop {
+        if (arr[i] > 0) {
+            break arr[i];
+        }
+        i += 1;
+    }
+}
+
+// match in statement position (not the tail) — followed by more code
+fun print_color(c: Color) {
+    match c {
+        Color::Red   => println("red"),
+        Color::Green => println("green"),
+        Color::Blue  => println("blue"),
+    }
+    println("done")
+}
+
+// loop in statement position (not the tail) — followed by more code
+fun count_to(n: Int) -> Int {
+    mut count = 0;
+    loop {
+        if (count >= n) {
+            break;
+        }
+        count += 1;
+    }
+    return count;
+}
+
+// multiple match statements in a block, none as the tail
+fun report(c: Color) {
+    match c {
+        Color::Red => println("warm"),
+        _          => println("cool"),
+    }
+    match c {
+        Color::Blue => println("very cool"),
+        _           => println("not blue"),
+    }
+    println("end")
+}
+
+fun main() {
+    println(color_name(Color::Red));
+    println(color_name(Color::Green));
+    println(color_name(Color::Blue));
+    println(int_to_string(first_positive([0, 0, 7, 1])));
+    print_color(Color::Blue);
+    println(int_to_string(count_to(5)));
+    report(Color::Red);
+    report(Color::Blue);
+}
