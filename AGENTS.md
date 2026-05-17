@@ -30,6 +30,7 @@ Yoloscript is a statically-typed, expression-oriented scripting language. This r
 3. **Check existing decisions** — search `backlog/decisions/` for any ADR that governs the area being changed. Read it before writing any code.
 4. **Check dependencies** — verify every listed dependency task is actually done and its implementation matches what this task expects.
 5. **If no clear path forward exists** — STOP. Ask for guidance before beginning implementation. Do not make a significant architectural decision unilaterally.
+6. **Commit** after moving the task to `in-progress`: `task(TASK-ID): start — brief description`
 
 ### During implementation
 
@@ -45,6 +46,55 @@ Yoloscript is a statically-typed, expression-oriented scripting language. This r
 3. If any non-obvious decisions were made during implementation → create a decision record.
 4. If the implementation revealed spec gaps that you fixed → verify the spec edit is committed.
 5. If a spec section is now interpreter-validated, tag it: `> ✓ Interpreter-validated (v0.1)`
+6. **Commit** after marking the task `done`: `task(TASK-ID): close — brief summary`
+
+### When updating a task
+
+Whenever you edit a task (change status, add notes, modify acceptance criteria, etc.), **commit immediately** after the update:
+- `task(TASK-ID): update — what changed`
+
+---
+
+## Commit Convention
+
+Every commit related to a task **must include the task ID**:
+
+```
+<type>(<task-id>): <description>
+```
+
+### Two separate repos — two separate commit streams
+
+The backlog lives in a git submodule (`docs/backlog/`). The main repo and the backlog submodule are **always committed separately**:
+
+- **Backlog submodule**: commit on every task state change (create, start, update, close)
+- **Main repo**: commit only when actual source code is written — never solely because a task changed state
+
+Never bundle a backlog commit and a code commit into one. Stage and commit each repo independently.
+
+### Commit reference table
+
+| Situation | Repo | Type | Example |
+|---|---|---|---|
+| Create a task | backlog | `task` | `task(TASK-42): create — implement generic type inference` |
+| Start a task (→ in-progress) | backlog | `task` | `task(TASK-42): start — begin implementation` |
+| Update a task | backlog | `task` | `task(TASK-42): update — add acceptance criteria` |
+| Close a task (→ done) | backlog | `task` | `task(TASK-42): close — implementation complete` |
+| Code change for a task | main | `feat` / `fix` / `refactor` / `test` / `docs` | `feat(TASK-42): add generic type inference` |
+
+Commits not related to any task omit the task ID and use the type prefix alone: `docs: fix typo in README`.
+
+### Closing commits require a body
+
+When closing a task, **both** the backlog commit and the main repo commit must include a body with a bullet list of what was done:
+
+```
+task(TASK-42): close — implement generic type inference
+
+- Added unification for generic type variables in typeinference/mod.rs
+- Extended TypeEnv to track generic constraints
+- Added 12 integration tests covering polymorphic functions
+```
 
 ---
 

@@ -109,6 +109,27 @@ Decision records live in `docs/backlog/decisions/`. Milestones (epics and phases
 - Read `backlog://workflow/overview` (or call `backlog.get_backlog_instructions()`) before creating tasks to avoid duplicates and follow the correct workflow
 - Task statuses: `open`, `in-progress`, `done`, `blocked`
 - Every task should link to the relevant spec doc or backlog item
+- **Always commit to the backlog submodule** immediately after creating, updating, or closing a task
+- **The main repo only gets a commit when actual code is written** — task state changes alone do not trigger a main repo commit
+- The backlog submodule and the main repo are committed **separately and never together**
+
+### Commit Message Convention
+- All commits related to a task **must include the task ID** in the message
+- Format: `<type>(<task-id>): <description>`
+- Types: `task` (create/update/close), `feat`, `fix`, `refactor`, `test`, `docs`
+- Examples:
+  - Backlog submodule — `task(TASK-42): create — implement type inference for generics`
+  - Backlog submodule — `task(TASK-42): update — add acceptance criteria`
+  - Backlog submodule — `task(TASK-42): close — implementation complete`
+  - Main repo — `feat(TASK-42): add generic type inference`
+- **Closing commits (both backlog and main repo) must include a body**: a bullet list of what was done
+  ```
+  task(TASK-42): close — implement generic type inference
+
+  - Added unification for generic type variables in typeinference/mod.rs
+  - Extended TypeEnv to track generic constraints
+  - Added 12 integration tests covering polymorphic functions
+  ```
 
 ### Three-Stage Validation
 1. **Designed**: Written in spec, not yet implemented
