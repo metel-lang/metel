@@ -25,20 +25,22 @@ pub fn check(program: Program) -> Result<TypedProgram, YoloscriptError> {
     let subst = ctx.solve()?;
 
     // Build SchemeEnv from user functions, then add polymorphic built-in schemes.
+    // Hand off the generator so all remaining TypeVar allocations are globally unique.
+    let mut gen = ctx.split_gen();
     let mut scheme_env: SchemeEnv = HashMap::new();
     for fg in fun_generalizations {
         let resolved = subst.apply(&fg.fun_ty);
         let scheme = generalize(resolved, &fg.env_fvs);
         scheme_env.insert(fg.name, scheme);
     }
-    register_builtin_poly_schemes(&mut scheme_env);
+    register_builtin_poly_schemes(&mut scheme_env, &mut gen);
 
     // Build concrete environments for Pass 2.
     let concrete_struct_env = build_concrete_struct_env(&ctx.struct_env, &subst)?;
     let concrete_method_env = build_concrete_method_env(&ctx.method_env, &subst)?;
 
     // Pass 2: re-derive concrete types and build TypedAST.
-    construct_program(&program, &subst, &scheme_env, concrete_struct_env, concrete_method_env, &ctx.enum_env)
+    construct_program(&program, &subst, &scheme_env, concrete_struct_env, concrete_method_env, &ctx.enum_env, gen)
 }
 
 fn register_builtins(ctx: &mut InferContext) {
@@ -77,9 +79,7 @@ fn register_builtins(ctx: &mut InferContext) {
     });
 }
 
-fn register_builtin_poly_schemes(scheme_env: &mut SchemeEnv) {
-    let mut gen = TypeVarGenerator::new();
-
+fn register_builtin_poly_schemes(scheme_env: &mut SchemeEnv, gen: &mut TypeVarGenerator) {
     let t = gen.fresh();
     scheme_env.insert("array_push".into(), TypeScheme {
         quantified_vars: vec![t],
@@ -1120,6 +1120,8 @@ struct ConstructCtx<'a> {
     struct_env: HashMap<String, Vec<(String, Type)>>,
     method_env: HashMap<String, HashMap<String, Type>>,
     enum_env:   &'a HashMap<String, EnumInfo>,
+    /// Shared generator continued from Pass 1; keeps TypeVar identities globally unique.
+    gen:        TypeVarGenerator,
 }
 
 impl<'a> ConstructCtx<'a> {
@@ -1129,11 +1131,12 @@ impl<'a> ConstructCtx<'a> {
         struct_env: HashMap<String, Vec<(String, Type)>>,
         method_env: HashMap<String, HashMap<String, Type>>,
         enum_env:   &'a HashMap<String, EnumInfo>,
+        gen:        TypeVarGenerator,
     ) -> Self {
         let mut ctx = Self {
             subst, scheme_env,
             env: vec![HashMap::new()],
-            struct_env, method_env, enum_env,
+            struct_env, method_env, enum_env, gen,
         };
         let str_ty   = Type::Str;
         let int_ty   = Type::Int;
@@ -1171,8 +1174,9 @@ fn construct_program(
     struct_env: HashMap<String, Vec<(String, Type)>>,
     method_env: HashMap<String, HashMap<String, Type>>,
     enum_env:   &HashMap<String, EnumInfo>,
+    gen:        TypeVarGenerator,
 ) -> Result<TypedProgram, YoloscriptError> {
-    let mut ctx = ConstructCtx::new(subst, scheme_env, struct_env, method_env, enum_env);
+    let mut ctx = ConstructCtx::new(subst, scheme_env, struct_env, method_env, enum_env, gen);
 
     // Hoist resolved function types so forward references work in Pass 2.
     for decl in &program.decls {
@@ -1759,7 +1763,7 @@ fn construct_call(
             let scheme = ctx.scheme_env.get(name.as_str()).ok_or_else(|| {
                 YoloscriptError::type_error(ErrorCode::E0003, format!("undefined name `{name}`"), ident_span)
             })?;
-            let concrete = instantiate_scheme_for_call(scheme, &arg_types, span)?;
+            let concrete = instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?;
             let typed = TypedExpr::Ident(name.clone(), concrete.clone(), ident_span.clone());
             (typed, concrete)
         }
@@ -1815,11 +1819,9 @@ fn instantiate_scheme_for_call(
     scheme:    &TypeScheme,
     arg_types: &[&Type],
     span:      &Span,
+    gen:       &mut TypeVarGenerator,
 ) -> Result<Type, YoloscriptError> {
-    // Start past the scheme's quantified vars to avoid mapping a var to itself.
-    let start = scheme.quantified_vars.iter().map(|v| v.0 + 1).max().unwrap_or(0);
-    let mut gen = TypeVarGenerator::with_counter(start);
-    let instance = instantiate(scheme, &mut gen);
+    let instance = instantiate(scheme, gen);
 
     let (params, ret) = match instance {
         InferType::Fun(p, r) => (p, r),

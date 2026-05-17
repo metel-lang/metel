@@ -24,6 +24,21 @@ impl std::fmt::Display for TypeVar {
 }
 
 /// Counter for generating fresh type variables.
+///
+/// # Invariant: TypeVar identity is global
+///
+/// `TypeVar` equality means identity — two vars with the same `u32` are the *same* variable.
+/// All `TypeVarGenerator` instances within a single type-check run must therefore be
+/// coordinated: each new generator must start past the highest counter value produced by
+/// any earlier generator.  Creating an independent `TypeVarGenerator::new()` in a call site
+/// that produces vars intended to be globally unique will cause collisions — the "fresh"
+/// var may be identical to an already-used one, producing self-referential substitutions
+/// and infinite recursion in `Substitution::apply`.
+///
+/// The correct pattern: `InferContext` owns the generator for Pass 1.  After Pass 1,
+/// call `ctx.split_gen()` to obtain a new generator that starts past all Pass 1 vars,
+/// then thread that single instance through Pass 2 (and any intermediate steps like
+/// `register_builtin_poly_schemes`).
 pub struct TypeVarGenerator {
     counter: u32,
 }
@@ -472,6 +487,14 @@ impl InferContext {
 
     pub fn fresh_type_var_raw(&mut self) -> TypeVar {
         self.var_gen.fresh()
+    }
+
+    /// Return a new generator whose counter starts immediately past all vars
+    /// allocated by this context.  Use this to hand off to a subsequent phase
+    /// (Pass 2, `register_builtin_poly_schemes`) so that every `TypeVar` ever
+    /// produced during a type-check run is globally unique.
+    pub fn split_gen(&self) -> TypeVarGenerator {
+        TypeVarGenerator::with_counter(self.var_gen.counter())
     }
 
     /// Enter a new lexical scope (e.g. a function body or block).
