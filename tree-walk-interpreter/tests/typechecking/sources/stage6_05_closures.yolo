@@ -1,0 +1,25 @@
+// Stage 6: closures.
+
+// Closure with explicit param and return type annotations
+let add = fun(x: Int, y: Int) -> Int { x + y };
+let sum: Int = add(3, 4);
+
+// Closure with annotated params, inferred return type
+let double = fun(x: Int) { x * 2 };
+let d: Int = double(5);
+
+// Closure capturing an outer variable
+let factor: Int = 3;
+let multiply = fun(x: Int) -> Int { x * factor };
+let m: Int = multiply(7);
+
+// Closure passed to a higher-order function
+fun apply(f: fun(Int) -> Int, x: Int) -> Int {
+    f(x)
+}
+
+let result: Int = apply(fun(n: Int) -> Int { n + 1 }, 10);
+
+// Closure returning a negated value
+let negate = fun(x: Int) -> Int { -x };
+let neg: Int = negate(5);

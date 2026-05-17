@@ -310,6 +310,11 @@ mod tests {
         check_file(&format!("{}/stage6_07_error_propagation.yolo", test_dir()));
     }
 
+    #[test]
+    fn stage6_closures() {
+        check_file(&format!("{}/stage6_05_closures.yolo", test_dir()));
+    }
+
     // ── Stage 6 negative tests ────────────────────────────────────────────────
 
     #[test]

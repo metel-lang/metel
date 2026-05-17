@@ -753,6 +753,24 @@ fn infer_expr(
                 span,
             ))
         }
+        Expr::Closure { params, return_type, body, .. } => {
+            let param_types: Vec<InferType> = params.iter().map(|p| {
+                if let Some(ann) = &p.type_ann { type_expr_to_infer(ann) } else { ctx.fresh_var() }
+            }).collect();
+            let ret_ty = return_type.as_ref()
+                .map(type_expr_to_infer)
+                .unwrap_or_else(|| ctx.fresh_var());
+            ctx.push_scope();
+            for (p, pt) in params.iter().zip(param_types.iter()) {
+                ctx.bind_mono(&p.name, pt.clone(), p.mutable);
+            }
+            let saved_ret = ctx.push_return_type(ret_ty.clone());
+            let body_ty = infer_block(body, ctx, fun_generalizations)?;
+            ctx.add_constraint(body_ty, ret_ty.clone(), body.span.clone());
+            ctx.pop_return_type(saved_ret);
+            ctx.pop_scope();
+            Ok(InferType::Fun(param_types, Box::new(ret_ty)))
+        }
         Expr::PropagateError { expr, span } => {
             let inner_ty = infer_expr(expr, ctx, fun_generalizations)?;
             let ok_var  = ctx.fresh_var();
@@ -1477,6 +1495,29 @@ fn construct_expr(expr: &Expr, expected_ty: Option<&Type>, ctx: &mut ConstructCt
                 span.clone(),
             ))
         }
+        Expr::Closure { params, return_type, body, span } => {
+            let param_types: Vec<Type> = params.iter()
+                .map(|p| p.type_ann.as_ref()
+                    .map(|ann| resolved_to_type(&type_expr_to_infer(ann), ctx.subst, &p.span))
+                    .unwrap_or_else(|| Err(YoloscriptError::type_error(
+                        ErrorCode::E0002,
+                        format!("closure parameter `{}` needs a type annotation", p.name),
+                        &p.span,
+                    ))))
+                .collect::<Result<_, _>>()?;
+            let ret_ty = return_type.as_ref()
+                .map(|ann| resolved_to_type(&type_expr_to_infer(ann), ctx.subst, span))
+                .transpose()?
+                .unwrap_or(Type::Unit);
+            ctx.push_scope();
+            for (p, ty) in params.iter().zip(param_types.iter()) {
+                ctx.bind(&p.name, ty.clone());
+            }
+            let typed_body = construct_block(body, ctx)?;
+            ctx.pop_scope();
+            let ty = Type::Fun(param_types, Box::new(ret_ty));
+            Ok(TypedExpr::Closure { params: params.clone(), return_type: return_type.clone(), body: typed_body, ty, span: span.clone() })
+        }
         Expr::PropagateError { expr, span } => {
             let typed_expr = construct_expr(expr, None, ctx)?;
             let ty = match typed_expr.ty() {
@@ -1676,10 +1717,22 @@ fn construct_call(
 }
 
 /// Instantiate a polymorphic scheme against concrete argument types.
-///
-/// Creates fresh type variables for the quantified vars, unifies them against
-/// the concrete arg types, and returns the fully concrete `Fun` type for this
-/// call site.
+fn type_to_infer(ty: &Type) -> InferType {
+    match ty {
+        Type::Never            => InferType::Never,
+        Type::Array(t)         => InferType::Array(Box::new(type_to_infer(t))),
+        Type::Tuple(ts)        => InferType::Tuple(ts.iter().map(type_to_infer).collect()),
+        Type::Fun(ps, ret)     => InferType::Fun(
+            ps.iter().map(type_to_infer).collect(),
+            Box::new(type_to_infer(ret)),
+        ),
+        Type::Named(n, args)   => InferType::Named(n.clone(), args.iter().map(type_to_infer).collect()),
+        Type::Perhaps(t)       => InferType::Named("Perhaps".into(), vec![type_to_infer(t)]),
+        Type::Result(t, e)     => InferType::Named("Result".into(), vec![type_to_infer(t), type_to_infer(e)]),
+        other                  => InferType::Concrete(other.clone()),
+    }
+}
+
 fn instantiate_scheme_for_call(
     scheme:    &TypeScheme,
     arg_types: &[&Type],
@@ -1695,7 +1748,7 @@ fn instantiate_scheme_for_call(
 
     let mut subst = Substitution::new();
     for (param, arg_ty) in params.iter().zip(arg_types.iter()) {
-        let arg_infer = InferType::Concrete((*arg_ty).clone());
+        let arg_infer = type_to_infer(*arg_ty);
         let s = unify(&subst.apply(param), &arg_infer).map_err(|_| {
             YoloscriptError::type_error(ErrorCode::E0001, "argument type mismatch", span)
         })?;
