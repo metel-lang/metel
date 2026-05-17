@@ -107,7 +107,7 @@ Decision records live in `docs/backlog/decisions/`. Milestones (epics and phases
 ### Task Management
 - All tasks are managed via the **Backlog.md MCP server** — use its tools to create, update, and close tasks
 - Read `backlog://workflow/overview` (or call `backlog.get_backlog_instructions()`) before creating tasks to avoid duplicates and follow the correct workflow
-- Task statuses: `open`, `in-progress`, `done`, `blocked`
+- Task statuses: `Backlog` (not in current milestone), `To Do`, `In Progress`, `Done`
 - Every task should link to the relevant spec doc or backlog item
 - **Always commit to the backlog submodule** immediately after creating, updating, or closing a task
 - **The main repo only gets a commit when actual code is written** — task state changes alone do not trigger a main repo commit
