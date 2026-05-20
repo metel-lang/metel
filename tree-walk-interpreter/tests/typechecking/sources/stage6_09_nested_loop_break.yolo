@@ -10,9 +10,18 @@ let _b: Int = loop {
     if (true) { break 42; } else { break 0; }
 };
 
-// inner loop break does not escape to outer loop; outer diverges (Never)
-fun diverge_outer() -> Int {
+// inner loop break does not escape to outer loop; outer diverges (Never).
+// Both trailing-semicolon and no-semicolon forms are valid in statement position.
+fun diverge_outer_with_semi() -> Int {
     loop {
-        let _: String = loop { break "inner"; };
+        loop { break "inner"; };
+        loop { break "inner"; };
+    }
+}
+
+fun diverge_outer_no_semi() -> Int {
+    loop {
+        loop { break "inner"; }
+        loop { break "inner"; }
     }
 }

@@ -71,11 +71,11 @@ stmt = {
 
 block      = { "{" ~ block_item* ~ expr? ~ "}" }
 // block_item wraps each statement-level item. block_expr_stmt handles `if`,
-// `match`, and `loop` in statement position without a trailing `;`: it matches
-// only when the expression is NOT immediately followed by the closing `}` of
-// the block, leaving that case for the tail `expr?`.
+// `match`, and `loop` in statement position with an optional trailing `;`. The
+// !"}" lookahead keeps the tail-expression case for `expr?`; if the optional
+// `;` was consumed and `}` follows, pest backtracks and `expr_stmt` takes over.
 block_item      = { block_expr_stmt | decl }
-block_expr_stmt = { (if_expr | match_expr | loop_expr) ~ !"}" }
+block_expr_stmt = { (if_expr | match_expr | loop_expr) ~ ";"? ~ !"}" }
 expr_stmt  = { expr ~ ";" }
 
 while_stmt = { "while" ~ "(" ~ expr ~ ")" ~ block }
