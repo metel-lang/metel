@@ -5,9 +5,9 @@ use std::collections::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::ast::{BinOp, Literal, Span, UnaryOp};
+use crate::ast::{BinOp, Literal, Param, Pattern, Span, UnaryOp};
 use crate::error::YoloscriptError;
-use crate::typed_ast::{TypedExpr, TypedProgram};
+use crate::typed_ast::{FunBody, TypedBlock, TypedDecl, TypedExpr, TypedForInit, TypedProgram, TypedStmt};
 
 // ── Runtime values ────────────────────────────────────────────────────────────
 
@@ -22,6 +22,9 @@ pub enum Value {
     Array(Rc<RefCell<Vec<Value>>>),
     Struct { name: String, fields: HashMap<String, Value> },
     Enum { name: String, variant: String, fields: HashMap<String, Value> },
+    /// A named function definition hoisted into the environment.
+    /// Actual call dispatch is implemented in #4; the entry point uses this directly for main().
+    Function { name: String, params: Vec<Param>, body: FunBody },
     Closure(Rc<ClosureValue>),
     Builtin(String, fn(Vec<Value>, &Span) -> Result<Value, YoloscriptError>),
     Perhaps(Option<Box<Value>>),
@@ -125,9 +128,235 @@ pub fn evaluate(program: TypedProgram) -> Result<(), YoloscriptError> {
     let mut env = Environment::new();
     register_builtins(&mut env);
 
-    // TODO: evaluate each declaration, then call main()
-    let _ = program;
-    Ok(())
+    // Pass 1: hoist function declarations so forward references work.
+    for decl in &program {
+        if let TypedDecl::Fun(f) = decl {
+            env.define(&f.name, Value::Function {
+                name:   f.name.clone(),
+                params: f.params.clone(),
+                body:   f.body.clone(),
+            });
+        }
+    }
+
+    // Pass 2: evaluate top-level let/mut bindings and statements in order.
+    for decl in &program {
+        if !matches!(decl, TypedDecl::Fun(_)) {
+            eval_decl(decl, &mut env)?;
+        }
+    }
+
+    // Call main() directly — it takes no arguments, so we execute its body without
+    // the full call-dispatch machinery that will come in #4.
+    let dummy = Span { start: 0, end: 0, filename: "<program>".to_string() };
+    let main_body = match env.get("main") {
+        Some(Value::Function { body: FunBody::Typed(b), .. }) => b,
+        Some(Value::Function { body: FunBody::Generic(_), .. }) =>
+            return Err(YoloscriptError::panic("main() must not be generic", &dummy)),
+        Some(_) =>
+            return Err(YoloscriptError::panic("`main` is not a function", &dummy)),
+        None =>
+            return Err(YoloscriptError::panic("no main() function defined", &dummy)),
+    };
+    match eval_block(&main_body, &mut env)? {
+        Signal::Value(_) | Signal::Return(_) => Ok(()),
+        other => Err(YoloscriptError::panic(
+            format!("unexpected signal from main(): {other:?}"),
+            &dummy,
+        )),
+    }
+}
+
+// ── Block and declaration evaluation ─────────────────────────────────────────
+
+/// Evaluate a block: push scope, run stmts, return tail (or Unit).
+/// Non-Value signals (Return, Break, Continue) short-circuit and propagate out.
+pub fn eval_block(block: &TypedBlock, env: &mut Environment) -> Result<Signal, YoloscriptError> {
+    env.push_scope();
+    for decl in &block.stmts {
+        let sig = eval_decl(decl, env)?;
+        match sig {
+            Signal::Value(_) => {}
+            other => {
+                env.pop_scope();
+                return Ok(other);
+            }
+        }
+    }
+    let result = match &block.tail {
+        Some(tail) => eval_expr(tail, env),
+        None       => Ok(Signal::Value(Value::Unit)),
+    };
+    env.pop_scope();
+    result
+}
+
+/// Evaluate a single declaration inside a block or at the top level.
+fn eval_decl(decl: &TypedDecl, env: &mut Environment) -> Result<Signal, YoloscriptError> {
+    match decl {
+        TypedDecl::Let(d) => {
+            let val = eval_expr(&d.value, env)?.into_value();
+            env.define(&d.name, val);
+            Ok(Signal::Value(Value::Unit))
+        }
+        TypedDecl::Mut(d) => {
+            let val = eval_expr(&d.value, env)?.into_value();
+            env.define(&d.name, val);
+            Ok(Signal::Value(Value::Unit))
+        }
+        TypedDecl::Fun(f) => {
+            env.define(&f.name, Value::Function {
+                name:   f.name.clone(),
+                params: f.params.clone(),
+                body:   f.body.clone(),
+            });
+            Ok(Signal::Value(Value::Unit))
+        }
+        TypedDecl::Stmt(s) => eval_stmt(s, env),
+        // Type-level declarations have no runtime representation.
+        TypedDecl::Struct(_) | TypedDecl::Enum(_) | TypedDecl::Impl(_) | TypedDecl::Trait(_) => {
+            Ok(Signal::Value(Value::Unit))
+        }
+    }
+}
+
+// ── Statement evaluation ──────────────────────────────────────────────────────
+
+pub fn eval_stmt(stmt: &TypedStmt, env: &mut Environment) -> Result<Signal, YoloscriptError> {
+    match stmt {
+        TypedStmt::Expr(e) => {
+            // Must propagate non-Value signals (Break/Continue/Return) that arise from
+            // control-flow expressions used in statement position, e.g. `if (x) { break; }`.
+            match eval_expr(e, env)? {
+                Signal::Value(_) => Ok(Signal::Value(Value::Unit)),
+                other            => Ok(other),
+            }
+        }
+        TypedStmt::Return(r) => {
+            let val = match &r.value {
+                Some(e) => eval_expr(e, env)?.into_value(),
+                None    => Value::Unit,
+            };
+            Ok(Signal::Return(val))
+        }
+        TypedStmt::Break(b) => {
+            let val = match &b.value {
+                Some(e) => eval_expr(e, env)?.into_value(),
+                None    => Value::Unit,
+            };
+            Ok(Signal::Break(val))
+        }
+        TypedStmt::Continue(_) => Ok(Signal::Continue),
+
+        TypedStmt::While(w) => {
+            loop {
+                match eval_expr(&w.condition, env)? {
+                    Signal::Value(Value::Bool(false)) => break,
+                    Signal::Value(Value::Bool(true))  => {}
+                    Signal::Value(_) => return Err(YoloscriptError::panic(
+                        "while: expected Bool condition", &w.span,
+                    )),
+                    other => return Ok(other), // Return / PropagateErr from condition
+                }
+                match eval_block(&w.body, env)? {
+                    Signal::Value(_) | Signal::Continue => {}
+                    Signal::Break(_)       => break,
+                    Signal::Return(v)      => return Ok(Signal::Return(v)),
+                    Signal::PropagateErr(v)=> return Ok(Signal::PropagateErr(v)),
+                }
+            }
+            Ok(Signal::Value(Value::Unit))
+        }
+
+        TypedStmt::For(f) => {
+            // The init binding lives in its own scope so it doesn't leak out.
+            // PoC note: if eval_block errors inside the loop, this scope is not
+            // popped (errors are fatal so it doesn't matter in practice).
+            env.push_scope();
+            if let Some(init) = &f.init {
+                match init {
+                    TypedForInit::Mut(d) => {
+                        let val = eval_expr(&d.value, env)?.into_value();
+                        env.define(&d.name, val);
+                    }
+                    TypedForInit::Expr(e) => { eval_expr(e, env)?; }
+                }
+            }
+            let result = loop {
+                if let Some(cond) = &f.condition {
+                    match eval_expr(cond, env)? {
+                        Signal::Value(Value::Bool(false)) => break Ok(Signal::Value(Value::Unit)),
+                        Signal::Value(Value::Bool(true))  => {}
+                        Signal::Value(_) => break Err(YoloscriptError::panic(
+                            "for: expected Bool condition", &f.span,
+                        )),
+                        other => break Ok(other),
+                    }
+                }
+                match eval_block(&f.body, env)? {
+                    Signal::Value(_) | Signal::Continue => {}
+                    Signal::Break(_)        => break Ok(Signal::Value(Value::Unit)),
+                    Signal::Return(v)       => break Ok(Signal::Return(v)),
+                    Signal::PropagateErr(v) => break Ok(Signal::PropagateErr(v)),
+                }
+                if let Some(step) = &f.step {
+                    eval_expr(step, env)?;
+                }
+            };
+            env.pop_scope();
+            result
+        }
+
+        TypedStmt::ForIn(fi) => {
+            let iterable = eval_expr(&fi.iterable, env)?.into_value();
+            eval_for_in(&fi.binding, iterable, &fi.body, &fi.span, env)
+        }
+    }
+}
+
+fn eval_for_in(
+    binding: &str,
+    iterable: Value,
+    body:     &TypedBlock,
+    span:     &Span,
+    env:      &mut Environment,
+) -> Result<Signal, YoloscriptError> {
+    let items: Vec<Value> = match iterable {
+        Value::Array(rc) => rc.borrow().clone(),
+        Value::Struct { ref name, ref fields } if name == "Range" => {
+            let s = range_field(fields, "start", span)?;
+            let e = range_field(fields, "end",   span)?;
+            (s..e).map(Value::Int).collect()
+        }
+        Value::Struct { ref name, ref fields } if name == "RangeInclusive" => {
+            let s = range_field(fields, "start", span)?;
+            let e = range_field(fields, "end",   span)?;
+            (s..=e).map(Value::Int).collect()
+        }
+        _ => return Err(YoloscriptError::panic("for-in: expected Array or Range", span)),
+    };
+
+    for item in items {
+        // Push a scope for the loop variable, then eval_block pushes its own inner scope.
+        env.push_scope();
+        env.define(binding, item);
+        let sig = eval_block(body, env)?;
+        env.pop_scope();
+        match sig {
+            Signal::Value(_) | Signal::Continue => {}
+            Signal::Break(_)        => break,
+            Signal::Return(v)       => return Ok(Signal::Return(v)),
+            Signal::PropagateErr(v) => return Ok(Signal::PropagateErr(v)),
+        }
+    }
+    Ok(Signal::Value(Value::Unit))
+}
+
+fn range_field(fields: &HashMap<String, Value>, name: &str, span: &Span) -> Result<i64, YoloscriptError> {
+    match fields.get(name) {
+        Some(Value::Int(n)) => Ok(*n),
+        _ => Err(YoloscriptError::panic(format!("range: missing or non-Int field `{name}`"), span)),
+    }
 }
 
 // ── Expression evaluation ─────────────────────────────────────────────────────
@@ -287,12 +516,170 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
             }
         }
 
-        // All other variants are handled by later issues.
+        TypedExpr::If { condition, then_branch, else_branch, span, .. } => {
+            match eval_expr(condition, env)? {
+                Signal::Value(Value::Bool(true))  => eval_block(then_branch, env),
+                Signal::Value(Value::Bool(false)) => match else_branch {
+                    Some(branch) => eval_block(branch, env),
+                    None         => Ok(Signal::Value(Value::Unit)),
+                },
+                Signal::Value(_) => Err(YoloscriptError::panic("if: expected Bool condition", span)),
+                other => Ok(other), // propagate Return / PropagateErr from condition
+            }
+        }
+
+        TypedExpr::Loop { body, .. } => {
+            loop {
+                match eval_block(body, env)? {
+                    Signal::Value(_) | Signal::Continue => {}
+                    Signal::Break(val)      => return Ok(Signal::Value(val)),
+                    Signal::Return(v)       => return Ok(Signal::Return(v)),
+                    Signal::PropagateErr(v) => return Ok(Signal::PropagateErr(v)),
+                }
+            }
+        }
+
+        TypedExpr::Match(m) => {
+            let scrutinee = eval_expr(&m.scrutinee, env)?.into_value();
+            for arm in &m.arms {
+                let mut bindings = HashMap::new();
+                if !match_pattern(&arm.pattern, &scrutinee, &mut bindings) {
+                    continue;
+                }
+                // Evaluate the guard (if any) in a scope that includes pattern bindings.
+                if let Some(guard) = &arm.guard {
+                    env.push_scope();
+                    for (k, v) in &bindings { env.define(k, v.clone()); }
+                    let guard_val = eval_expr(guard, env)?.into_value();
+                    env.pop_scope();
+                    match guard_val {
+                        Value::Bool(true)  => {}
+                        Value::Bool(false) => continue,
+                        _ => return Err(YoloscriptError::panic("match guard: expected Bool", &arm.span)),
+                    }
+                }
+                // Execute the arm body in a scope with pattern bindings.
+                env.push_scope();
+                for (k, v) in bindings { env.define(&k, v); }
+                let result = eval_expr(&arm.body, env);
+                env.pop_scope();
+                return result;
+            }
+            Err(YoloscriptError::panic("match: no arm matched scrutinee", &m.span))
+        }
+
+        TypedExpr::Assign { target, op, value, span, .. } => {
+            use crate::ast::{AssignOp, AssignTarget};
+            let rhs = eval_expr(value, env)?.into_value();
+            match target {
+                AssignTarget::Ident(name, _) => {
+                    let new_val = if matches!(op, AssignOp::Assign) {
+                        rhs
+                    } else {
+                        let cur = env.get(name).ok_or_else(|| {
+                            YoloscriptError::panic(format!("assign: undefined `{name}`"), span)
+                        })?;
+                        apply_assign_op(op, cur, rhs, span)?
+                    };
+                    if !env.set(name, new_val) {
+                        return Err(YoloscriptError::panic(
+                            format!("assign: undefined `{name}`"), span,
+                        ));
+                    }
+                    Ok(Signal::Value(Value::Unit))
+                }
+                // Field and index assignment handled in #54.
+                other_target => Err(YoloscriptError::panic(
+                    format!("assign: field/index targets not yet implemented"),
+                    match other_target {
+                        AssignTarget::FieldAccess { span, .. } => span,
+                        AssignTarget::Index { span, .. } => span,
+                        AssignTarget::Ident(_, span) => span,
+                    },
+                )),
+            }
+        }
+
+        // Variants handled by other issues (#54 for StructLiteral/FieldAccess/MethodCall,
+        // #4 for Call/Closure, PropagateError for error handling).
         other => Err(YoloscriptError::panic(
-            format!("eval_expr: unimplemented variant {:?}", other.span()),
+            format!("eval_expr: unimplemented variant"),
             other.span(),
         )),
     }
+}
+
+// ── Pattern matching ──────────────────────────────────────────────────────────
+
+/// Try to match `value` against `pattern`.
+/// On success, writes any new name→value bindings into `out` and returns `true`.
+/// On failure, returns `false` (bindings already written are harmless — the caller
+/// discards the map and tries the next arm).
+fn match_pattern(pattern: &Pattern, value: &Value, out: &mut HashMap<String, Value>) -> bool {
+    match pattern {
+        Pattern::Wildcard(_) => true,
+
+        Pattern::Nope(_) => matches!(value, Value::Perhaps(None)),
+
+        Pattern::Literal(lit, _) => match (lit, value) {
+            (Literal::Int(a),   Value::Int(b))          => a == b,
+            (Literal::Float(a), Value::Float(b))        => a == b,
+            (Literal::Bool(a),  Value::Bool(b))         => a == b,
+            (Literal::Str(a),   Value::Str(b))          => a == b,
+            (Literal::Unit,     Value::Unit)             => true,
+            (Literal::Nope,     Value::Perhaps(None))   => true,
+            _ => false,
+        },
+
+        Pattern::Binding(name, _) => {
+            out.insert(name.clone(), value.clone());
+            true
+        }
+
+        Pattern::Tuple(sub_patterns, _) => match value {
+            Value::Tuple(elems) if elems.len() == sub_patterns.len() => {
+                sub_patterns.iter().zip(elems.iter())
+                    .all(|(p, v)| match_pattern(p, v, out))
+            }
+            _ => false,
+        },
+
+        Pattern::EnumVariant { path, fields, .. } => {
+            let variant_name = path.last().map(String::as_str).unwrap_or("");
+            match value {
+                Value::Enum { variant, fields: enum_fields, .. } if variant == variant_name => {
+                    for field_name in fields {
+                        match enum_fields.get(field_name) {
+                            Some(v) => { out.insert(field_name.clone(), v.clone()); }
+                            None    => return false,
+                        }
+                    }
+                    true
+                }
+                _ => false,
+            }
+        }
+    }
+}
+
+// ── Assignment and binary operators ──────────────────────────────────────────
+
+fn apply_assign_op(
+    op: &crate::ast::AssignOp,
+    cur: Value,
+    rhs: Value,
+    span: &Span,
+) -> Result<Value, YoloscriptError> {
+    use crate::ast::AssignOp;
+    let fake_binop = match op {
+        AssignOp::AddAssign => BinOp::Add,
+        AssignOp::SubAssign => BinOp::Sub,
+        AssignOp::MulAssign => BinOp::Mul,
+        AssignOp::DivAssign => BinOp::Div,
+        AssignOp::RemAssign => BinOp::Rem,
+        AssignOp::Assign    => unreachable!("plain Assign handled before apply_assign_op"),
+    };
+    eval_binop(&fake_binop, cur, rhs, span).map(Signal::into_value)
 }
 
 fn eval_binop(op: &BinOp, lv: Value, rv: Value, span: &Span) -> Result<Signal, YoloscriptError> {

@@ -12,3 +12,6 @@ mod parsing_tests;
 
 #[path = "evaluator/evaluator_tests.rs"]
 mod evaluator_tests;
+
+#[path = "evaluator/evaluator_tests_3.rs"]
+mod evaluator_tests_3;
