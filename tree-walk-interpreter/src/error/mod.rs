@@ -11,6 +11,7 @@ pub enum ErrorCode {
     E0005, // Invalid operand types
     E0006, // Assignment to immutable binding
     E0007, // Invalid cast
+    E0008, // Non-exhaustive match
 }
 
 impl std::fmt::Display for ErrorCode {
@@ -23,6 +24,7 @@ impl std::fmt::Display for ErrorCode {
             ErrorCode::E0005 => write!(f, "E0005"),
             ErrorCode::E0006 => write!(f, "E0006"),
             ErrorCode::E0007 => write!(f, "E0007"),
+            ErrorCode::E0008 => write!(f, "E0008"),
         }
     }
 }

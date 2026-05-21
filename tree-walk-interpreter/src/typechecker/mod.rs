@@ -1879,12 +1879,14 @@ fn check_match_exhaustiveness(
                 false
             }
         }
+        // Never is uninhabited — a match on it is vacuously exhaustive.
+        Type::Never => true,
         // Int, Float, Str, Tuple, Array, Fun — value-infinite; only a catch-all suffices.
         _ => false,
     };
     if !exhaustive {
         return Err(YoloscriptError::type_error(
-            ErrorCode::E0003,
+            ErrorCode::E0008,
             "non-exhaustive match: not all cases are covered".to_string(),
             span,
         ));
