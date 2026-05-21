@@ -1,6 +1,6 @@
 # /sprint-end
 
-Close a sprint: run tests, carry over incomplete issues, open the sprint review issue and PR, then hand off to the user.
+Close a sprint: run tests, carry over incomplete issues, build and publish the sprint review issue and PR, then hand off to the user.
 
 **Arguments:** `$ARGUMENTS` — sprint number, e.g. `3`
 
@@ -35,7 +35,26 @@ cd tree-walk-interpreter && cargo test
 ```
 If any tests fail, do not proceed — fix them first.
 
-5. **Create the sprint review issue:**
+5. **Gather Epic Progress data.**
+Determine which milestone(s) the sprint issues belong to (from step 2). For each milestone, fetch its open and closed issue counts:
+```bash
+wsl gh api repos/Vladastos/Yoloscript/milestones \
+  --jq '.[] | select(.title == "<milestone>") | {title: .title, open: .open_issues, closed: .closed_issues}'
+```
+Format as: `<milestone>: <closed>/<closed+open> issues closed`.
+
+6. **Gather Spec Notes.**
+Find all commits on the sprint branch that touched the `docs/` submodule:
+```bash
+git log main..HEAD --oneline -- docs/
+```
+Also check for any RFC status changes committed during the sprint:
+```bash
+git log main..HEAD --oneline -- docs/internal/rfcs/
+```
+If there are no such commits, write "No spec changes this sprint."
+
+7. **Create the sprint review issue** using all data gathered above:
 ```bash
 wsl gh issue create \
   --repo Vladastos/Yoloscript \
@@ -45,23 +64,23 @@ wsl gh issue create \
 <goal from kickoff issue>
 
 ## Completed
-$(for each closed issue: - [x] #N Title)
+<for each closed issue: - [x] #N Title>
 
 ## Carried Over
-$(for each open issue: - [ ] #N Title — reason if known)
+<for each open issue: - [ ] #N Title>
 
 ## Epic Progress
-<!-- How does this sprint advance the milestone? -->
+<milestone progress lines from step 5>
 
 ## Spec Notes
-<!-- Did any spec ambiguities surface? Link to any RFC or docs/public/spec/ changes. -->
+<doc commit summaries from step 6, or 'No spec changes this sprint.'>
 
 ## Next Sprint Seeds
-<!-- Issues or ideas for the next sprint -->"
+<!-- Add ideas for the next sprint here -->"
 ```
 Note the issue number returned — it is needed for the PR body.
 
-6. **Open a pull request** from `sprint/<N>` → `main`:
+8. **Open a pull request** from `sprint/<N>` → `main`:
 ```bash
 gh pr create \
   --repo Vladastos/Yoloscript \
@@ -78,18 +97,16 @@ EOF
 ```
 Both `Closes` lines are required. On merge, GitHub automatically closes the sprint review issue and the kickoff issue.
 
-7. **Leave a note for the user:**
+9. **Leave a note for the user:**
 
-> **Sprint <N> is ready for review.**
+> **Sprint <N> is wrapped up.**
 >
-> - Fill in the review issue: #<review-issue-number>
-> - Review the PR diff and approve it on GitHub
-> - **Merge the PR** — this automatically closes the review issue (#<review-issue-number>) and the kickoff issue (#<kickoff-issue-number>)
-> - After merging, delete the `sprint/<N>` branch on GitHub
+> - Review issue: #<review-issue-number> — all sections are filled in. Add **Next Sprint Seeds** if you have ideas.
+> - **Merge the PR** on GitHub — this automatically closes the review issue and the kickoff issue.
+> - After merging, delete the `sprint/<N>` branch on GitHub.
 
 ## Notes
-- A sprint with 0 completed issues should still produce a review issue — record why.
-- Do not close the kickoff issue manually — the PR merge closes it via `Closes #N`.
-- Do not close the review issue manually — the PR merge closes it via `Closes #N`.
-- If spec ambiguities surfaced during the sprint, prompt the user to open a `/new-rfc`.
+- A sprint with 0 completed issues should still produce a review issue — record why in Completed.
+- Do not close the kickoff or review issues manually — both close via `Closes #N` on PR merge.
+- If spec ambiguities surfaced (visible in Spec Notes), prompt the user to open a `/new-rfc`.
 - The sprint branch must not be deleted until after the PR is merged.
