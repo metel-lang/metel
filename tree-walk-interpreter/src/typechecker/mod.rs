@@ -9,6 +9,26 @@ use crate::types::Type;
 
 type SchemeEnv = HashMap<String, TypeScheme>;
 
+fn array_push_scheme(t: TypeVar) -> TypeScheme {
+    TypeScheme {
+        quantified_vars: vec![t],
+        ty: InferType::Fun(
+            vec![InferType::Array(Box::new(InferType::Var(t))), InferType::Var(t)],
+            Box::new(InferType::unit()),
+        ),
+    }
+}
+
+fn array_len_scheme(t: TypeVar) -> TypeScheme {
+    TypeScheme {
+        quantified_vars: vec![t],
+        ty: InferType::Fun(
+            vec![InferType::Array(Box::new(InferType::Var(t)))],
+            Box::new(InferType::int()),
+        ),
+    }
+}
+
 /// Run the type checker over an untyped AST, producing a fully typed AST.
 pub fn check(program: Program) -> Result<TypedProgram, YoloscriptError> {
     // Pre-pass: build the type registry, then create the inference context.
@@ -68,40 +88,16 @@ fn register_builtins(ctx: &mut InferContext) {
         InferType::Fun(vec![str_ty.clone()], Box::new(int_ty.clone())));
 
     let t = ctx.fresh_type_var_raw();
-    ctx.bind_poly("array_push", TypeScheme {
-        quantified_vars: vec![t],
-        ty: InferType::Fun(
-            vec![InferType::Array(Box::new(InferType::Var(t))), InferType::Var(t)],
-            Box::new(InferType::unit()),
-        ),
-    });
+    ctx.bind_poly("array_push", array_push_scheme(t));
     let t = ctx.fresh_type_var_raw();
-    ctx.bind_poly("array_len", TypeScheme {
-        quantified_vars: vec![t],
-        ty: InferType::Fun(
-            vec![InferType::Array(Box::new(InferType::Var(t)))],
-            Box::new(InferType::int()),
-        ),
-    });
+    ctx.bind_poly("array_len", array_len_scheme(t));
 }
 
 fn register_builtin_poly_schemes(scheme_env: &mut SchemeEnv, gen: &mut TypeVarGenerator) {
     let t = gen.fresh();
-    scheme_env.insert("array_push".into(), TypeScheme {
-        quantified_vars: vec![t],
-        ty: InferType::Fun(
-            vec![InferType::Array(Box::new(InferType::Var(t))), InferType::Var(t)],
-            Box::new(InferType::unit()),
-        ),
-    });
+    scheme_env.insert("array_push".into(), array_push_scheme(t));
     let t = gen.fresh();
-    scheme_env.insert("array_len".into(), TypeScheme {
-        quantified_vars: vec![t],
-        ty: InferType::Fun(
-            vec![InferType::Array(Box::new(InferType::Var(t)))],
-            Box::new(InferType::int()),
-        ),
-    });
+    scheme_env.insert("array_len".into(), array_len_scheme(t));
 }
 
 /// Build the `TypeRegistry` from the program's declarations and built-in types.
