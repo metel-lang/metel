@@ -233,16 +233,19 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
         }
 
         TypedExpr::Cast { expr: inner, target_type, span, .. } => {
+            // v0.1: only `Int as Float` (widening) and identity casts reach here —
+            // the typechecker rejects all other forms before evaluation.
+            // TODO(Epic 004, task 0002): replace with From<S> trait dispatch.
             let v = eval_expr(inner, env)?.into_value();
             let result = match (&v, target_type) {
                 (Value::Int(n), crate::ast::TypeExpr::Named(t, _)) if t == "Float" => {
                     Value::Float(*n as f64)
                 }
-                (Value::Float(f), crate::ast::TypeExpr::Named(t, _)) if t == "Int" => {
-                    Value::Int(*f as i64)
-                }
+                // Identity casts
+                (Value::Int(_),   crate::ast::TypeExpr::Named(t, _)) if t == "Int"   => v,
+                (Value::Float(_), crate::ast::TypeExpr::Named(t, _)) if t == "Float" => v,
                 _ => return Err(YoloscriptError::panic(
-                    format!("cast: unsupported coercion"),
+                    "cast: unsupported coercion (should have been caught by typechecker)",
                     span,
                 )),
             };

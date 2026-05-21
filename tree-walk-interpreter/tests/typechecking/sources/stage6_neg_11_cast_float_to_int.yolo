@@ -1,0 +1,3 @@
+// Narrowing cast Float as Int is rejected in v0.1.
+let f: Float = 3.9;
+let n: Int = f as Int; // ERROR[E0007]

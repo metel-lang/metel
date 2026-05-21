@@ -1,10 +1,14 @@
-// Stage 6: type casts (v0.1 provisional: identity casts only).
+// Stage 6: type casts (v0.1: identity casts and Int as Float widening only).
 
+// Identity casts
 let i: Int   = 42;
 let i2: Int  = i as Int;
 
 let g: Float = 3.14;
 let f2: Float = g as Float;
 
-// Cast in arithmetic context (identity cast preserves type)
+// Widening cast: Int as Float
+let as_float: Float = 7 as Float;
+
+// Cast in arithmetic context
 let area: Float = g as Float * 5.0 * 5.0;

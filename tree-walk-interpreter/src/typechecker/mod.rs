@@ -768,13 +768,29 @@ fn infer_expr(
             }
         }
         Expr::Cast { expr, target_type, span } => {
+            // v0.1: only `Int as Float` (widening) and identity casts are permitted.
+            // Narrowing (`Float as Int`) is intentionally rejected — use an explicit
+            // conversion function instead.
+            // TODO(Epic 004, task 0002): replace this check with a `From<S>` trait lookup
+            // so that user-defined types can participate in `as` casts.
             let source_ty = infer_expr(expr, ctx, fun_generalizations)?;
             let target_ty = type_expr_to_infer(target_type);
-            // v0.1 provisional: both sides must be in the same numeric family (Int or Float).
-            // Epic 004 task 0002 replaces this with a From<S> trait lookup.
-            let num_var = ctx.fresh_var();
-            ctx.add_constraint(source_ty, num_var.clone(), span.clone());
-            ctx.add_constraint(target_ty.clone(), num_var, span.clone());
+            // Solve current constraints so we can inspect the concrete types.
+            let source_resolved = ctx.solve()?.apply(&source_ty);
+            let target_resolved = ctx.solve()?.apply(&target_ty);
+            let valid = matches!(
+                (&source_resolved, &target_resolved),
+                (InferType::Concrete(Type::Int),   InferType::Concrete(Type::Float))
+                | (InferType::Concrete(Type::Int),   InferType::Concrete(Type::Int))
+                | (InferType::Concrete(Type::Float), InferType::Concrete(Type::Float))
+            );
+            if !valid {
+                return Err(YoloscriptError::type_error(
+                    ErrorCode::E0007,
+                    format!("cannot cast `{source_resolved}` to `{target_resolved}` — only `Int as Float` and identity casts are supported"),
+                    span,
+                ));
+            }
             Ok(target_ty)
         }
         Expr::TupleAccess { object, index, span } => {

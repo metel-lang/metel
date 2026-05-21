@@ -378,6 +378,16 @@ mod tests {
     }
 
     #[test]
+    fn stage6_neg_cast_bool() {
+        check_file(&format!("{}/stage6_neg_10_cast_bool.yolo", test_dir()));
+    }
+
+    #[test]
+    fn stage6_neg_cast_float_to_int() {
+        check_file(&format!("{}/stage6_neg_11_cast_float_to_int.yolo", test_dir()));
+    }
+
+    #[test]
     fn stage6_neg_match_arm_mismatch() {
         check_file(&format!("{}/stage6_neg_06_match_arm_mismatch.yolo", test_dir()));
     }

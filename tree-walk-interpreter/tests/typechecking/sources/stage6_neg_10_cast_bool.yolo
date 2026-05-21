@@ -1,0 +1,3 @@
+// Casting a Bool to Int should fail with E0007.
+let b: Bool = true;
+let n: Int = b as Int; // ERROR[E0007]

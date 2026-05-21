@@ -8,6 +8,7 @@ mod tests {
     use yoloscript::{parser, typechecker};
     use yoloscript::evaluator::{Environment, Signal, Value, eval_expr};
     use yoloscript::typed_ast::TypedDecl;
+    use yoloscript::error::YoloscriptError;
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -15,6 +16,12 @@ mod tests {
     fn typed_program(src: &str) -> Vec<TypedDecl> {
         let ast = parser::parse(src, "test").expect("parse error");
         typechecker::check(ast).expect("typecheck error")
+    }
+
+    /// Parse + typecheck, returning the error instead of panicking.
+    fn typecheck_result(src: &str) -> Result<Vec<TypedDecl>, YoloscriptError> {
+        let ast = parser::parse(src, "test").expect("parse error");
+        typechecker::check(ast)
     }
 
     /// Parse + typecheck `let x = <expr>;` and evaluate the RHS expression.
@@ -175,45 +182,32 @@ mod tests {
     }
 
     // ── Cast ──────────────────────────────────────────────────────────────────
-    // The typechecker's cast inference currently unifies source and target types,
-    // which rejects cross-type casts. Build TypedExpr directly to test eval_expr.
 
     #[test]
     fn cast_int_to_float() {
-        use yoloscript::ast::{Literal as AstLit, Span, TypeExpr};
-        use yoloscript::typed_ast::TypedExpr;
-        use yoloscript::types::Type;
-
-        let span = Span { start: 0, end: 0, filename: "test".to_string() };
-        let inner = TypedExpr::Literal(AstLit::Int(3), Type::Int, span.clone());
-        let cast_expr = TypedExpr::Cast {
-            expr: Box::new(inner),
-            target_type: TypeExpr::Named("Float".to_string(), vec![]),
-            ty: Type::Float,
-            span,
-        };
-        let mut env = Environment::new();
-        let val = eval_expr(&cast_expr, &mut env).unwrap().into_value();
+        let val = eval_let("let x = 3 as Float;");
         assert!(matches!(val, Value::Float(f) if (f - 3.0).abs() < 1e-9));
     }
 
     #[test]
-    fn cast_float_to_int() {
-        use yoloscript::ast::{Literal as AstLit, Span, TypeExpr};
-        use yoloscript::typed_ast::TypedExpr;
-        use yoloscript::types::Type;
+    fn cast_identity_int() {
+        let val = eval_let("let x = 5 as Int;");
+        assert!(matches!(val, Value::Int(5)));
+    }
 
-        let span = Span { start: 0, end: 0, filename: "test".to_string() };
-        let inner = TypedExpr::Literal(AstLit::Float(3.9), Type::Float, span.clone());
-        let cast_expr = TypedExpr::Cast {
-            expr: Box::new(inner),
-            target_type: TypeExpr::Named("Int".to_string(), vec![]),
-            ty: Type::Int,
-            span,
-        };
-        let mut env = Environment::new();
-        let val = eval_expr(&cast_expr, &mut env).unwrap().into_value();
-        assert!(matches!(val, Value::Int(3)));
+    #[test]
+    fn cast_identity_float() {
+        let val = eval_let("let x = 2.5 as Float;");
+        assert!(matches!(val, Value::Float(f) if (f - 2.5).abs() < 1e-9));
+    }
+
+    #[test]
+    fn cast_float_to_int_rejected() {
+        let err = typecheck_result("let x = 3.9 as Int;").expect_err("expected E0007");
+        assert!(
+            matches!(&err, YoloscriptError::TypeError { code, .. } if format!("{code}") == "E0007"),
+            "expected E0007, got: {err}"
+        );
     }
 
     // ── Tuple ─────────────────────────────────────────────────────────────────
