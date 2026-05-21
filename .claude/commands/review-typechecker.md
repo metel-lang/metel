@@ -1,6 +1,6 @@
 # /review-typechecker
 
-Review a change to `src/typeinference/mod.rs` or `src/typechecker/mod.rs` before committing.
+Review a change to any file under `src/typeinference/` or `src/typechecker/` before committing.
 Work through every checklist item. Report pass/fail for each section. Do not skip items.
 
 ---
@@ -102,6 +102,31 @@ The canonical pattern is `instantiate_scheme_for_call`. Any new site that instan
 
 ---
 
-## 9. Summary
+## 9. Code quality
+
+- [ ] **Comments**: no new comment describes *what* the code does — only the non-obvious *why* (a hidden constraint, a subtle invariant, a workaround). Remove any comment that just restates the function or variable name.
+- [ ] **Nesting depth**: no new function body exceeds 3 levels of indentation in its happy path. If a match arm contains another match or a for loop with an if inside, extract a helper.
+- [ ] **File size**: `inference.rs` and `construction.rs` have not grown significantly past their current sizes without a corresponding split or extraction. Flag if either file exceeds ~1100 lines.
+- [ ] **Concern separation**: new helpers belong to exactly one pass (infer or construct). A helper that takes both `InferContext` and `ConstructCtx` parameters is a sign of blurred concerns.
+
+---
+
+## 10. Test coverage
+
+- [ ] Every new happy-path behavior has at least one passing typechecking test (`.yolo` file under `tests/typechecking/` or a phase test in `tests/typeinference_tests.rs`)
+- [ ] Every new error path (new `ErrorCode` emission or new rejection branch) has at least one negative test that asserts the error is produced
+- [ ] If a test was added: confirm it actually exercises the changed code path, not a pre-existing path that happens to pass
+
+---
+
+## 11. Implementation notes
+
+- [ ] If the change adds or removes a known limitation, update the **Known Limitations** section of `docs/internal/impl-notes/typechecker.md`
+- [ ] If the change introduces a new invariant, pattern, or non-obvious constraint (e.g. a new required ordering, a new fallback strategy), add it to the relevant section of the impl-notes
+- [ ] If an existing impl-note now describes something that no longer exists (removed function, resolved limitation), remove or update that entry
+
+---
+
+## 12. Summary
 
 State the result for each section (pass / fail / n/a) and list any blockers. If any section fails, do not commit — resolve the issue first.
