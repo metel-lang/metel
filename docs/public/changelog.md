@@ -1,0 +1,29 @@
+---
+title: "Gust Language Changelog"
+---
+
+# Changelog
+
+## v0.1
+
+Initial language version. Implemented by the tree-walk interpreter.
+
+**Features included:**
+- Primitive types: `Int`, `Float`, `Bool`, `String`, `()`
+- Variables: `let` (immutable), `mut` (mutable), lexical scoping, `fun`/type hoisting
+- Functions: first-class values, closures with mutable capture, `?` operator (exact error type match only)
+- Structs: literals, field access, methods (`impl`), `mut self`, associated functions
+- Enums: unit and struct-like variants, `impl` blocks
+- Built-in generic types: `Perhaps<T>`, `Result<T, E>`, `Array<T>` / `T[]` (as special cases; user-defined generics are v0.2)
+- Exhaustive pattern matching: all pattern kinds (see [Pattern Kinds](spec/expressions.md#pattern-kinds))
+- Control flow: `if`/`else`, `while`, `for`, `for-in` (arrays and ranges only), `loop`, `break`/`continue`, `return`
+- Type casting: `as` for `Int ↔ Float`
+- Never type (`!`)
+- Tuples
+- Built-in functions (see [Built-in Functions](spec/runtime.md#built-in-functions))
+
+**Not included (v0.2+):**
+- User-defined generic functions and types (see [Generics](spec/types.md#generics))
+- User-defined traits and `impl Trait for Type` (see [Traits](spec/declarations.md#traits))
+- `From`-based `?` coercion across different error types (see [The ? Operator](spec/functions.md#the--operator))
+- User-defined `Iterable<T>` implementations (see [For-In](spec/expressions.md#for-in))

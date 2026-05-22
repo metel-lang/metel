@@ -1,0 +1,222 @@
+# Declarations
+
+## Variables
+
+### Immutable Bindings
+
+```gust
+let x = 42;
+let name: String = "Vlad";
+```
+
+`let` bindings cannot be reassigned and must always be initialized.
+
+### Mutable Bindings
+
+```gust
+mut counter = 0;
+counter = counter + 1;
+counter += 1;   // compound assignment
+```
+
+`mut` bindings can be reassigned and also must be initialized at declaration. Compound assignment operators `+=`, `-=`, `*=`, `/=`, `%=` are supported.
+
+### Scoping and Shadowing
+
+Variables are lexically scoped. Each block `{ }` introduces a new scope. Inner scopes can shadow outer variables.
+
+`let` and `mut` declarations are sequential — a binding is visible only from its declaration point to the end of its containing block.
+
+`fun` declarations are hoisted to the top of their containing block. All `fun` declarations in a block are mutually visible to each other and to all other statements in that block, regardless of declaration order. This enables forward references and mutual recursion at any nesting level.
+
+Hoisting is block-local: a `fun` declared in an inner block is not visible in the outer block. Normal lexical scoping applies across block boundaries — inner blocks see outer declarations, outer blocks do not see inner declarations.
+
+```gust
+fun a() { b(); }        // OK — b is hoisted within this block
+fun b() { a(); }        // OK — mutual recursion at top level
+
+fun outer() {
+    inner();            // OK — inner is hoisted within outer's block
+
+    fun inner() {
+        helper();       // OK — helper is hoisted within inner's block
+        fun helper() { }
+    }
+
+    helper();           // ERROR — helper is scoped to inner's block
+}
+```
+
+`struct` and `enum` declarations are hoisted to **program scope** — they are visible throughout the entire program regardless of where they appear in the source. A type declared inside a function body or any nested block is as visible as a top-level type declaration. Unlike `fun` hoisting, which is block-local, type definition hoisting is global.
+
+```gust
+fun make_point() -> Point {
+    return Point { x: 1.0, y: 2.0 };   // OK — Point is globally visible
+}
+
+fun inner() {
+    struct Point {         // declared inside a function — still globally visible
+        x: Float,
+        y: Float,
+    }
+}
+```
+
+`impl` blocks follow the same global-hoisting rule as the types they extend.
+
+---
+
+## Structs
+
+```gust
+struct Point {
+    x: Float,
+    y: Float,
+}
+```
+
+### Instantiation and Field Access
+
+```gust
+let p = Point { x: 1.0, y: 2.0 };
+let x = p.x;
+```
+
+### Methods
+
+```gust
+impl Point {
+    fun distance(self, other: Point) -> Float {
+        let dx = self.x - other.x;
+        let dy = self.y - other.y;
+        return dx * dx + dy * dy;   // squared distance
+    }
+}
+
+let d = p.distance(q);
+```
+
+`self` refers to the receiver. Methods are called with dot syntax.
+
+### Mutable Receiver
+
+Methods that mutate the receiver declare `mut self`. Mutation happens in place:
+
+```gust
+impl Counter {
+    fun increment(mut self) {
+        self.value += 1;
+    }
+}
+```
+
+### Generic Structs
+
+```gust
+struct Pair<A, B> {
+    first: A,
+    second: B,
+}
+```
+
+---
+
+## Enums
+
+```gust
+enum Direction { North, South, East, West }
+
+enum Shape {
+    Circle { radius: Float },
+    Rectangle { width: Float, height: Float },
+}
+```
+
+Variants may be unit (no data) or struct-like (named fields).
+
+### Instantiation
+
+```gust
+let dir = Direction::North;
+let s = Shape::Circle { radius: 5.0 };
+```
+
+### Methods on Enums
+
+`impl` blocks on enums follow the same syntax as structs:
+
+```gust
+impl Shape {
+    fun area(self) -> Float {
+        match self {
+            Shape::Circle { radius } => 3.14159 * radius * radius,
+            Shape::Rectangle { width, height } => width * height,
+        }
+    }
+}
+```
+
+---
+
+## Traits
+
+> **v0.2 feature.** The trait system is not available in v0.1. Built-in trait-dependent
+> behaviour (`as` for `Int ↔ Float`, `?` with exact error match, `for-in` over arrays
+> and ranges) is available in v0.1 as hardcoded special cases. User-defined traits,
+> `impl Trait for Type`, and trait bounds are v0.2.
+
+```gust
+trait Printable {
+    fun print(self);
+}
+
+trait Comparable {
+    fun compare(self, other: Self) -> Int;
+}
+```
+
+### Implementing a Trait
+
+```gust
+impl Printable for Point {
+    fun print(self) {
+        println("(" + float_to_string(self.x) + ", " + float_to_string(self.y) + ")");
+    }
+}
+```
+
+### Trait Bounds
+
+```gust
+fun print_all<T: Printable>(items: T[]) {
+    for (let item in items) {
+        item.print();
+    }
+}
+```
+
+### Default Method Implementations
+
+```gust
+trait Greet {
+    fun name(self) -> String;
+
+    fun greet(self) {                          // default implementation
+        println("Hello, " + self.name() + "!");
+    }
+}
+```
+
+### The Self Type
+
+`Self` inside a trait definition refers to the concrete implementing type:
+
+```gust
+trait Comparable {
+    fun compare(self, other: Self) -> Int;
+}
+```
+
+### Static Dispatch Only
+
+Trait objects (`dyn Trait`) are not available in v0.1. All polymorphism is via generics (static dispatch).

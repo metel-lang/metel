@@ -109,7 +109,7 @@ Gust/
 │   │   └── parsing/        # Parser tests
 │   └── Cargo.toml
 │
-└── backlog/           # Docs, tasks, milestones, and decisions (Backlog MCP)
+└── docs/           # Spec, RFCs, Changelog
 ```
 
 ## Resources
