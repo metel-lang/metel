@@ -31,7 +31,7 @@ impl std::fmt::Display for ErrorCode {
 
 /// All errors that can be produced at any stage of the pipeline.
 #[derive(Debug, Error)]
-pub enum YoloscriptError {
+pub enum GustError {
     #[error("Parse error in {filename} at {start}..{end}: {message}")]
     ParseError { message: String, start: usize, end: usize, filename: String },
 
@@ -50,7 +50,7 @@ pub enum YoloscriptError {
     Internal { message: String },
 }
 
-impl YoloscriptError {
+impl GustError {
     pub fn parse(msg: impl Into<String>, span: &Span) -> Self {
         Self::ParseError {
             message: msg.into(),

@@ -1,5 +1,5 @@
-// Yoloscript v0.1 PEG grammar for pest
-// Reference: docs/Yoloscript/spec/Language Spec.md §2–§12
+// Gust v0.1 PEG grammar for pest
+// Reference: docs/Gust/spec/Language Spec.md §2–§12
 //
 // Convention:
 //   SCREAMING_SNAKE_CASE = silent / atomic rules (pest built-ins or terminals)

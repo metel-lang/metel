@@ -11,4 +11,4 @@
 
 mut counter = 0;
 mut flag    = false;
-mut name: String = "yoloscript";
+mut name: String = "gust";

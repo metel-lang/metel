@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::Program;
-use crate::error::YoloscriptError;
+use crate::error::GustError;
 use crate::typed_ast::TypedProgram;
 use crate::typeinference::*;
 
@@ -19,7 +19,7 @@ struct FunGeneralization {
 }
 
 /// Run the type checker over an untyped AST, producing a fully typed AST.
-pub fn check(program: Program) -> Result<TypedProgram, YoloscriptError> {
+pub fn check(program: Program) -> Result<TypedProgram, GustError> {
     // Pre-pass: build the type registry, then create the inference context.
     let mut gen = TypeVarGenerator::new();
     let reg = registry::build_registry(&program, &mut gen);

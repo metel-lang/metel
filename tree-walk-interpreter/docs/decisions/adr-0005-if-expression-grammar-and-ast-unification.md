@@ -29,7 +29,7 @@ Because PEG parsers are greedy and `decl*` is tried before the optional trailing
 genuine expression positions — let binding values, function arguments, binary operands,
 etc. The following idiomatic pattern fails to type-check:
 
-```yoloscript
+```gust
 fun max(a: Int, b: Int) -> Int {
     if (a > b) { a } else { b }  // parsed as Stmt::If; block tail is None → Unit
 }                                 // E0001: cannot unify Unit with Int
@@ -37,14 +37,14 @@ fun max(a: Int, b: Int) -> Int {
 
 The workaround is to assign the if-expression to a let binding:
 
-```yoloscript
+```gust
 fun max(a: Int, b: Int) -> Int {
     let result: Int = if (a > b) { a } else { b };
     result
 }
 ```
 
-This is surprising for users and inconsistent with Rust, whose design Yoloscript borrows
+This is surprising for users and inconsistent with Rust, whose design Gust borrows
 from heavily. In Rust, `if` is always an expression and can appear directly as a
 function body's tail value.
 
@@ -118,7 +118,7 @@ is always a statement; the workaround is `let result = if (…) { … } else { �
 - Grammar remains simple and unambiguous
 
 **Cons:**
-- Surprising to users; diverges from the Rust design Yoloscript follows
+- Surprising to users; diverges from the Rust design Gust follows
 - The workaround adds noise (extra `let` binding) to every function that wants to
   return an if-expression
 - The doc for the grammar quirk is in the notes of an epic-005 task — easy to lose

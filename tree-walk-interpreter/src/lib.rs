@@ -1,4 +1,4 @@
-/// Yoloscript language interpreter library.
+/// Gust language interpreter library.
 /// Exposes modules for use in tests and external code.
 
 pub mod ast;

@@ -1,4 +1,4 @@
-# Yoloscript
+# Gust
 
 A Rust-inspired programming language with a tree-walk interpreter written in Rust.
 
@@ -8,7 +8,7 @@ Looking for a side project, a colleague suggested writing an interpreter. "Nice 
 
 I started following the book (using Rust) but soon decided I wanted to design my own language. Designing a language proved to be a non-trivial task — what type system? expression-oriented or statement-oriented? garbage collected or not? Rather than overthink it, I took the only reasonable approach: just go for it.
 
-Hence the name: **Yoloscript**.
+Hence the name: **Gust**.
 
 The first iteration proved you can only yolo so much before getting lost in the sauce. This second one tries to learn from that — structure and a clear path tend to get you further than raw momentum.
 
@@ -18,7 +18,7 @@ Whether that goal was achieved is left as an exercise to the reader.
 
 ## What?
 
-Yoloscript is a statically typed, expression-oriented programming language. It features:
+Gust is a statically typed, expression-oriented programming language. It features:
 
 - **Strong static typing** with local type inference (Hindley-Milner)
 - **Algebraic data types** — enums with data-carrying variants
@@ -30,7 +30,7 @@ Yoloscript is a statically typed, expression-oriented programming language. It f
 - **Traits** for ad-hoc polymorphism
 - **Memory managed by the runtime** (reference counting)
 
-See the Language Specification (managed via the Backlog MCP) for the complete definition.
+See the Language Specification for the complete definition.
 
 
 ## How?
@@ -68,7 +68,7 @@ cargo build --release
 ### Run a Program
 
 ```bash
-cargo run -- path/to/program.yolo
+cargo run -- path/to/program.gust
 ```
 
 ### Run Tests
@@ -86,7 +86,7 @@ cargo test --test lib typechecking_tests
 
 ## Example
 
-```yoloscript
+```gust
 fun factorial(n: Int) -> Int {
     if (n <= 1) { 1 } else { n * factorial(n - 1) }
 }
@@ -97,7 +97,7 @@ let result = factorial(5);
 ## Project Structure
 
 ```
-Yoloscript/
+Gust/
 ├── tree-walk-interpreter/
 │   ├── src/
 │   │   ├── parser/         # PEG grammar (pest) → untyped AST

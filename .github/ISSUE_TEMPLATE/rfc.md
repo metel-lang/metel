@@ -1,6 +1,6 @@
 ---
 name: RFC
-about: Propose a change to the Yoloscript language specification
+about: Propose a change to the Gust language specification
 title: 'RFC-NNN: '
 labels: 'type:rfc,rfc:draft'
 assignees: ''

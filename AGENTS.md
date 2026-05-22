@@ -1,8 +1,8 @@
-# Yoloscript — Agent Guide
+# Gust — Agent Guide
 
 ## Project
 
-Yoloscript is a statically-typed, expression-oriented language. This repository contains its tree-walk interpreter. Tasks are tracked in GitHub Projects v2; spec docs and decision records live in `docs/`. The versioning model (language versions, RFC lifecycle, doc conventions) is defined in [`docs/internal/versioning.md`](docs/internal/versioning.md).
+Gust is a statically-typed, expression-oriented language. This repository contains its tree-walk interpreter. Tasks are tracked in GitHub Projects v2; spec docs and decision records live in `docs/`. The versioning model (language versions, RFC lifecycle, doc conventions) is defined in [`docs/internal/versioning.md`](docs/internal/versioning.md).
 
 ---
 

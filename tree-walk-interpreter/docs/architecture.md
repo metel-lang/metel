@@ -5,7 +5,7 @@
 ## Pipeline
 
 ```
-.yolo source file
+.gust source file
        │
        ▼
   ┌─────────┐
@@ -33,7 +33,7 @@ Each stage is a separate Rust module. No stage is skipped.
 tree-walk-interpreter/
 ├── Cargo.toml
 └── src/
-    ├── main.rs            — CLI entry point: reads a .yolo file, runs the pipeline
+    ├── main.rs            — CLI entry point: reads a .gust file, runs the pipeline
     ├── grammar.pest       — pest PEG grammar for the full v0.1 language
     ├── parser/            — drives pest, builds untyped AST from CST
     ├── ast/               — untyped AST node definitions
@@ -58,16 +58,16 @@ tree-walk-interpreter/
 |------|------|-------------|-------------|
 | Untyped program | `ast::Program` | parser | typechecker |
 | Typed program | `typed_ast::TypedProgram` | typechecker | evaluator |
-| Errors | `YoloscriptError` | any stage | caller / CLI |
+| Errors | `GustError` | any stage | caller / CLI |
 
 ---
 
 ## Error Design
 
-All errors use a unified `YoloscriptError` type:
+All errors use a unified `GustError` type:
 
 ```rust
-enum YoloscriptError {
+enum GustError {
     ParseError   { code: ErrorCode, message: String, start: usize, end: usize, filename: String },
     TypeError    { code: ErrorCode, message: String, start: usize, end: usize, filename: String },
     RuntimePanic { message: String, start: usize, end: usize, filename: String },
@@ -75,7 +75,7 @@ enum YoloscriptError {
 }
 ```
 
-Type error codes: E0001–E0008. Runtime panics (`.yolo()` on `nope`, out-of-bounds, division by zero) terminate with a non-zero exit code.
+Type error codes: E0001–E0008. Runtime panics (`.gust()` on `nope`, out-of-bounds, division by zero) terminate with a non-zero exit code.
 
 ---
 

@@ -16,5 +16,5 @@
 let x: Int = 100;
 let y: Float = 2.718;
 let z: Bool = false;
-let s: String = "yoloscript";
+let s: String = "gust";
 let n: Perhaps<Int> = nope;

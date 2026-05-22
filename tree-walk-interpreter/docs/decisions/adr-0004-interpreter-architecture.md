@@ -6,7 +6,7 @@ status: accepted
 ---
 ## Context
 
-We are building the first Yoloscript interpreter. Its primary goal is spec validation — proving that the v0.1 language spec is complete, consistent, and implementable. Performance is a secondary concern at this stage.
+We are building the first Gust interpreter. Its primary goal is spec validation — proving that the v0.1 language spec is complete, consistent, and implementable. Performance is a secondary concern at this stage.
 
 Three architectural decisions needed to be made before writing any code.
 
@@ -40,7 +40,7 @@ The goal of v0.1 is spec validation, not performance. A tree-walker can be built
 
 **Chosen: Option A — static type checker pass.**
 
-The spec defines Yoloscript as statically typed. Implementing only runtime type checking would validate the runtime behaviour of the interpreter but not the type system itself — which is one of the most complex and most important parts of the spec (inference, generics, trait bounds, `Perhaps<T>`, `Result<T,E>`). A static type checker validates those spec sections directly. It is also a prerequisite for the LLVM compiler, which will need a fully typed AST. Building it now avoids rebuilding it later.
+The spec defines Gust as statically typed. Implementing only runtime type checking would validate the runtime behaviour of the interpreter but not the type system itself — which is one of the most complex and most important parts of the spec (inference, generics, trait bounds, `Perhaps<T>`, `Result<T,E>`). A static type checker validates those spec sections directly. It is also a prerequisite for the LLVM compiler, which will need a fully typed AST. Building it now avoids rebuilding it later.
 
 The type checker runs as a distinct pass: `source → parse → AST → type check → (typed AST) → evaluate`.
 
@@ -58,7 +58,7 @@ The type checker runs as a distinct pass: `source → parse → AST → type che
 
 **Chosen: Option A — monomorphisation.**
 
-Consistent with the eventual LLVM compiler architecture. Builds the right mental model for how generics work in Yoloscript. Type tags would diverge from the compiler model and make the transition harder. Runtime overhead of monomorphisation is acceptable in an interpreter.
+Consistent with the eventual LLVM compiler architecture. Builds the right mental model for how generics work in Gust. Type tags would diverge from the compiler model and make the transition harder. Runtime overhead of monomorphisation is acceptable in an interpreter.
 
 ---
 

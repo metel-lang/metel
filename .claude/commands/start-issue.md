@@ -14,7 +14,7 @@ If the current branch is not `sprint/<N>`, warn the user and do not proceed. All
 
 2. **Read the issue:**
 ```bash
-wsl gh issue view <N> --repo Vladastos/Yoloscript
+wsl gh issue view <N> --repo Vladastos/Gust
 ```
 Display the title, description, acceptance criteria, labels, and milestone to the user.
 
@@ -22,7 +22,7 @@ Display the title, description, acceptance criteria, labels, and milestone to th
 
 4. **Mark as in-progress:**
 ```bash
-wsl gh issue edit <N> --repo Vladastos/Yoloscript \
+wsl gh issue edit <N> --repo Vladastos/Gust \
   --remove-label "status:backlog" \
   --add-label "status:in-progress"
 ```

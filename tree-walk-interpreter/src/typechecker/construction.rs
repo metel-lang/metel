@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::ast::*;
-use crate::error::{ErrorCode, YoloscriptError};
+use crate::error::{ErrorCode, GustError};
 use crate::typed_ast::*;
 use crate::typeinference::*;
 use crate::types::Type;
@@ -73,7 +73,7 @@ pub(super) fn construct_program(
     method_env: HashMap<String, HashMap<String, Type>>,
     enum_env:   &HashMap<String, EnumInfo>,
     gen:        TypeVarGenerator,
-) -> Result<TypedProgram, YoloscriptError> {
+) -> Result<TypedProgram, GustError> {
     let mut ctx = ConstructCtx::new(subst, scheme_env, struct_env, method_env, enum_env, gen);
 
     // Hoist resolved function types so forward references work in Pass 2.
@@ -94,7 +94,7 @@ pub(super) fn construct_program(
     Ok(out)
 }
 
-fn construct_decl(decl: &Decl, ctx: &mut ConstructCtx) -> Result<TypedDecl, YoloscriptError> {
+fn construct_decl(decl: &Decl, ctx: &mut ConstructCtx) -> Result<TypedDecl, GustError> {
     match decl {
         Decl::Let(ld) => {
             let expected_ty = ld.type_ann.as_ref()
@@ -137,9 +137,9 @@ fn construct_decl(decl: &Decl, ctx: &mut ConstructCtx) -> Result<TypedDecl, Yolo
     }
 }
 
-fn construct_fun_decl(fun: &FunDecl, ctx: &mut ConstructCtx) -> Result<TypedDecl, YoloscriptError> {
+fn construct_fun_decl(fun: &FunDecl, ctx: &mut ConstructCtx) -> Result<TypedDecl, GustError> {
     let scheme = ctx.scheme_env.get(&fun.name)
-        .ok_or_else(|| YoloscriptError::internal(format!("missing type for fn `{}`", fun.name)))?
+        .ok_or_else(|| GustError::internal(format!("missing type for fn `{}`", fun.name)))?
         .clone();
 
     let body = if scheme.quantified_vars.is_empty() {
@@ -151,7 +151,7 @@ fn construct_fun_decl(fun: &FunDecl, ctx: &mut ConstructCtx) -> Result<TypedDecl
                 let rt = infer_type_to_type(&ret, &fun.span).ok();
                 (pts, rt)
             }
-            _ => return Err(YoloscriptError::internal(format!("expected Fun type for `{}`", fun.name))),
+            _ => return Err(GustError::internal(format!("expected Fun type for `{}`", fun.name))),
         };
         ctx.push_scope();
         for (param, ty) in fun.params.iter().zip(param_types.iter()) {
@@ -171,13 +171,13 @@ fn construct_fun_decl(fun: &FunDecl, ctx: &mut ConstructCtx) -> Result<TypedDecl
     }))
 }
 
-fn construct_impl_decl(ib: &ImplBlock, ctx: &mut ConstructCtx) -> Result<TypedDecl, YoloscriptError> {
+fn construct_impl_decl(ib: &ImplBlock, ctx: &mut ConstructCtx) -> Result<TypedDecl, GustError> {
     if ib.trait_name.is_some() {
-        return Err(YoloscriptError::internal("trait impl blocks not yet supported"));
+        return Err(GustError::internal("trait impl blocks not yet supported"));
     }
     let target_name = match &ib.target_type {
         TypeExpr::Named(name, _) => name.clone(),
-        _ => return Err(YoloscriptError::internal("generic impl blocks not yet supported")),
+        _ => return Err(GustError::internal("generic impl blocks not yet supported")),
     };
     let methods = ib.methods.iter()
         .map(|m| construct_impl_method(m, &target_name, ctx))
@@ -194,7 +194,7 @@ fn construct_impl_method(
     method: &FunDecl,
     target_name: &str,
     ctx: &mut ConstructCtx,
-) -> Result<TypedFunDecl, YoloscriptError> {
+) -> Result<TypedFunDecl, GustError> {
     let self_ty = Type::Named(target_name.to_string(), vec![]);
     let param_types: Vec<Type> = method.params.iter()
         .map(|p| {
@@ -203,7 +203,7 @@ fn construct_impl_method(
             } else {
                 p.type_ann.as_ref()
                     .map(|ann| resolved_to_type(&type_expr_to_infer(ann), ctx.subst, &p.span))
-                    .unwrap_or_else(|| Err(YoloscriptError::type_error(
+                    .unwrap_or_else(|| Err(GustError::type_error(
                         ErrorCode::E0002,
                         format!("parameter `{}` needs a type annotation", p.name),
                         &p.span,
@@ -231,7 +231,7 @@ fn construct_block(
     block: &Block,
     expected_tail_ty: Option<&Type>,
     ctx: &mut ConstructCtx,
-) -> Result<TypedBlock, YoloscriptError> {
+) -> Result<TypedBlock, GustError> {
     ctx.push_scope();
     let mut stmts = vec![];
     for stmt in &block.stmts {
@@ -245,7 +245,7 @@ fn construct_block(
     Ok(TypedBlock { stmts, tail, span: block.span.clone() })
 }
 
-fn construct_stmt(stmt: &Stmt, ctx: &mut ConstructCtx) -> Result<TypedStmt, YoloscriptError> {
+fn construct_stmt(stmt: &Stmt, ctx: &mut ConstructCtx) -> Result<TypedStmt, GustError> {
     match stmt {
         Stmt::Expr(e) => Ok(TypedStmt::Expr(construct_expr(e, None, ctx)?)),
         Stmt::Return(r) => {
@@ -303,7 +303,7 @@ fn construct_stmt(stmt: &Stmt, ctx: &mut ConstructCtx) -> Result<TypedStmt, Yolo
             let elem_ty = match iterable.ty() {
                 Type::Array(elem) => *elem.clone(),
                 Type::Named(name, args) if name == "Range" && args.len() == 1 => Type::Int,
-                _ => return Err(YoloscriptError::internal("for-in over non-iterable type")),
+                _ => return Err(GustError::internal("for-in over non-iterable type")),
             };
             ctx.push_scope();
             ctx.bind(&fi.binding, elem_ty);
@@ -313,7 +313,7 @@ fn construct_stmt(stmt: &Stmt, ctx: &mut ConstructCtx) -> Result<TypedStmt, Yolo
                 binding: fi.binding.clone(), iterable, body, span: fi.span.clone(),
             }))
         }
-        _ => Err(YoloscriptError::internal("statement not yet supported in construct")),
+        _ => Err(GustError::internal("statement not yet supported in construct")),
     }
 }
 
@@ -321,14 +321,14 @@ fn construct_expr(
     expr: &Expr,
     expected_ty: Option<&Type>,
     ctx: &mut ConstructCtx,
-) -> Result<TypedExpr, YoloscriptError> {
+) -> Result<TypedExpr, GustError> {
     match expr {
         Expr::Literal(lit, span) => {
             let ty = construct_literal_type(lit, expected_ty, span)?;
             Ok(TypedExpr::Literal(lit.clone(), ty, span.clone()))
         }
         Expr::Ident(name, span) => {
-            let ty = ctx.lookup(name).cloned().ok_or_else(|| YoloscriptError::type_error(
+            let ty = ctx.lookup(name).cloned().ok_or_else(|| GustError::type_error(
                 ErrorCode::E0003,
                 format!("undefined name `{name}`"),
                 span,
@@ -346,7 +346,7 @@ fn construct_expr(
         }
         Expr::Array(elems, span) => {
             if elems.is_empty() {
-                let ty = expected_ty.cloned().ok_or_else(|| YoloscriptError::type_error(
+                let ty = expected_ty.cloned().ok_or_else(|| GustError::type_error(
                     ErrorCode::E0002,
                     "cannot infer element type of empty array; add a type annotation",
                     span,
@@ -366,7 +366,7 @@ fn construct_expr(
             let typed_idx = construct_expr(index,  None, ctx)?;
             let elem_ty = match typed_obj.ty() {
                 Type::Array(elem) => *elem.clone(),
-                _ => return Err(YoloscriptError::type_error(
+                _ => return Err(GustError::type_error(
                     ErrorCode::E0001,
                     "indexed value is not an array",
                     span,
@@ -414,14 +414,14 @@ fn construct_expr(
             let typed_obj = construct_expr(object, None, ctx)?;
             let struct_name = match typed_obj.ty() {
                 Type::Named(name, _) => name.clone(),
-                t => return Err(YoloscriptError::internal(
+                t => return Err(GustError::internal(
                     format!("field access on non-struct type {t}")
                 )),
             };
             let field_ty = ctx.struct_env.get(&struct_name)
                 .and_then(|fs| fs.iter().find(|(n, _)| n == field))
                 .map(|(_, ty)| ty.clone())
-                .ok_or_else(|| YoloscriptError::internal(
+                .ok_or_else(|| GustError::internal(
                     format!("no field `{field}` on `{struct_name}`")
                 ))?;
             Ok(TypedExpr::FieldAccess {
@@ -439,14 +439,14 @@ fn construct_expr(
                 Type::Int            => "Int".to_string(),
                 Type::Float          => "Float".to_string(),
                 Type::Bool           => "Bool".to_string(),
-                t => return Err(YoloscriptError::internal(
+                t => return Err(GustError::internal(
                     format!("method call on non-struct type {t}")
                 )),
             };
             let method_fun_ty = ctx.method_env.get(&struct_name)
                 .and_then(|m| m.get(method.as_str()))
                 .cloned()
-                .ok_or_else(|| YoloscriptError::internal(
+                .ok_or_else(|| GustError::internal(
                     format!("no method `{method}` on `{struct_name}`")
                 ))?;
             let typed_args: Vec<TypedExpr> = args.iter()
@@ -454,7 +454,7 @@ fn construct_expr(
                 .collect::<Result<_, _>>()?;
             let ret_ty = match method_fun_ty {
                 Type::Fun(_, ret) => *ret,
-                _ => return Err(YoloscriptError::internal("method type is not a function")),
+                _ => return Err(GustError::internal("method type is not a function")),
             };
             Ok(TypedExpr::MethodCall {
                 receiver: Box::new(typed_receiver),
@@ -485,7 +485,7 @@ fn construct_expr(
         }
         Expr::Path(segments, span) => {
             let [type_name, member_name] = segments.as_slice() else {
-                return Err(YoloscriptError::internal("invalid path in construct"));
+                return Err(GustError::internal("invalid path in construct"));
             };
             if let Some(ty) = ctx.method_env
                 .get(type_name.as_str())
@@ -504,7 +504,7 @@ fn construct_expr(
             let param_types: Vec<Type> = params.iter()
                 .map(|p| p.type_ann.as_ref()
                     .map(|ann| resolved_to_type(&type_expr_to_infer(ann), ctx.subst, &p.span))
-                    .unwrap_or_else(|| Err(YoloscriptError::type_error(
+                    .unwrap_or_else(|| Err(GustError::type_error(
                         ErrorCode::E0002,
                         format!("closure parameter `{}` needs a type annotation", p.name),
                         &p.span,
@@ -534,7 +534,7 @@ fn construct_expr(
             let ty = match typed_expr.ty() {
                 Type::Result(ok, _) => *ok.clone(),
                 Type::Named(name, args) if name == "Result" && args.len() == 2 => args[0].clone(),
-                _ => return Err(YoloscriptError::internal("? on non-Result value")),
+                _ => return Err(GustError::internal("? on non-Result value")),
             };
             Ok(TypedExpr::PropagateError { expr: Box::new(typed_expr), ty, span: span.clone() })
         }
@@ -553,10 +553,10 @@ fn construct_expr(
             let typed_obj = construct_expr(object, None, ctx)?;
             let ty = match typed_obj.ty() {
                 Type::Tuple(elems) => elems.get(*index).cloned()
-                    .ok_or_else(|| YoloscriptError::internal(
+                    .ok_or_else(|| GustError::internal(
                         format!("tuple index {index} out of bounds")
                     ))?,
-                _ => return Err(YoloscriptError::internal("tuple access on non-tuple")),
+                _ => return Err(GustError::internal("tuple access on non-tuple")),
             };
             Ok(TypedExpr::TupleAccess {
                 object: Box::new(typed_obj),
@@ -570,7 +570,7 @@ fn construct_expr(
             let ty = find_loop_break_type(&typed_body).unwrap_or(Type::Never);
             Ok(TypedExpr::Loop { body: typed_body, ty, span: span.clone() })
         }
-        _ => Err(YoloscriptError::internal("expression not yet supported in construct")),
+        _ => Err(GustError::internal("expression not yet supported in construct")),
     }
 }
 
@@ -609,7 +609,7 @@ fn find_break_in_expr(expr: &TypedExpr) -> Option<Type> {
     }
 }
 
-fn construct_match(m: &MatchExpr, ctx: &mut ConstructCtx) -> Result<TypedExpr, YoloscriptError> {
+fn construct_match(m: &MatchExpr, ctx: &mut ConstructCtx) -> Result<TypedExpr, GustError> {
     let scrutinee = construct_expr(&m.scrutinee, None, ctx)?;
     let scrutinee_ty = scrutinee.ty().clone();
     let mut typed_arms = vec![];
@@ -648,7 +648,7 @@ fn check_match_exhaustiveness(
     scrutinee_ty: &Type,
     enum_env: &HashMap<String, EnumInfo>,
     span: &Span,
-) -> Result<(), YoloscriptError> {
+) -> Result<(), GustError> {
     if arms.iter().any(|a| a.guard.is_none() && is_catch_all_pattern(&a.pattern)) {
         return Ok(());
     }
@@ -683,7 +683,7 @@ fn check_match_exhaustiveness(
         _ => false,
     };
     if !exhaustive {
-        return Err(YoloscriptError::type_error(
+        return Err(GustError::type_error(
             ErrorCode::E0008,
             "non-exhaustive match: not all cases are covered".to_string(),
             span,
@@ -722,7 +722,7 @@ fn construct_pattern_bindings(
     pattern: &Pattern,
     scrutinee_ty: &Type,
     ctx: &mut ConstructCtx,
-) -> Result<(), YoloscriptError> {
+) -> Result<(), GustError> {
     match pattern {
         Pattern::Wildcard(_) | Pattern::Literal(_, _) | Pattern::Nope(_) => {}
         Pattern::Binding(name, _) => {
@@ -731,7 +731,7 @@ fn construct_pattern_bindings(
         Pattern::Tuple(pats, _) => {
             let elems = match scrutinee_ty {
                 Type::Tuple(ts) => ts.clone(),
-                _ => return Err(YoloscriptError::internal("tuple pattern on non-tuple")),
+                _ => return Err(GustError::internal("tuple pattern on non-tuple")),
             };
             for (pat, elem_ty) in pats.iter().zip(elems.iter()) {
                 construct_pattern_bindings(pat, elem_ty, ctx)?;
@@ -739,7 +739,7 @@ fn construct_pattern_bindings(
         }
         Pattern::EnumVariant { path, fields, span } => {
             let [enum_name, variant_name] = path.as_slice() else {
-                return Err(YoloscriptError::internal("invalid pattern path"));
+                return Err(GustError::internal("invalid pattern path"));
             };
             let _ = span;
             bind_enum_variant_fields(enum_name, variant_name, fields, scrutinee_ty, ctx)?;
@@ -764,18 +764,18 @@ fn construct_enum_literal_ty(
     expected_ty: Option<&Type>,
     span: &Span,
     ctx: &mut ConstructCtx,
-) -> Result<Type, YoloscriptError> {
+) -> Result<Type, GustError> {
     // Resolve concrete type arguments using the same instantiate-then-unify
     // pattern as instantiate_scheme_for_call.
     let enum_info = ctx.enum_env.get(enum_name)
-        .ok_or_else(|| YoloscriptError::type_error(
+        .ok_or_else(|| GustError::type_error(
             ErrorCode::E0003,
             format!("unknown enum `{enum_name}`"),
             span,
         ))?;
     let variant = enum_info.variants.iter()
         .find(|v| v.name == variant_name)
-        .ok_or_else(|| YoloscriptError::type_error(
+        .ok_or_else(|| GustError::type_error(
             ErrorCode::E0003,
             format!("no variant `{variant_name}` on enum `{enum_name}`"),
             span,
@@ -833,7 +833,7 @@ fn construct_enum_literal_ty(
             let resolved = local_subst.apply(fv);
             if matches!(resolved, InferType::Var(_)) {
                 hint_args.get(i).cloned()
-                    .ok_or_else(|| YoloscriptError::type_error(
+                    .ok_or_else(|| GustError::type_error(
                         ErrorCode::E0002,
                         "cannot infer type; add a type annotation",
                         span,
@@ -857,13 +857,13 @@ fn bind_enum_variant_fields(
     fields: &[String],
     scrutinee_ty: &Type,
     ctx: &mut ConstructCtx,
-) -> Result<(), YoloscriptError> {
+) -> Result<(), GustError> {
     let enum_info = ctx.enum_env.get(enum_name)
-        .ok_or_else(|| YoloscriptError::internal(format!("unknown enum `{enum_name}`")))?
+        .ok_or_else(|| GustError::internal(format!("unknown enum `{enum_name}`")))?
         .clone();
     let variant = enum_info.variants.iter()
         .find(|v| v.name == variant_name)
-        .ok_or_else(|| YoloscriptError::internal(format!("unknown variant `{variant_name}`")))?
+        .ok_or_else(|| GustError::internal(format!("unknown variant `{variant_name}`")))?
         .clone();
     let type_args = extract_type_args_from_type(scrutinee_ty);
     let mut remap = Substitution::new();
@@ -875,7 +875,7 @@ fn bind_enum_variant_fields(
         let template_ty = variant.fields.iter()
             .find(|(n, _)| n == field_name)
             .map(|(_, ty)| ty.clone())
-            .ok_or_else(|| YoloscriptError::internal(
+            .ok_or_else(|| GustError::internal(
                 format!("no field `{field_name}` on variant `{variant_name}`")
             ))?;
         let concrete = infer_type_to_type(&remap.apply(&template_ty), &dummy)?;
@@ -895,7 +895,7 @@ fn construct_call(
     args:   &[Expr],
     span:   &Span,
     ctx:    &mut ConstructCtx,
-) -> Result<TypedExpr, YoloscriptError> {
+) -> Result<TypedExpr, GustError> {
     let typed_args: Vec<TypedExpr> = args.iter()
         .map(|a| construct_expr(a, None, ctx))
         .collect::<Result<_, _>>()?;
@@ -904,7 +904,7 @@ fn construct_call(
     let (typed_callee, fun_ty) = match callee {
         Expr::Ident(name, ident_span) if ctx.lookup(name).is_none() => {
             let scheme = ctx.scheme_env.get(name.as_str()).ok_or_else(|| {
-                YoloscriptError::type_error(ErrorCode::E0003, format!("undefined name `{name}`"), ident_span)
+                GustError::type_error(ErrorCode::E0003, format!("undefined name `{name}`"), ident_span)
             })?;
             let concrete = instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?;
             let typed = TypedExpr::Ident(name.clone(), concrete.clone(), ident_span.clone());
@@ -920,7 +920,7 @@ fn construct_call(
     match &fun_ty {
         Type::Fun(params, ret) => {
             if params.len() != typed_args.len() {
-                return Err(YoloscriptError::type_error(
+                return Err(GustError::type_error(
                     ErrorCode::E0004,
                     format!("expected {} argument(s), got {}", params.len(), typed_args.len()),
                     span,
@@ -933,7 +933,7 @@ fn construct_call(
                 span:   span.clone(),
             })
         }
-        _ => Err(YoloscriptError::type_error(
+        _ => Err(GustError::type_error(
             ErrorCode::E0001,
             "called a non-function value",
             span,
@@ -946,19 +946,19 @@ fn instantiate_scheme_for_call(
     arg_types: &[&Type],
     span:      &Span,
     gen:       &mut TypeVarGenerator,
-) -> Result<Type, YoloscriptError> {
+) -> Result<Type, GustError> {
     let instance = instantiate(scheme, gen);
 
     let (params, ret) = match instance {
         InferType::Fun(p, r) => (p, r),
-        _ => return Err(YoloscriptError::internal("scheme type is not a function")),
+        _ => return Err(GustError::internal("scheme type is not a function")),
     };
 
     let mut subst = Substitution::new();
     for (param, arg_ty) in params.iter().zip(arg_types.iter()) {
         let arg_infer = type_to_infer(*arg_ty);
         let s = unify(&subst.apply(param), &arg_infer).map_err(|_| {
-            YoloscriptError::type_error(ErrorCode::E0001, "argument type mismatch", span)
+            GustError::type_error(ErrorCode::E0001, "argument type mismatch", span)
         })?;
         subst = subst.compose(&s);
     }
@@ -974,7 +974,7 @@ fn construct_literal_type(
     lit: &Literal,
     expected_ty: Option<&Type>,
     span: &Span,
-) -> Result<Type, YoloscriptError> {
+) -> Result<Type, GustError> {
     match lit {
         Literal::Int(_)   => Ok(Type::Int),
         Literal::Float(_) => Ok(Type::Float),
@@ -985,7 +985,7 @@ fn construct_literal_type(
         // the expected type from the enclosing binding's annotation (propagated via
         // construct_expr's expected_ty parameter). If no annotation, E0002 — but Pass 1
         // should have already caught the unannotated case via an unresolved type var.
-        Literal::Nope     => expected_ty.cloned().ok_or_else(|| YoloscriptError::type_error(
+        Literal::Nope     => expected_ty.cloned().ok_or_else(|| GustError::type_error(
             ErrorCode::E0002,
             "cannot infer type of `nope`; add a type annotation",
             span,
@@ -999,7 +999,7 @@ fn construct_binop(
     rhs: &Expr,
     span: &Span,
     ctx: &mut ConstructCtx,
-) -> Result<TypedExpr, YoloscriptError> {
+) -> Result<TypedExpr, GustError> {
     let lhs = construct_expr(lhs, None, ctx)?;
     let rhs = construct_expr(rhs, None, ctx)?;
     let ty = match op {
@@ -1016,7 +1016,7 @@ fn construct_unaryop(
     operand: &Expr,
     span:    &Span,
     ctx:     &mut ConstructCtx,
-) -> Result<TypedExpr, YoloscriptError> {
+) -> Result<TypedExpr, GustError> {
     let operand = construct_expr(operand, None, ctx)?;
     let ty = match op {
         UnaryOp::Neg => operand.ty().clone(),

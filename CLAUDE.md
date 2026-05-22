@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Yoloscript is a Rust-inspired programming language with a tree-walk interpreter written in Rust. The project implements a statically typed, expression-oriented language with features like type inference, pattern matching, and generics.
+Gust is a Rust-inspired programming language with a tree-walk interpreter written in Rust. The project implements a statically typed, expression-oriented language with features like type inference, pattern matching, and generics.
 
 ## Common Development Commands
 
@@ -14,7 +14,7 @@ Yoloscript is a Rust-inspired programming language with a tree-walk interpreter 
 cd tree-walk-interpreter
 cargo build --release
 
-# Run a Yoloscript program
+# Run a Gust program
 cargo run -- path/to/program.yolo
 
 # Run in debug mode with output

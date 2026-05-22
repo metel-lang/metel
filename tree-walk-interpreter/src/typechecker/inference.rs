@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::ast::*;
-use crate::error::{ErrorCode, YoloscriptError};
+use crate::error::{ErrorCode, GustError};
 use crate::typeinference::*;
 use crate::types::Type;
 
@@ -25,7 +25,7 @@ pub(super) fn infer_program(
     program: &Program,
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
-) -> Result<(), YoloscriptError> {
+) -> Result<(), GustError> {
     for decl in &program.decls {
         infer_decl(decl, ctx, fun_generalizations)?;
     }
@@ -36,7 +36,7 @@ fn infer_decl(
     decl: &Decl,
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
-) -> Result<InferType, YoloscriptError> {
+) -> Result<InferType, GustError> {
     match decl {
         Decl::Let(ld) => {
             let val_ty = infer_expr(&ld.value, ctx, fun_generalizations)?;
@@ -58,11 +58,11 @@ fn infer_decl(
         Decl::Struct(_) | Decl::Enum(_) | Decl::Trait(_) => Ok(InferType::unit()),
         Decl::Impl(ib) => {
             if ib.trait_name.is_some() {
-                return Err(YoloscriptError::internal("trait impl blocks not yet supported"));
+                return Err(GustError::internal("trait impl blocks not yet supported"));
             }
             let target_name = match &ib.target_type {
                 TypeExpr::Named(name, args) if args.is_empty() => name.clone(),
-                _ => return Err(YoloscriptError::internal("generic impl blocks not yet supported")),
+                _ => return Err(GustError::internal("generic impl blocks not yet supported")),
             };
             for method in &ib.methods {
                 infer_impl_method(method, &target_name, ctx, fun_generalizations)?;
@@ -77,9 +77,9 @@ fn infer_fun_decl(
     fun: &FunDecl,
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
-) -> Result<(), YoloscriptError> {
+) -> Result<(), GustError> {
     if !fun.generics.is_empty() {
-        return Err(YoloscriptError::internal(format!(
+        return Err(GustError::internal(format!(
             "generic function `{}` not yet supported",
             fun.name
         )));
@@ -133,9 +133,9 @@ fn infer_impl_method(
     target_name: &str,
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
-) -> Result<(), YoloscriptError> {
+) -> Result<(), GustError> {
     if !method.generics.is_empty() {
-        return Err(YoloscriptError::internal(format!(
+        return Err(GustError::internal(format!(
             "generic method `{}` not yet supported", method.name
         )));
     }
@@ -174,7 +174,7 @@ fn infer_block(
     block: &Block,
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
-) -> Result<InferType, YoloscriptError> {
+) -> Result<InferType, GustError> {
     ctx.push_scope();
     hoist_fun_decls(&block.stmts, ctx);
     let mut last_stmt_ty = InferType::unit();
@@ -193,7 +193,7 @@ fn infer_stmt(
     stmt: &Stmt,
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
-) -> Result<InferType, YoloscriptError> {
+) -> Result<InferType, GustError> {
     match stmt {
         Stmt::Expr(e) => { infer_expr(e, ctx, fun_generalizations)?; Ok(InferType::unit()) }
         Stmt::Return(r) => {
@@ -265,7 +265,7 @@ fn infer_stmt(
                     ctx.add_constraint(iter_ty, InferType::Array(Box::new(elem_ty.clone())), fi.span.clone());
                 }
                 _ => {
-                    return Err(YoloscriptError::type_error(
+                    return Err(GustError::type_error(
                         ErrorCode::E0001,
                         format!("expected array or range in for-in, got `{resolved_iter}`"),
                         &fi.span,
@@ -281,7 +281,7 @@ fn infer_stmt(
             let _ = iter_var_span;
             Ok(InferType::unit())
         }
-        _ => Err(YoloscriptError::internal("statement not yet supported")),
+        _ => Err(GustError::internal("statement not yet supported")),
     }
 }
 
@@ -289,11 +289,11 @@ fn infer_expr(
     expr: &Expr,
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
-) -> Result<InferType, YoloscriptError> {
+) -> Result<InferType, GustError> {
     match expr {
         Expr::Literal(lit, _)          => Ok(infer_literal(lit, ctx)),
         Expr::Ident(name, span)        => {
-            ctx.lookup(name).ok_or_else(|| YoloscriptError::type_error(
+            ctx.lookup(name).ok_or_else(|| GustError::type_error(
                 ErrorCode::E0003,
                 format!("undefined name `{name}`"),
                 span,
@@ -325,7 +325,7 @@ fn infer_expr(
                 .collect::<Result<_, _>>()?;
             if let InferType::Fun(params, _) = &callee_ty {
                 if params.len() != arg_tys.len() {
-                    return Err(YoloscriptError::type_error(
+                    return Err(GustError::type_error(
                         ErrorCode::E0004,
                         format!("expected {} argument(s), got {}", params.len(), arg_tys.len()),
                         span,
@@ -394,13 +394,13 @@ fn infer_expr(
         Expr::FieldAccess { object, field, span } => {
             let obj_ty = infer_expr(object, ctx, fun_generalizations)?;
             let obj_ty = ctx.solve()?.apply(&obj_ty);
-            let struct_name = named_type_name(&obj_ty).ok_or_else(|| YoloscriptError::type_error(
+            let struct_name = named_type_name(&obj_ty).ok_or_else(|| GustError::type_error(
                 ErrorCode::E0002,
                 "cannot infer struct type for field access; add a type annotation",
                 span,
             ))?;
             let fields = ctx.get_struct_fields(&struct_name)
-                .ok_or_else(|| YoloscriptError::type_error(
+                .ok_or_else(|| GustError::type_error(
                     ErrorCode::E0003,
                     format!("unknown type `{struct_name}`"),
                     span,
@@ -408,7 +408,7 @@ fn infer_expr(
             fields.iter()
                 .find(|(n, _)| n == field)
                 .map(|(_, ty)| ty.clone())
-                .ok_or_else(|| YoloscriptError::type_error(
+                .ok_or_else(|| GustError::type_error(
                     ErrorCode::E0003,
                     format!("no field `{field}` on `{struct_name}`"),
                     span,
@@ -417,14 +417,14 @@ fn infer_expr(
         Expr::MethodCall { receiver, method, args, span } => {
             let recv_ty = infer_expr(receiver, ctx, fun_generalizations)?;
             let recv_ty = ctx.solve()?.apply(&recv_ty);
-            let struct_name = named_type_name(&recv_ty).ok_or_else(|| YoloscriptError::type_error(
+            let struct_name = named_type_name(&recv_ty).ok_or_else(|| GustError::type_error(
                 ErrorCode::E0002,
                 "cannot infer receiver type for method call; add a type annotation",
                 span,
             ))?;
             let method_ty = ctx.get_method_type(&struct_name, method)
                 .cloned()
-                .ok_or_else(|| YoloscriptError::type_error(
+                .ok_or_else(|| GustError::type_error(
                     ErrorCode::E0003,
                     format!("no method `{method}` on `{struct_name}`"),
                     span,
@@ -445,7 +445,7 @@ fn infer_expr(
                 infer_enum_variant_literal(&path[0], &path[1], fields, span, ctx, fun_generalizations)
             } else {
                 let struct_name = path.last()
-                    .ok_or_else(|| YoloscriptError::internal("empty path in struct literal"))?
+                    .ok_or_else(|| GustError::internal("empty path in struct literal"))?
                     .clone();
                 infer_struct_literal(struct_name, fields, span, ctx, fun_generalizations)
             }
@@ -462,7 +462,7 @@ fn infer_expr(
                 | (InferType::Concrete(Type::Float), InferType::Concrete(Type::Float))
             );
             if !valid {
-                return Err(YoloscriptError::type_error(
+                return Err(GustError::type_error(
                     ErrorCode::E0007,
                     format!("cannot cast `{source_resolved}` to `{target_resolved}` — only `Int as Float` and identity casts are supported"),
                     span,
@@ -475,13 +475,13 @@ fn infer_expr(
             let obj_ty = ctx.solve()?.apply(&obj_ty);
             match &obj_ty {
                 InferType::Tuple(elems) => {
-                    elems.get(*index).cloned().ok_or_else(|| YoloscriptError::type_error(
+                    elems.get(*index).cloned().ok_or_else(|| GustError::type_error(
                         ErrorCode::E0003,
                         format!("tuple index {index} out of bounds (tuple has {} elements)", elems.len()),
                         span,
                     ))
                 }
-                _ => Err(YoloscriptError::type_error(
+                _ => Err(GustError::type_error(
                     ErrorCode::E0002,
                     "cannot infer tuple type for index access; add a type annotation",
                     span,
@@ -498,7 +498,7 @@ fn infer_expr(
         }
         Expr::Path(segments, span) => {
             let [type_name, member_name] = segments.as_slice() else {
-                return Err(YoloscriptError::type_error(
+                return Err(GustError::type_error(
                     ErrorCode::E0003,
                     format!("unresolved path `{}`", segments.join("::")),
                     span,
@@ -517,7 +517,7 @@ fn infer_expr(
                     }
                 }
             }
-            Err(YoloscriptError::type_error(
+            Err(GustError::type_error(
                 ErrorCode::E0003,
                 format!("no member `{member_name}` on type `{type_name}`"),
                 span,
@@ -561,7 +561,7 @@ fn infer_expr(
             Ok(ok_var)
         }
         Expr::Match(m) => infer_match(m, ctx, fun_generalizations),
-        _ => Err(YoloscriptError::internal("expression not yet supported")),
+        _ => Err(GustError::internal("expression not yet supported")),
     }
 }
 
@@ -569,7 +569,7 @@ fn infer_match(
     m: &MatchExpr,
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
-) -> Result<InferType, YoloscriptError> {
+) -> Result<InferType, GustError> {
     let scrutinee_ty = infer_expr(&m.scrutinee, ctx, fun_generalizations)?;
     let result_var = ctx.fresh_var();
     for arm in &m.arms {
@@ -590,7 +590,7 @@ fn infer_pattern(
     pattern: &Pattern,
     scrutinee_ty: &InferType,
     ctx: &mut InferContext,
-) -> Result<(), YoloscriptError> {
+) -> Result<(), GustError> {
     let span = pattern_span(pattern);
     match pattern {
         Pattern::Wildcard(_) => {}
@@ -622,7 +622,7 @@ fn infer_pattern(
         }
         Pattern::EnumVariant { path, fields, span: pat_span } => {
             let [enum_name, variant_name] = path.as_slice() else {
-                return Err(YoloscriptError::type_error(
+                return Err(GustError::type_error(
                     ErrorCode::E0003,
                     format!("unresolved pattern path `{}`", path.join("::")),
                     pat_span,
@@ -671,7 +671,7 @@ fn infer_binop(
     span: &Span,
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
-) -> Result<InferType, YoloscriptError> {
+) -> Result<InferType, GustError> {
     let lhs_ty = infer_expr(lhs, ctx, fun_generalizations)?;
     let rhs_ty = infer_expr(rhs, ctx, fun_generalizations)?;
     match op {
@@ -704,7 +704,7 @@ fn infer_unaryop(
     span: &Span,
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
-) -> Result<InferType, YoloscriptError> {
+) -> Result<InferType, GustError> {
     let ty = infer_expr(operand, ctx, fun_generalizations)?;
     match op {
         UnaryOp::Neg => Ok(ty),
@@ -722,9 +722,9 @@ fn infer_enum_variant_literal(
     span: &Span,
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
-) -> Result<InferType, YoloscriptError> {
+) -> Result<InferType, GustError> {
     let enum_info = ctx.get_enum(enum_name)
-        .ok_or_else(|| YoloscriptError::type_error(
+        .ok_or_else(|| GustError::type_error(
             ErrorCode::E0003,
             format!("unknown enum `{enum_name}`"),
             span,
@@ -732,7 +732,7 @@ fn infer_enum_variant_literal(
         .clone();
     let variant = enum_info.variants.iter()
         .find(|v| v.name == variant_name)
-        .ok_or_else(|| YoloscriptError::type_error(
+        .ok_or_else(|| GustError::type_error(
             ErrorCode::E0003,
             format!("no variant `{variant_name}` on enum `{enum_name}`"),
             span,
@@ -746,7 +746,7 @@ fn infer_enum_variant_literal(
         let raw_ty = variant.fields.iter()
             .find(|(n, _)| n == fname)
             .map(|(_, ty)| ty)
-            .ok_or_else(|| YoloscriptError::type_error(
+            .ok_or_else(|| GustError::type_error(
                 ErrorCode::E0003,
                 format!("no field `{fname}` on `{enum_name}::{variant_name}`"),
                 span,
@@ -770,9 +770,9 @@ fn infer_struct_literal(
     span: &Span,
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
-) -> Result<InferType, YoloscriptError> {
+) -> Result<InferType, GustError> {
     let expected_fields = ctx.get_struct_fields(&struct_name)
-        .ok_or_else(|| YoloscriptError::type_error(
+        .ok_or_else(|| GustError::type_error(
             ErrorCode::E0003,
             format!("unknown struct `{struct_name}`"),
             span,
@@ -782,7 +782,7 @@ fn infer_struct_literal(
         let decl_ty = expected_fields.iter()
             .find(|(n, _)| n == name)
             .map(|(_, ty)| ty.clone())
-            .ok_or_else(|| YoloscriptError::type_error(
+            .ok_or_else(|| GustError::type_error(
                 ErrorCode::E0003,
                 format!("no field `{name}` on `{struct_name}`"),
                 span,
@@ -792,7 +792,7 @@ fn infer_struct_literal(
     }
     for (decl_name, _) in &expected_fields {
         if !fields.iter().any(|(n, _)| n == decl_name) {
-            return Err(YoloscriptError::type_error(
+            return Err(GustError::type_error(
                 ErrorCode::E0003,
                 format!("missing field `{decl_name}` in `{struct_name}`"),
                 span,
@@ -808,18 +808,18 @@ fn infer_field_assign_type(
     target_span: &Span,
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
-) -> Result<InferType, YoloscriptError> {
+) -> Result<InferType, GustError> {
     let obj_ty = infer_expr(object, ctx, fun_generalizations)?;
     let obj_ty = ctx.solve()?.apply(&obj_ty);
     let struct_name = named_type_name(&obj_ty).ok_or_else(|| {
-        YoloscriptError::type_error(
+        GustError::type_error(
             ErrorCode::E0002,
             "cannot infer struct type for field assignment; add a type annotation",
             target_span,
         )
     })?;
     let fields = ctx.get_struct_fields(&struct_name)
-        .ok_or_else(|| YoloscriptError::type_error(
+        .ok_or_else(|| GustError::type_error(
             ErrorCode::E0003,
             format!("unknown type `{struct_name}`"),
             target_span,
@@ -828,7 +828,7 @@ fn infer_field_assign_type(
     fields.iter()
         .find(|(n, _)| n == field)
         .map(|(_, ty)| ty.clone())
-        .ok_or_else(|| YoloscriptError::type_error(
+        .ok_or_else(|| GustError::type_error(
             ErrorCode::E0003,
             format!("no field `{field}` on `{struct_name}`"),
             target_span,
@@ -842,9 +842,9 @@ fn infer_enum_variant_pattern(
     scrutinee_ty: &InferType,
     pat_span: &Span,
     ctx: &mut InferContext,
-) -> Result<(), YoloscriptError> {
+) -> Result<(), GustError> {
     let enum_info = ctx.get_enum(enum_name)
-        .ok_or_else(|| YoloscriptError::type_error(
+        .ok_or_else(|| GustError::type_error(
             ErrorCode::E0003,
             format!("unknown enum `{enum_name}` in pattern"),
             pat_span,
@@ -852,7 +852,7 @@ fn infer_enum_variant_pattern(
         .clone();
     let variant = enum_info.variants.iter()
         .find(|v| v.name == variant_name)
-        .ok_or_else(|| YoloscriptError::type_error(
+        .ok_or_else(|| GustError::type_error(
             ErrorCode::E0003,
             format!("no variant `{variant_name}` on `{enum_name}`"),
             pat_span,
@@ -874,7 +874,7 @@ fn infer_enum_variant_pattern(
         let raw_ty = variant.fields.iter()
             .find(|(n, _)| n == field_name)
             .map(|(_, ty)| ty)
-            .ok_or_else(|| YoloscriptError::type_error(
+            .ok_or_else(|| GustError::type_error(
                 ErrorCode::E0003,
                 format!("no field `{field_name}` on `{enum_name}::{variant_name}`"),
                 pat_span,

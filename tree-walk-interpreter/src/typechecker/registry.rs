@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{Decl, Program, Span, TypeExpr};
-use crate::error::YoloscriptError;
+use crate::error::GustError;
 use crate::typeinference::{
     EnumInfo, InferContext, InferType, TypeRegistry, TypeScheme, TypeVar, TypeVarGenerator,
     VariantInfo,
@@ -150,7 +150,7 @@ pub(super) fn register_builtin_poly_schemes(
 pub(super) fn build_concrete_struct_env(
     struct_env: &HashMap<String, Vec<(String, InferType)>>,
     subst: &crate::typeinference::Substitution,
-) -> Result<HashMap<String, Vec<(String, Type)>>, YoloscriptError> {
+) -> Result<HashMap<String, Vec<(String, Type)>>, GustError> {
     let dummy = Span::new(0, 0, "");
     struct_env.iter()
         .map(|(name, fields)| {
@@ -165,7 +165,7 @@ pub(super) fn build_concrete_struct_env(
 pub(super) fn build_concrete_method_env(
     method_env: &HashMap<String, HashMap<String, InferType>>,
     subst: &crate::typeinference::Substitution,
-) -> Result<HashMap<String, HashMap<String, Type>>, YoloscriptError> {
+) -> Result<HashMap<String, HashMap<String, Type>>, GustError> {
     let dummy = Span::new(0, 0, "");
     method_env.iter()
         .map(|(type_name, methods)| {

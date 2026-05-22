@@ -1,6 +1,6 @@
-//! Integration tests: each .yolo test program must run through the parser without errors. These tests are meant to cover the full range of language features, and are not expected to be minimal. They are primarily intended to catch regressions in the parser as new features are added.
+//! Integration tests: each .gust test program must run through the parser without errors. These tests are meant to cover the full range of language features, and are not expected to be minimal. They are primarily intended to catch regressions in the parser as new features are added.
 
-use yoloscript::parser;
+use gust::parser;
 
 fn run(filename: &str) {
     let path = format!("tests/parsing/sources/{}", filename);
@@ -11,34 +11,34 @@ fn run(filename: &str) {
 }
 
 #[test]
-fn test_01_literals_and_variables() { run("01_literals_and_variables.yolo"); }
+fn test_01_literals_and_variables() { run("01_literals_and_variables.gust"); }
 
 #[test]
-fn test_02_control_flow() { run("02_control_flow.yolo"); }
+fn test_02_control_flow() { run("02_control_flow.gust"); }
 
 #[test]
-fn test_03_functions_and_closures() { run("03_functions_and_closures.yolo"); }
+fn test_03_functions_and_closures() { run("03_functions_and_closures.gust"); }
 
 #[test]
-fn test_04_structs_and_impl() { run("04_structs_and_impl.yolo"); }
+fn test_04_structs_and_impl() { run("04_structs_and_impl.gust"); }
 
 #[test]
-fn test_05_enums_and_match() { run("05_enums_and_match.yolo"); }
+fn test_05_enums_and_match() { run("05_enums_and_match.gust"); }
 
 #[test]
-fn test_06_traits() { run("06_traits.yolo"); }
+fn test_06_traits() { run("06_traits.gust"); }
 
 #[test]
-fn test_07_arrays_and_tuples() { run("07_arrays_and_tuples.yolo"); }
+fn test_07_arrays_and_tuples() { run("07_arrays_and_tuples.gust"); }
 
 #[test]
-fn test_08_error_handling() { run("08_error_handling.yolo"); }
+fn test_08_error_handling() { run("08_error_handling.gust"); }
 
 #[test]
-fn test_09_casting_and_generics() { run("09_casting_and_generics.yolo"); }
+fn test_09_casting_and_generics() { run("09_casting_and_generics.gust"); }
 
 #[test]
-fn test_10_comprehensive() { run("10_comprehensive.yolo"); }
+fn test_10_comprehensive() { run("10_comprehensive.gust"); }
 
 #[test]
-fn test_11_block_expr_stmts() { run("11_block_expr_stmts.yolo"); }
+fn test_11_block_expr_stmts() { run("11_block_expr_stmts.gust"); }

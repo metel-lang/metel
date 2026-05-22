@@ -3,7 +3,7 @@
 
 #[cfg(test)]
 mod phase_1_type_variables {
-    use yoloscript::typeinference::{TypeVar, TypeVarGenerator};
+    use gust::typeinference::{TypeVar, TypeVarGenerator};
 
     #[test]
     fn test_type_var_creation() {
@@ -78,8 +78,8 @@ mod phase_1_type_variables {
 
 #[cfg(test)]
 mod phase_2_infer_types {
-    use yoloscript::typeinference::{InferType, TypeVar};
-    use yoloscript::types::Type;
+    use gust::typeinference::{InferType, TypeVar};
+    use gust::types::Type;
 
     #[test]
     fn test_concrete_variants() {
@@ -190,7 +190,7 @@ mod phase_2_infer_types {
 
 #[cfg(test)]
 mod phase_3_substitution {
-    use yoloscript::typeinference::{InferType, Substitution, TypeVar};
+    use gust::typeinference::{InferType, Substitution, TypeVar};
 
     #[test]
     fn test_bind_and_lookup() {
@@ -298,7 +298,7 @@ mod phase_3_substitution {
 
 #[cfg(test)]
 mod phase_4_unification {
-    use yoloscript::typeinference::{unify, InferType, TypeVar};
+    use gust::typeinference::{unify, InferType, TypeVar};
 
     #[test]
     fn test_unify_identical_concrete() {
@@ -469,8 +469,8 @@ mod phase_4_unification {
 
 #[cfg(test)]
 mod phase_5_constraints {
-    use yoloscript::typeinference::{solve_constraints, Constraint, InferType, TypeVar};
-    use yoloscript::ast::Span;
+    use gust::typeinference::{solve_constraints, Constraint, InferType, TypeVar};
+    use gust::ast::Span;
 
     fn span() -> Span {
         Span::new(0, 1, "test")
@@ -520,11 +520,11 @@ mod phase_5_constraints {
 
     #[test]
     fn test_error_carries_span() {
-        let bad_span = Span::new(10, 20, "myfile.yolo");
+        let bad_span = Span::new(10, 20, "myfile.gust");
         let cs = vec![Constraint::new(InferType::int(), InferType::bool(), bad_span)];
         let err = solve_constraints(cs).unwrap_err();
         let msg = format!("{}", err);
-        assert!(msg.contains("myfile.yolo"));
+        assert!(msg.contains("myfile.gust"));
         assert!(msg.contains("10"));
         assert!(msg.contains("20"));
     }
@@ -564,7 +564,7 @@ mod phase_5_constraints {
 #[cfg(test)]
 mod phase_6_type_schemes {
     use std::collections::HashSet;
-    use yoloscript::typeinference::{
+    use gust::typeinference::{
         free_vars, generalize, instantiate, InferType, TypeScheme, TypeVar, TypeVarGenerator,
     };
 
@@ -718,8 +718,8 @@ mod phase_6_type_schemes {
 
 #[cfg(test)]
 mod phase_7_infer_context {
-    use yoloscript::ast::Span;
-    use yoloscript::typeinference::{generalize, InferContext, InferType, TypeScheme, TypeVar};
+    use gust::ast::Span;
+    use gust::typeinference::{generalize, InferContext, InferType, TypeScheme, TypeVar};
     use std::collections::HashSet;
 
     fn span() -> Span {
@@ -959,8 +959,8 @@ mod phase_7_infer_context {
 
 #[cfg(test)]
 mod phase_8_known_limitations {
-    use yoloscript::ast::Span;
-    use yoloscript::typeinference::{
+    use gust::ast::Span;
+    use gust::typeinference::{
         instantiate, solve_constraints, Constraint, InferType, TypeScheme, TypeVar, TypeVarGenerator,
     };
 
@@ -1062,7 +1062,7 @@ mod phase_8_known_limitations {
     /// to be concrete before any later constraints are processed.
     ///
     /// This is demonstrated at the full pipeline level in
-    /// limit_03_field_access_needs_annotation.yolo. At the constraint level,
+    /// limit_03_field_access_needs_annotation.gust. At the constraint level,
     /// the limitation manifests as: if a type variable stands for the receiver,
     /// `named_type_name` returns None and inference fails immediately (not via
     /// the constraint solver), so there is nothing to assert here about
@@ -1073,7 +1073,7 @@ mod phase_8_known_limitations {
     fn test_eager_partial_solve_var_has_no_named_type() {
         // Applying ctx.solve() to an unbound type variable leaves it as a Var.
         // named_type_name on a Var returns None — field lookup cannot proceed.
-        use yoloscript::typeinference::Substitution;
+        use gust::typeinference::Substitution;
 
         let s = Substitution::new();
         let unresolved = s.apply(&InferType::var(TypeVar(0)));

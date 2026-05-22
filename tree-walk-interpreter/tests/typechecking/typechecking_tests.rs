@@ -4,9 +4,9 @@
 #[cfg(test)]
 mod tests {
     use std::path::Path;
-    use yoloscript::error::YoloscriptError;
-    use yoloscript::parser;
-    use yoloscript::typechecker;
+    use gust::error::GustError;
+    use gust::parser;
+    use gust::typechecker;
 
     // ── Harness helpers ───────────────────────────────────────────────────────
 
@@ -57,7 +57,7 @@ mod tests {
                 Ok(_) => panic!("expected type error in {filename} but check() returned Ok"),
             };
             match &err {
-                YoloscriptError::TypeError { code, start, .. } => {
+                GustError::TypeError { code, start, .. } => {
                     let (expected_line, expected_code) = &annotations[0];
                     let actual_line = byte_offset_to_line(&source, *start);
                     assert_eq!(
@@ -82,350 +82,350 @@ mod tests {
 
     #[test]
     fn stage1_literals() {
-        check_file(&format!("{}/01_literals.yolo", test_dir()));
+        check_file(&format!("{}/01_literals.gust", test_dir()));
     }
 
     #[test]
     fn stage1_annotations() {
-        check_file(&format!("{}/02_annotations.yolo", test_dir()));
+        check_file(&format!("{}/02_annotations.gust", test_dir()));
     }
 
     #[test]
     fn stage1_arithmetic() {
-        check_file(&format!("{}/03_arithmetic.yolo", test_dir()));
+        check_file(&format!("{}/03_arithmetic.gust", test_dir()));
     }
 
     #[test]
     fn stage1_mut_bindings() {
-        check_file(&format!("{}/08_mut_bindings.yolo", test_dir()));
+        check_file(&format!("{}/08_mut_bindings.gust", test_dir()));
     }
 
     // ── Stage 1 negative tests ────────────────────────────────────────────────
 
     #[test]
     fn stage1_neg_type_mismatch() {
-        check_file(&format!("{}/neg_01_type_mismatch.yolo", test_dir()));
+        check_file(&format!("{}/neg_01_type_mismatch.gust", test_dir()));
     }
 
     #[test]
     fn stage1_neg_annotation_required() {
-        check_file(&format!("{}/neg_02_annotation_required.yolo", test_dir()));
+        check_file(&format!("{}/neg_02_annotation_required.gust", test_dir()));
     }
 
     // ── Stage 2 positive tests ────────────────────────────────────────────────
 
     #[test]
     fn stage2_if_stmt() {
-        check_file(&format!("{}/stage2_01_if_stmt.yolo", test_dir()));
+        check_file(&format!("{}/stage2_01_if_stmt.gust", test_dir()));
     }
 
     #[test]
     fn stage2_while_stmt() {
-        check_file(&format!("{}/stage2_02_while_stmt.yolo", test_dir()));
+        check_file(&format!("{}/stage2_02_while_stmt.gust", test_dir()));
     }
 
     #[test]
     fn stage2_if_expr() {
-        check_file(&format!("{}/stage2_03_if_expr.yolo", test_dir()));
+        check_file(&format!("{}/stage2_03_if_expr.gust", test_dir()));
     }
 
     #[test]
     fn stage2_else_if() {
-        check_file(&format!("{}/stage2_04_else_if.yolo", test_dir()));
+        check_file(&format!("{}/stage2_04_else_if.gust", test_dir()));
     }
 
     // ── Stage 2 negative tests ────────────────────────────────────────────────
 
     #[test]
     fn stage2_neg_non_bool_condition() {
-        check_file(&format!("{}/stage2_neg_01_non_bool_condition.yolo", test_dir()));
+        check_file(&format!("{}/stage2_neg_01_non_bool_condition.gust", test_dir()));
     }
 
     // ── Stage 3 positive tests ────────────────────────────────────────────────
 
     #[test]
     fn stage3_function_calls() {
-        check_file(&format!("{}/04_functions.yolo", test_dir()));
+        check_file(&format!("{}/04_functions.gust", test_dir()));
     }
 
     #[test]
     fn stage3_nested_calls() {
-        check_file(&format!("{}/05_nested_calls.yolo", test_dir()));
+        check_file(&format!("{}/05_nested_calls.gust", test_dir()));
     }
 
     #[test]
     fn stage3_let_polymorphism() {
-        check_file(&format!("{}/06_let_polymorphism.yolo", test_dir()));
+        check_file(&format!("{}/06_let_polymorphism.gust", test_dir()));
     }
 
     #[test]
     fn stage3_forward_reference() {
-        check_file(&format!("{}/07_forward_reference.yolo", test_dir()));
+        check_file(&format!("{}/07_forward_reference.gust", test_dir()));
     }
 
     #[test]
     fn stage3_tuples() {
-        check_file(&format!("{}/stage3_01_tuples.yolo", test_dir()));
+        check_file(&format!("{}/stage3_01_tuples.gust", test_dir()));
     }
 
     #[test]
     fn stage3_arrays() {
-        check_file(&format!("{}/stage3_02_arrays.yolo", test_dir()));
+        check_file(&format!("{}/stage3_02_arrays.gust", test_dir()));
     }
 
     // ── Stage 3 negative tests ────────────────────────────────────────────────
 
     #[test]
     fn stage3_neg_arity_mismatch() {
-        check_file(&format!("{}/stage3_neg_01_arity_mismatch.yolo", test_dir()));
+        check_file(&format!("{}/stage3_neg_01_arity_mismatch.gust", test_dir()));
     }
 
     #[test]
     fn stage3_neg_index_non_array() {
-        check_file(&format!("{}/stage3_neg_02_index_non_array.yolo", test_dir()));
+        check_file(&format!("{}/stage3_neg_02_index_non_array.gust", test_dir()));
     }
 
     #[test]
     fn stage3_neg_non_function_callee() {
-        check_file(&format!("{}/stage3_neg_03_non_function_callee.yolo", test_dir()));
+        check_file(&format!("{}/stage3_neg_03_non_function_callee.gust", test_dir()));
     }
 
     #[test]
     fn stage3_neg_empty_array_no_annotation() {
-        check_file(&format!("{}/stage3_neg_04_empty_array_no_annotation.yolo", test_dir()));
+        check_file(&format!("{}/stage3_neg_04_empty_array_no_annotation.gust", test_dir()));
     }
 
     #[test]
     fn stage3_neg_array_element_mismatch() {
-        check_file(&format!("{}/stage3_neg_05_array_element_mismatch.yolo", test_dir()));
+        check_file(&format!("{}/stage3_neg_05_array_element_mismatch.gust", test_dir()));
     }
 
     #[test]
     fn stage3_neg_non_int_index() {
-        check_file(&format!("{}/stage3_neg_06_non_int_index.yolo", test_dir()));
+        check_file(&format!("{}/stage3_neg_06_non_int_index.gust", test_dir()));
     }
 
     // ── Stage 4 positive tests ────────────────────────────────────────────────
 
     #[test]
     fn stage4_if_as_block_tail() {
-        check_file(&format!("{}/stage3_03_if_as_block_tail.yolo", test_dir()));
+        check_file(&format!("{}/stage3_03_if_as_block_tail.gust", test_dir()));
     }
 
     #[test]
     fn stage4_assign() {
-        check_file(&format!("{}/stage4_01_assign.yolo", test_dir()));
+        check_file(&format!("{}/stage4_01_assign.gust", test_dir()));
     }
 
     #[test]
     fn stage4_return_diverges() {
-        check_file(&format!("{}/stage4_02_return_diverges.yolo", test_dir()));
+        check_file(&format!("{}/stage4_02_return_diverges.gust", test_dir()));
     }
 
     #[test]
     fn stage4_index_assign() {
-        check_file(&format!("{}/stage4_03_index_assign.yolo", test_dir()));
+        check_file(&format!("{}/stage4_03_index_assign.gust", test_dir()));
     }
 
     // ── Stage 4 negative tests ────────────────────────────────────────────────
 
     #[test]
     fn stage4_neg_if_no_else_non_unit() {
-        check_file(&format!("{}/stage3_neg_07_if_no_else_non_unit.yolo", test_dir()));
+        check_file(&format!("{}/stage3_neg_07_if_no_else_non_unit.gust", test_dir()));
     }
 
     #[test]
     fn stage4_neg_assign_to_let() {
-        check_file(&format!("{}/stage4_neg_01_assign_to_let.yolo", test_dir()));
+        check_file(&format!("{}/stage4_neg_01_assign_to_let.gust", test_dir()));
     }
 
     #[test]
     fn stage4_neg_assign_undeclared() {
-        check_file(&format!("{}/stage4_neg_02_assign_undeclared.yolo", test_dir()));
+        check_file(&format!("{}/stage4_neg_02_assign_undeclared.gust", test_dir()));
     }
 
     #[test]
     fn stage4_neg_assign_type_mismatch() {
-        check_file(&format!("{}/stage4_neg_03_assign_type_mismatch.yolo", test_dir()));
+        check_file(&format!("{}/stage4_neg_03_assign_type_mismatch.gust", test_dir()));
     }
 
     #[test]
     fn stage4_neg_index_assign_type_mismatch() {
-        check_file(&format!("{}/stage4_neg_04_index_assign_type_mismatch.yolo", test_dir()));
+        check_file(&format!("{}/stage4_neg_04_index_assign_type_mismatch.gust", test_dir()));
     }
 
     // ── Stage 5 positive tests ────────────────────────────────────────────────
 
     #[test]
     fn stage5_structs_and_methods() {
-        check_file(&format!("{}/stage5_01_structs_and_methods.yolo", test_dir()));
+        check_file(&format!("{}/stage5_01_structs_and_methods.gust", test_dir()));
     }
 
     #[test]
     fn stage5_builtin_type_methods() {
-        check_file(&format!("{}/stage5_02_builtin_type_methods.yolo", test_dir()));
+        check_file(&format!("{}/stage5_02_builtin_type_methods.gust", test_dir()));
     }
 
     // ── Stage 5 negative tests ────────────────────────────────────────────────
 
     #[test]
     fn stage5_neg_struct_field_type_mismatch() {
-        check_file(&format!("{}/stage5_neg_01_struct_field_type_mismatch.yolo", test_dir()));
+        check_file(&format!("{}/stage5_neg_01_struct_field_type_mismatch.gust", test_dir()));
     }
 
     #[test]
     fn stage5_neg_unknown_field() {
-        check_file(&format!("{}/stage5_neg_02_unknown_field.yolo", test_dir()));
+        check_file(&format!("{}/stage5_neg_02_unknown_field.gust", test_dir()));
     }
 
     #[test]
     fn stage5_neg_method_arg_type_mismatch() {
-        check_file(&format!("{}/stage5_neg_03_method_arg_type_mismatch.yolo", test_dir()));
+        check_file(&format!("{}/stage5_neg_03_method_arg_type_mismatch.gust", test_dir()));
     }
 
     #[test]
     fn stage5_neg_unknown_method() {
-        check_file(&format!("{}/stage5_neg_04_unknown_method.yolo", test_dir()));
+        check_file(&format!("{}/stage5_neg_04_unknown_method.gust", test_dir()));
     }
 
     #[test]
     fn stage5_neg_field_access_non_struct() {
-        check_file(&format!("{}/stage5_neg_05_field_access_non_struct.yolo", test_dir()));
+        check_file(&format!("{}/stage5_neg_05_field_access_non_struct.gust", test_dir()));
     }
 
     #[test]
     fn stage5_neg_field_access_unknown_field() {
-        check_file(&format!("{}/stage5_neg_06_field_access_unknown_field.yolo", test_dir()));
+        check_file(&format!("{}/stage5_neg_06_field_access_unknown_field.gust", test_dir()));
     }
 
     #[test]
     fn stage5_neg_struct_literal_missing_field() {
-        check_file(&format!("{}/stage5_neg_07_struct_literal_missing_field.yolo", test_dir()));
+        check_file(&format!("{}/stage5_neg_07_struct_literal_missing_field.gust", test_dir()));
     }
 
     // ── Stage 6 tests ─────────────────────────────────────────────────────────
 
     #[test]
     fn stage6_builtins() {
-        check_file(&format!("{}/stage6_01_builtins.yolo", test_dir()));
+        check_file(&format!("{}/stage6_01_builtins.gust", test_dir()));
     }
 
     #[test]
     fn stage6_for_loops() {
-        check_file(&format!("{}/stage6_02_for_loops.yolo", test_dir()));
+        check_file(&format!("{}/stage6_02_for_loops.gust", test_dir()));
     }
 
     #[test]
     fn stage6_loop_expr() {
-        check_file(&format!("{}/stage6_03_loop_expr.yolo", test_dir()));
+        check_file(&format!("{}/stage6_03_loop_expr.gust", test_dir()));
     }
 
     #[test]
     fn stage6_tuple_access() {
-        check_file(&format!("{}/stage6_04_tuple_access.yolo", test_dir()));
+        check_file(&format!("{}/stage6_04_tuple_access.gust", test_dir()));
     }
 
     #[test]
     fn stage6_cast() {
-        check_file(&format!("{}/stage6_06_cast.yolo", test_dir()));
+        check_file(&format!("{}/stage6_06_cast.gust", test_dir()));
     }
 
     #[test]
     fn stage6_enums() {
-        check_file(&format!("{}/stage6_08_enums.yolo", test_dir()));
+        check_file(&format!("{}/stage6_08_enums.gust", test_dir()));
     }
 
     #[test]
     fn stage6_error_propagation() {
-        check_file(&format!("{}/stage6_07_error_propagation.yolo", test_dir()));
+        check_file(&format!("{}/stage6_07_error_propagation.gust", test_dir()));
     }
 
     #[test]
     fn stage6_closures() {
-        check_file(&format!("{}/stage6_05_closures.yolo", test_dir()));
+        check_file(&format!("{}/stage6_05_closures.gust", test_dir()));
     }
 
     // ── Stage 6 negative tests ────────────────────────────────────────────────
 
     #[test]
     fn stage6_nested_loop_break() {
-        check_file(&format!("{}/stage6_09_nested_loop_break.yolo", test_dir()));
+        check_file(&format!("{}/stage6_09_nested_loop_break.gust", test_dir()));
     }
 
     #[test]
     fn stage6_enum_literal_types() {
-        check_file(&format!("{}/stage6_10_enum_literal_types.yolo", test_dir()));
+        check_file(&format!("{}/stage6_10_enum_literal_types.gust", test_dir()));
     }
 
     #[test]
     fn stage6_neg_for_in_non_iterable() {
-        check_file(&format!("{}/stage6_neg_01_for_in_non_iterable.yolo", test_dir()));
+        check_file(&format!("{}/stage6_neg_01_for_in_non_iterable.gust", test_dir()));
     }
 
     #[test]
     fn stage6_neg_loop_break_mismatch() {
-        check_file(&format!("{}/stage6_neg_02_loop_break_mismatch.yolo", test_dir()));
+        check_file(&format!("{}/stage6_neg_02_loop_break_mismatch.gust", test_dir()));
     }
 
     #[test]
     fn stage6_neg_tuple_access_oob() {
-        check_file(&format!("{}/stage6_neg_03_tuple_access_oob.yolo", test_dir()));
+        check_file(&format!("{}/stage6_neg_03_tuple_access_oob.gust", test_dir()));
     }
 
     #[test]
     fn stage6_neg_cast_string() {
-        check_file(&format!("{}/stage6_neg_04_cast_string.yolo", test_dir()));
+        check_file(&format!("{}/stage6_neg_04_cast_string.gust", test_dir()));
     }
 
     #[test]
     fn stage6_neg_cast_bool() {
-        check_file(&format!("{}/stage6_neg_10_cast_bool.yolo", test_dir()));
+        check_file(&format!("{}/stage6_neg_10_cast_bool.gust", test_dir()));
     }
 
     #[test]
     fn stage6_neg_cast_float_to_int() {
-        check_file(&format!("{}/stage6_neg_11_cast_float_to_int.yolo", test_dir()));
+        check_file(&format!("{}/stage6_neg_11_cast_float_to_int.gust", test_dir()));
     }
 
     #[test]
     fn stage6_neg_match_arm_mismatch() {
-        check_file(&format!("{}/stage6_neg_06_match_arm_mismatch.yolo", test_dir()));
+        check_file(&format!("{}/stage6_neg_06_match_arm_mismatch.gust", test_dir()));
     }
 
     #[test]
     fn stage6_neg_error_propagation_non_result() {
-        check_file(&format!("{}/stage6_neg_05_error_propagation_non_result.yolo", test_dir()));
+        check_file(&format!("{}/stage6_neg_05_error_propagation_non_result.gust", test_dir()));
     }
 
     #[test]
     fn stage6_neg_builtin_wrong_arg_type() {
-        check_file(&format!("{}/stage6_neg_07_builtin_wrong_arg_type.yolo", test_dir()));
+        check_file(&format!("{}/stage6_neg_07_builtin_wrong_arg_type.gust", test_dir()));
     }
 
     #[test]
     fn stage6_neg_enum_unknown_variant() {
-        check_file(&format!("{}/stage6_neg_08_enum_unknown_variant.yolo", test_dir()));
+        check_file(&format!("{}/stage6_neg_08_enum_unknown_variant.gust", test_dir()));
     }
 
     #[test]
     fn stage6_neg_enum_field_type_mismatch() {
-        check_file(&format!("{}/stage6_neg_09_enum_field_type_mismatch.yolo", test_dir()));
+        check_file(&format!("{}/stage6_neg_09_enum_field_type_mismatch.gust", test_dir()));
     }
 
     // ── Known-limitation tests ─────────────────────────────────────────────────
 
     #[test]
     fn limit_rank1_fn_arg() {
-        check_file(&format!("{}/limit_01_rank1_fn_arg.yolo", test_dir()));
+        check_file(&format!("{}/limit_01_rank1_fn_arg.gust", test_dir()));
     }
 
     #[test]
     fn limit_let_closure_mono() {
-        check_file(&format!("{}/limit_02_let_closure_mono.yolo", test_dir()));
+        check_file(&format!("{}/limit_02_let_closure_mono.gust", test_dir()));
     }
 
     #[test]
     fn limit_field_access_needs_annotation() {
-        check_file(&format!("{}/limit_03_field_access_needs_annotation.yolo", test_dir()));
+        check_file(&format!("{}/limit_03_field_access_needs_annotation.gust", test_dir()));
     }
 }

@@ -8,7 +8,7 @@ Close a sprint: run tests, carry over incomplete issues, build and publish the s
 
 1. **Fetch the sprint kickoff issue** to retrieve the sprint goal, planned issues, and kickoff issue number:
 ```bash
-wsl gh issue list --repo Vladastos/Yoloscript \
+wsl gh issue list --repo Vladastos/Gust \
   --label "sprint:kickoff" \
   --search "Sprint <N> Kickoff" \
   --json number,title,body
@@ -16,7 +16,7 @@ wsl gh issue list --repo Vladastos/Yoloscript \
 
 2. **Categorise planned issues** into completed and carried-over:
 ```bash
-wsl gh issue list --repo Vladastos/Yoloscript \
+wsl gh issue list --repo Vladastos/Gust \
   --label "status:in-progress" \
   --json number,title,state,milestone
 ```
@@ -24,7 +24,7 @@ Issues still open → carried over. Issues closed during the sprint → complete
 
 3. **Move carried-over issues back to backlog:**
 ```bash
-wsl gh issue edit <N> --repo Vladastos/Yoloscript \
+wsl gh issue edit <N> --repo Vladastos/Gust \
   --remove-label "status:in-progress" \
   --add-label "status:backlog"
 ```
@@ -38,7 +38,7 @@ If any tests fail, do not proceed — fix them first.
 5. **Gather Epic Progress data.**
 Determine which milestone(s) the sprint issues belong to (from step 2). For each milestone, fetch its open and closed issue counts:
 ```bash
-wsl gh api repos/Vladastos/Yoloscript/milestones \
+wsl gh api repos/Vladastos/Gust/milestones \
   --jq '.[] | select(.title == "<milestone>") | {title: .title, open: .open_issues, closed: .closed_issues}'
 ```
 Format as: `<milestone>: <closed>/<closed+open> issues closed`.
@@ -57,7 +57,7 @@ If there are no such commits, write "No spec changes this sprint."
 7. **Create the sprint review issue** using all data gathered above:
 ```bash
 wsl gh issue create \
-  --repo Vladastos/Yoloscript \
+  --repo Vladastos/Gust \
   --title "Sprint <N> Review" \
   --label "sprint:review" \
   --body "## Sprint Goal
@@ -83,7 +83,7 @@ Note the issue number returned — it is needed for the PR body.
 8. **Open a pull request** from `sprint/<N>` → `main`:
 ```bash
 gh pr create \
-  --repo Vladastos/Yoloscript \
+  --repo Vladastos/Gust \
   --base main \
   --head sprint/<N> \
   --title "Sprint <N> — <theme>" \

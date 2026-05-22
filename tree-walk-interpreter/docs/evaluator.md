@@ -11,7 +11,7 @@
 TypedProgram  ──►  evaluate()  ──►  side effects / RuntimePanic
 ```
 
-Entry point: `evaluator::evaluate(program: TypedProgram) -> Result<(), YoloscriptError>`
+Entry point: `evaluator::evaluate(program: TypedProgram) -> Result<(), GustError>`
 
 The evaluator operates on the `TypedProgram` produced by `typechecker::check()`. It does not re-check types — if the evaluator panics on a type mismatch, that is a typechecker bug, not an evaluator limitation.
 
@@ -33,7 +33,7 @@ pub enum Value {
     Struct { name: String, fields: HashMap<String, Value> },
     Enum   { name: String, variant: String, fields: HashMap<String, Value> },
     Closure(Rc<ClosureValue>),
-    Builtin(String, fn(Vec<Value>, &Span) -> Result<Value, YoloscriptError>),
+    Builtin(String, fn(Vec<Value>, &Span) -> Result<Value, GustError>),
     Perhaps(Option<Box<Value>>),
     YoloResult(Result<Box<Value>, Box<Value>>),
 }
@@ -53,7 +53,7 @@ pub enum Value {
 
 ## Signal-Based Control Flow
 
-All evaluation functions return `Result<Signal, YoloscriptError>`:
+All evaluation functions return `Result<Signal, GustError>`:
 
 ```rust
 pub enum Signal {

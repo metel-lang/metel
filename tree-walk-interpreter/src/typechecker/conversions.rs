@@ -1,5 +1,5 @@
 use crate::ast::{Span, TypeExpr};
-use crate::error::{ErrorCode, YoloscriptError};
+use crate::error::{ErrorCode, GustError};
 use crate::typeinference::{InferType, Substitution};
 use crate::types::Type;
 
@@ -29,11 +29,11 @@ pub(super) fn type_expr_to_infer(te: &TypeExpr) -> InferType {
 
 /// Convert a fully-solved `InferType` to a concrete `Type`.
 /// Returns E0002 if any type variable is still unresolved.
-pub(super) fn infer_type_to_type(ty: &InferType, span: &Span) -> Result<Type, YoloscriptError> {
+pub(super) fn infer_type_to_type(ty: &InferType, span: &Span) -> Result<Type, GustError> {
     match ty {
         InferType::Concrete(t) => Ok(t.clone()),
         InferType::Never       => Ok(Type::Never),
-        InferType::Var(_)      => Err(YoloscriptError::type_error(
+        InferType::Var(_)      => Err(GustError::type_error(
             ErrorCode::E0002,
             "cannot infer type; add a type annotation",
             span,
@@ -66,7 +66,7 @@ pub(super) fn resolved_to_type(
     ty: &InferType,
     subst: &Substitution,
     span: &Span,
-) -> Result<Type, YoloscriptError> {
+) -> Result<Type, GustError> {
     infer_type_to_type(&subst.apply(ty), span)
 }
 

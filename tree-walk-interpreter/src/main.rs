@@ -11,15 +11,15 @@ mod typechecker;
 mod typeinference;
 mod types;
 
-use error::YoloscriptError;
+use error::GustError;
 
 #[derive(Parser)]
-#[command(name = "yoloscript")]
+#[command(name = "gust")]
 #[command(version = "0.1.0")]
-#[command(about = "Yoloscript interpreter")]
-#[command(long_about = "A tree-walk interpreter for the Yoloscript programming language")]
+#[command(about = "Gust interpreter")]
+#[command(long_about = "A tree-walk interpreter for the Gust programming language")]
 struct Args {
-    /// Path to the .yolo file to execute
+    /// Path to the .gust file to execute
     #[arg(value_name = "FILE")]
     file: String,
 
@@ -45,7 +45,7 @@ fn main() {
     }
 }
 
-fn run(source: &str, filename: &str, debug_ast: bool) -> Result<(), YoloscriptError> {
+fn run(source: &str, filename: &str, debug_ast: bool) -> Result<(), GustError> {
     // 1. Parse source → untyped AST
     let ast = parser::parse(source, filename)?;
 

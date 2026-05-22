@@ -51,9 +51,9 @@ pub struct TypeRegistry {
 impl TypeRegistry {
     pub fn lookup(&self, name: &str) -> Option<&TypeDef>;
     pub fn field_type(&self, struct_name: &str, field: &str, span: &Span)
-        -> Result<InferType, YoloscriptError>;
+        -> Result<InferType, GustError>;
     pub fn variant_fields(&self, enum_name: &str, variant: &str, span: &Span)
-        -> Result<&[(String, InferType)], YoloscriptError>;
+        -> Result<&[(String, InferType)], GustError>;
 }
 ```
 

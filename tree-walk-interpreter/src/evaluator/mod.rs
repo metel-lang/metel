@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::ast::{BinOp, Literal, Param, Pattern, Span, UnaryOp};
-use crate::error::YoloscriptError;
+use crate::error::GustError;
 use crate::typed_ast::{FunBody, TypedBlock, TypedDecl, TypedExpr, TypedForInit, TypedProgram, TypedStmt};
 
 // ── Runtime values ────────────────────────────────────────────────────────────
@@ -23,7 +23,7 @@ pub enum Value {
     Struct { name: String, fields: HashMap<String, Value> },
     Enum { name: String, variant: String, fields: HashMap<String, Value> },
     Closure(Rc<ClosureValue>),
-    Builtin(String, fn(Vec<Value>, &Span) -> Result<Value, YoloscriptError>),
+    Builtin(String, fn(Vec<Value>, &Span) -> Result<Value, GustError>),
     Perhaps(Option<Box<Value>>),
     YoloResult(Result<Box<Value>, Box<Value>>),
 }
@@ -123,7 +123,7 @@ impl Environment {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-pub fn evaluate(program: TypedProgram) -> Result<(), YoloscriptError> {
+pub fn evaluate(program: TypedProgram) -> Result<(), GustError> {
     let mut env = Environment::new();
     register_builtins(&mut env);
 
@@ -197,15 +197,15 @@ pub fn evaluate(program: TypedProgram) -> Result<(), YoloscriptError> {
     let main_body = match env.get("main") {
         Some(Value::Closure(rc)) => rc.body.clone(),
         Some(Value::Unit) =>
-            return Err(YoloscriptError::panic("main() is generic — not supported in v0.1", &dummy)),
+            return Err(GustError::panic("main() is generic — not supported in v0.1", &dummy)),
         Some(_) =>
-            return Err(YoloscriptError::panic("`main` is not a function", &dummy)),
+            return Err(GustError::panic("`main` is not a function", &dummy)),
         None =>
-            return Err(YoloscriptError::panic("no main() function defined", &dummy)),
+            return Err(GustError::panic("no main() function defined", &dummy)),
     };
     match eval_block(&main_body, &mut env)? {
         Signal::Value(_) | Signal::Return(_) => Ok(()),
-        other => Err(YoloscriptError::panic(
+        other => Err(GustError::panic(
             format!("unexpected signal from main(): {other:?}"),
             &dummy,
         )),
@@ -216,7 +216,7 @@ pub fn evaluate(program: TypedProgram) -> Result<(), YoloscriptError> {
 
 /// Evaluate a block: push scope, run stmts, return tail (or Unit).
 /// Non-Value signals (Return, Break, Continue) short-circuit and propagate out.
-pub fn eval_block(block: &TypedBlock, env: &mut Environment) -> Result<Signal, YoloscriptError> {
+pub fn eval_block(block: &TypedBlock, env: &mut Environment) -> Result<Signal, GustError> {
     env.push_scope();
     for decl in &block.stmts {
         let sig = eval_decl(decl, env)?;
@@ -237,7 +237,7 @@ pub fn eval_block(block: &TypedBlock, env: &mut Environment) -> Result<Signal, Y
 }
 
 /// Evaluate a single declaration inside a block or at the top level.
-fn eval_decl(decl: &TypedDecl, env: &mut Environment) -> Result<Signal, YoloscriptError> {
+fn eval_decl(decl: &TypedDecl, env: &mut Environment) -> Result<Signal, GustError> {
     match decl {
         TypedDecl::Let(d) => {
             match eval_expr(&d.value, env)? {
@@ -254,7 +254,7 @@ fn eval_decl(decl: &TypedDecl, env: &mut Environment) -> Result<Signal, Yoloscri
         TypedDecl::Fun(f) => {
             let body = match &f.body {
                 FunBody::Typed(b) => b.clone(),
-                FunBody::Generic(_) => return Err(YoloscriptError::internal(
+                FunBody::Generic(_) => return Err(GustError::internal(
                     "generic functions are not supported in v0.1",
                 )),
             };
@@ -281,7 +281,7 @@ fn eval_decl(decl: &TypedDecl, env: &mut Environment) -> Result<Signal, Yoloscri
 
 // ── Statement evaluation ──────────────────────────────────────────────────────
 
-pub fn eval_stmt(stmt: &TypedStmt, env: &mut Environment) -> Result<Signal, YoloscriptError> {
+pub fn eval_stmt(stmt: &TypedStmt, env: &mut Environment) -> Result<Signal, GustError> {
     match stmt {
         TypedStmt::Expr(e) => {
             // Must propagate non-Value signals (Break/Continue/Return) that arise from
@@ -312,7 +312,7 @@ pub fn eval_stmt(stmt: &TypedStmt, env: &mut Environment) -> Result<Signal, Yolo
                 match eval_expr(&w.condition, env)? {
                     Signal::Value(Value::Bool(false)) => break,
                     Signal::Value(Value::Bool(true))  => {}
-                    Signal::Value(_) => return Err(YoloscriptError::panic(
+                    Signal::Value(_) => return Err(GustError::panic(
                         "while: expected Bool condition", &w.span,
                     )),
                     other => return Ok(other), // Return / PropagateErr from condition
@@ -346,7 +346,7 @@ pub fn eval_stmt(stmt: &TypedStmt, env: &mut Environment) -> Result<Signal, Yolo
                     match eval_expr(cond, env)? {
                         Signal::Value(Value::Bool(false)) => break Ok(Signal::Value(Value::Unit)),
                         Signal::Value(Value::Bool(true))  => {}
-                        Signal::Value(_) => break Err(YoloscriptError::panic(
+                        Signal::Value(_) => break Err(GustError::panic(
                             "for: expected Bool condition", &f.span,
                         )),
                         other => break Ok(other),
@@ -379,7 +379,7 @@ fn eval_for_in(
     body:     &TypedBlock,
     span:     &Span,
     env:      &mut Environment,
-) -> Result<Signal, YoloscriptError> {
+) -> Result<Signal, GustError> {
     let items: Vec<Value> = match iterable {
         Value::Array(rc) => rc.borrow().clone(),
         Value::Struct { ref name, ref fields } if name == "Range" => {
@@ -392,7 +392,7 @@ fn eval_for_in(
             let e = range_field(fields, "end",   span)?;
             (s..=e).map(Value::Int).collect()
         }
-        _ => return Err(YoloscriptError::panic("for-in: expected Array or Range", span)),
+        _ => return Err(GustError::panic("for-in: expected Array or Range", span)),
     };
 
     for item in items {
@@ -411,16 +411,16 @@ fn eval_for_in(
     Ok(Signal::Value(Value::Unit))
 }
 
-fn range_field(fields: &HashMap<String, Value>, name: &str, span: &Span) -> Result<i64, YoloscriptError> {
+fn range_field(fields: &HashMap<String, Value>, name: &str, span: &Span) -> Result<i64, GustError> {
     match fields.get(name) {
         Some(Value::Int(n)) => Ok(*n),
-        _ => Err(YoloscriptError::panic(format!("range: missing or non-Int field `{name}`"), span)),
+        _ => Err(GustError::panic(format!("range: missing or non-Int field `{name}`"), span)),
     }
 }
 
 // ── Expression evaluation ─────────────────────────────────────────────────────
 
-pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, YoloscriptError> {
+pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, GustError> {
     match expr {
         TypedExpr::Literal(lit, _, _) => {
             let val = match lit {
@@ -437,7 +437,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
         TypedExpr::Ident(name, _, span) => {
             match env.get(name) {
                 Some(val) => Ok(Signal::Value(val)),
-                None => Err(YoloscriptError::panic(
+                None => Err(GustError::panic(
                     format!("undefined variable `{name}`"),
                     span,
                 )),
@@ -452,7 +452,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                 let span = expr.span();
                 match env.get(name) {
                     Some(val) => Ok(Signal::Value(val)),
-                    None => Err(YoloscriptError::panic(
+                    None => Err(GustError::panic(
                         format!("undefined variable `{name}`"),
                         span,
                     )),
@@ -491,7 +491,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                 return match l {
                     Value::Bool(false) => Ok(Signal::Value(Value::Bool(false))),
                     Value::Bool(true)  => eval_expr(rhs, env),
-                    _ => Err(YoloscriptError::panic("&&: expected Bool", span)),
+                    _ => Err(GustError::panic("&&: expected Bool", span)),
                 };
             }
             if matches!(op, BinOp::Or) {
@@ -499,7 +499,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                 return match l {
                     Value::Bool(true)  => Ok(Signal::Value(Value::Bool(true))),
                     Value::Bool(false) => eval_expr(rhs, env),
-                    _ => Err(YoloscriptError::panic("||: expected Bool", span)),
+                    _ => Err(GustError::panic("||: expected Bool", span)),
                 };
             }
 
@@ -514,8 +514,8 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                 (UnaryOp::Neg, Value::Int(n))   => Value::Int(-n),
                 (UnaryOp::Neg, Value::Float(f)) => Value::Float(-f),
                 (UnaryOp::Not, Value::Bool(b))  => Value::Bool(!b),
-                (UnaryOp::Neg, _) => return Err(YoloscriptError::panic("unary `-`: expected Int or Float", span)),
-                (UnaryOp::Not, _) => return Err(YoloscriptError::panic("unary `!`: expected Bool", span)),
+                (UnaryOp::Neg, _) => return Err(GustError::panic("unary `-`: expected Int or Float", span)),
+                (UnaryOp::Not, _) => return Err(GustError::panic("unary `!`: expected Bool", span)),
             };
             Ok(Signal::Value(result))
         }
@@ -532,7 +532,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                 // Identity casts
                 (Value::Int(_),   crate::ast::TypeExpr::Named(t, _)) if t == "Int"   => v,
                 (Value::Float(_), crate::ast::TypeExpr::Named(t, _)) if t == "Float" => v,
-                _ => return Err(YoloscriptError::panic(
+                _ => return Err(GustError::panic(
                     "cast: unsupported coercion (should have been caught by typechecker)",
                     span,
                 )),
@@ -545,13 +545,13 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
             match v {
                 Value::Tuple(elems) => {
                     elems.into_iter().nth(*index).map(Signal::Value).ok_or_else(|| {
-                        YoloscriptError::panic(
+                        GustError::panic(
                             format!("tuple index {index} out of bounds"),
                             span,
                         )
                     })
                 }
-                _ => Err(YoloscriptError::panic("tuple access on non-tuple", span)),
+                _ => Err(GustError::panic("tuple access on non-tuple", span)),
             }
         }
 
@@ -563,7 +563,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                     let borrowed = rc.borrow();
                     let len = borrowed.len() as i64;
                     if i < 0 || i >= len {
-                        Err(YoloscriptError::panic(
+                        Err(GustError::panic(
                             format!("index {i} out of bounds (len {len})"),
                             span,
                         ))
@@ -571,7 +571,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                         Ok(Signal::Value(borrowed[i as usize].clone()))
                     }
                 }
-                _ => Err(YoloscriptError::panic("index: expected Array[Int]", span)),
+                _ => Err(GustError::panic("index: expected Array[Int]", span)),
             }
         }
 
@@ -582,7 +582,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                     Some(branch) => eval_block(branch, env),
                     None         => Ok(Signal::Value(Value::Unit)),
                 },
-                Signal::Value(_) => Err(YoloscriptError::panic("if: expected Bool condition", span)),
+                Signal::Value(_) => Err(GustError::panic("if: expected Bool condition", span)),
                 other => Ok(other), // propagate Return / PropagateErr from condition
             }
         }
@@ -614,7 +614,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                     match guard_val {
                         Value::Bool(true)  => {}
                         Value::Bool(false) => continue,
-                        _ => return Err(YoloscriptError::panic("match guard: expected Bool", &arm.span)),
+                        _ => return Err(GustError::panic("match guard: expected Bool", &arm.span)),
                     }
                 }
                 // Execute the arm body in a scope with pattern bindings.
@@ -624,7 +624,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                 env.pop_scope();
                 return result;
             }
-            Err(YoloscriptError::panic("match: no arm matched scrutinee", &m.span))
+            Err(GustError::panic("match: no arm matched scrutinee", &m.span))
         }
 
         TypedExpr::Assign { target, op, value, span, .. } => {
@@ -636,12 +636,12 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                         rhs
                     } else {
                         let cur = env.get(name).ok_or_else(|| {
-                            YoloscriptError::panic(format!("assign: undefined `{name}`"), span)
+                            GustError::panic(format!("assign: undefined `{name}`"), span)
                         })?;
                         apply_assign_op(op, cur, rhs, span)?
                     };
                     if !env.set(name, new_val) {
-                        return Err(YoloscriptError::panic(
+                        return Err(GustError::panic(
                             format!("assign: undefined `{name}`"), span,
                         ));
                     }
@@ -651,19 +651,19 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                 AssignTarget::Index { object, index, span: tspan } => {
                     let arr_name = match object.as_ref() {
                         Expr::Ident(n, _) => n,
-                        _ => return Err(YoloscriptError::panic(
+                        _ => return Err(GustError::panic(
                             "index assign: only `ident[...]` supported in PoC", tspan,
                         )),
                     };
                     let i = eval_untyped_index(index, env, tspan)?;
                     let arr_val = env.get(arr_name).ok_or_else(|| {
-                        YoloscriptError::panic(format!("assign: `{arr_name}` not found"), tspan)
+                        GustError::panic(format!("assign: `{arr_name}` not found"), tspan)
                     })?;
                     match arr_val {
                         Value::Array(rc) => {
                             let len = rc.borrow().len() as i64;
                             if i < 0 || i >= len {
-                                return Err(YoloscriptError::panic(
+                                return Err(GustError::panic(
                                     format!("index {i} out of bounds (len {len})"), span,
                                 ));
                             }
@@ -676,7 +676,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                             rc.borrow_mut()[i as usize] = new_val;
                             Ok(Signal::Value(Value::Unit))
                         }
-                        _ => Err(YoloscriptError::panic(
+                        _ => Err(GustError::panic(
                             format!("index assign: `{arr_name}` is not an Array"), tspan,
                         )),
                     }
@@ -685,17 +685,17 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                 AssignTarget::FieldAccess { object, field, span: tspan } => {
                     let obj_name = match object.as_ref() {
                         Expr::Ident(n, _) => n,
-                        _ => return Err(YoloscriptError::panic(
+                        _ => return Err(GustError::panic(
                             "field assign: only `ident.field` supported in PoC", tspan,
                         )),
                     };
                     let rc = env.get_rc(obj_name).ok_or_else(|| {
-                        YoloscriptError::panic(format!("assign: `{obj_name}` not found"), tspan)
+                        GustError::panic(format!("assign: `{obj_name}` not found"), tspan)
                     })?;
                     let mut borrowed = rc.borrow_mut();
                     let fields = match &mut *borrowed {
                         Value::Struct { fields, .. } | Value::Enum { fields, .. } => fields,
-                        _ => return Err(YoloscriptError::panic(
+                        _ => return Err(GustError::panic(
                             format!("field assign: `{obj_name}` is not a struct/enum"), tspan,
                         )),
                     };
@@ -703,7 +703,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                         rhs
                     } else {
                         let cur = fields.get(field).cloned().ok_or_else(|| {
-                            YoloscriptError::panic(
+                            GustError::panic(
                                 format!("field assign: no field `{field}`"), tspan,
                             )
                         })?;
@@ -729,7 +729,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                 }))
             } else {
                 let name = path.last().ok_or_else(|| {
-                    YoloscriptError::panic("struct literal: empty path", span)
+                    GustError::panic("struct literal: empty path", span)
                 })?.clone();
                 Ok(Signal::Value(Value::Struct { name, fields: field_vals }))
             }
@@ -739,10 +739,10 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
             let val = eval_expr(object, env)?.into_value();
             let fields = match &val {
                 Value::Struct { fields, .. } | Value::Enum { fields, .. } => fields,
-                _ => return Err(YoloscriptError::panic("field access on non-struct/enum", span)),
+                _ => return Err(GustError::panic("field access on non-struct/enum", span)),
             };
             fields.get(field).cloned().map(Signal::Value).ok_or_else(|| {
-                YoloscriptError::panic(format!("no field `{field}` on value"), span)
+                GustError::panic(format!("no field `{field}` on value"), span)
             })
         }
 
@@ -760,13 +760,13 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
             // User-defined struct/enum methods — looked up by "TypeName::method".
             let type_name = match &recv_val {
                 Value::Struct { name, .. } | Value::Enum { name, .. } => name.clone(),
-                _ => return Err(YoloscriptError::panic(
+                _ => return Err(GustError::panic(
                     format!("method `{method}` not found on this value"), span,
                 )),
             };
             let key = format!("{type_name}::{method}");
             let func = env.get(&key).ok_or_else(|| {
-                YoloscriptError::panic(format!("no method `{method}` on `{type_name}`"), span)
+                GustError::panic(format!("no method `{method}` on `{type_name}`"), span)
             })?;
             // Prepend receiver as first argument (the `self` param).
             let mut all_args = vec![recv_val];
@@ -801,22 +801,22 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                     match variant.as_str() {
                         "Ok" => {
                             let v = fields.get("value").cloned().ok_or_else(|| {
-                                YoloscriptError::panic("Result::Ok: missing `value` field", span)
+                                GustError::panic("Result::Ok: missing `value` field", span)
                             })?;
                             Ok(Signal::Value(v))
                         }
                         "Err" => {
                             let e = fields.get("error").cloned().ok_or_else(|| {
-                                YoloscriptError::panic("Result::Err: missing `error` field", span)
+                                GustError::panic("Result::Err: missing `error` field", span)
                             })?;
                             Ok(Signal::PropagateErr(e))
                         }
-                        v => Err(YoloscriptError::panic(
+                        v => Err(GustError::panic(
                             format!("?: unknown Result variant `{v}`"), span,
                         )),
                     }
                 }
-                _ => Err(YoloscriptError::panic("?: expected a Result value", span)),
+                _ => Err(GustError::panic("?: expected a Result value", span)),
             }
         }
     }
@@ -879,7 +879,7 @@ fn match_pattern(pattern: &Pattern, value: &Value, out: &mut HashMap<String, Val
 
 /// Dispatch a function call to a `Value::Builtin` or `Value::Closure`.
 /// Converts `Signal::Return` and `Signal::PropagateErr` at the function boundary.
-fn call_function(func: Value, args: Vec<Value>, span: &Span) -> Result<Signal, YoloscriptError> {
+fn call_function(func: Value, args: Vec<Value>, span: &Span) -> Result<Signal, GustError> {
     match func {
         Value::Builtin(_, f) => Ok(Signal::Value(f(args, span)?)),
 
@@ -903,9 +903,9 @@ fn call_function(func: Value, args: Vec<Value>, span: &Span) -> Result<Signal, Y
         }
 
         Value::Unit =>
-            Err(YoloscriptError::panic("call: target is a generic function (not supported in v0.1)", span)),
+            Err(GustError::panic("call: target is a generic function (not supported in v0.1)", span)),
 
-        other => Err(YoloscriptError::panic(
+        other => Err(GustError::panic(
             format!("call: expected a closure or builtin, got {:?}", std::mem::discriminant(&other)),
             span,
         )),
@@ -920,16 +920,16 @@ fn eval_untyped_index(
     expr: &crate::ast::Expr,
     env: &Environment,
     span: &Span,
-) -> Result<i64, YoloscriptError> {
+) -> Result<i64, GustError> {
     use crate::ast::Expr;
     match expr {
         Expr::Literal(Literal::Int(n), _) => Ok(*n),
         Expr::Ident(name, _) => match env.get(name) {
             Some(Value::Int(n)) => Ok(n),
-            Some(_) => Err(YoloscriptError::panic(format!("`{name}` is not an Int"), span)),
-            None    => Err(YoloscriptError::panic(format!("undefined `{name}`"), span)),
+            Some(_) => Err(GustError::panic(format!("`{name}` is not an Int"), span)),
+            None    => Err(GustError::panic(format!("undefined `{name}`"), span)),
         },
-        _ => Err(YoloscriptError::panic(
+        _ => Err(GustError::panic(
             "index expression too complex for PoC; assign the index to a variable first", span,
         )),
     }
@@ -940,7 +940,7 @@ fn apply_assign_op(
     cur: Value,
     rhs: Value,
     span: &Span,
-) -> Result<Value, YoloscriptError> {
+) -> Result<Value, GustError> {
     use crate::ast::AssignOp;
     let fake_binop = match op {
         AssignOp::AddAssign => BinOp::Add,
@@ -953,18 +953,18 @@ fn apply_assign_op(
     eval_binop(&fake_binop, cur, rhs, span).map(Signal::into_value)
 }
 
-fn eval_binop(op: &BinOp, lv: Value, rv: Value, span: &Span) -> Result<Signal, YoloscriptError> {
+fn eval_binop(op: &BinOp, lv: Value, rv: Value, span: &Span) -> Result<Signal, GustError> {
     let result = match (op, lv, rv) {
         // Int arithmetic
         (BinOp::Add, Value::Int(a), Value::Int(b)) => Value::Int(a + b),
         (BinOp::Sub, Value::Int(a), Value::Int(b)) => Value::Int(a - b),
         (BinOp::Mul, Value::Int(a), Value::Int(b)) => Value::Int(a * b),
         (BinOp::Div, Value::Int(a), Value::Int(b)) => {
-            if b == 0 { return Err(YoloscriptError::panic("division by zero", span)); }
+            if b == 0 { return Err(GustError::panic("division by zero", span)); }
             Value::Int(a / b)
         }
         (BinOp::Rem, Value::Int(a), Value::Int(b)) => {
-            if b == 0 { return Err(YoloscriptError::panic("remainder by zero", span)); }
+            if b == 0 { return Err(GustError::panic("remainder by zero", span)); }
             Value::Int(a % b)
         }
 
@@ -1019,7 +1019,7 @@ fn eval_binop(op: &BinOp, lv: Value, rv: Value, span: &Span) -> Result<Signal, Y
             },
         },
 
-        (_, lv, rv) => return Err(YoloscriptError::panic(
+        (_, lv, rv) => return Err(GustError::panic(
             format!("binop: unsupported operand types ({lv:?}, {rv:?})"),
             span,
         )),
@@ -1038,7 +1038,7 @@ fn register_builtins(env: &mut Environment) {
             print!("{}", s);
             Ok(Value::Unit)
         } else {
-            Err(YoloscriptError::panic("print: expected String argument", span))
+            Err(GustError::panic("print: expected String argument", span))
         }
     }));
 
@@ -1047,7 +1047,7 @@ fn register_builtins(env: &mut Environment) {
             println!("{}", s);
             Ok(Value::Unit)
         } else {
-            Err(YoloscriptError::panic("println: expected String argument", span))
+            Err(GustError::panic("println: expected String argument", span))
         }
     }));
 
@@ -1055,7 +1055,7 @@ fn register_builtins(env: &mut Environment) {
         if let Some(Value::Int(n)) = args.first() {
             Ok(Value::Str(n.to_string()))
         } else {
-            Err(YoloscriptError::panic("int_to_string: expected Int argument", span))
+            Err(GustError::panic("int_to_string: expected Int argument", span))
         }
     }));
 
@@ -1063,7 +1063,7 @@ fn register_builtins(env: &mut Environment) {
         if let Some(Value::Float(f)) = args.first() {
             Ok(Value::Str(f.to_string()))
         } else {
-            Err(YoloscriptError::panic("float_to_string: expected Float argument", span))
+            Err(GustError::panic("float_to_string: expected Float argument", span))
         }
     }));
 
@@ -1071,7 +1071,7 @@ fn register_builtins(env: &mut Environment) {
         if let Some(Value::Bool(b)) = args.first() {
             Ok(Value::Str(if *b { "true" } else { "false" }.to_string()))
         } else {
-            Err(YoloscriptError::panic("bool_to_string: expected Bool argument", span))
+            Err(GustError::panic("bool_to_string: expected Bool argument", span))
         }
     }));
 
@@ -1079,14 +1079,14 @@ fn register_builtins(env: &mut Environment) {
         if let Some(Value::Str(s)) = args.first() {
             Ok(Value::Int(s.chars().count() as i64))
         } else {
-            Err(YoloscriptError::panic("string_len: expected String argument", span))
+            Err(GustError::panic("string_len: expected String argument", span))
         }
     }));
 
     env.define("string_concat", Value::Builtin("string_concat".to_string(), |args, span| {
         match (args.get(0), args.get(1)) {
             (Some(Value::Str(a)), Some(Value::Str(b))) => Ok(Value::Str(a.clone() + b)),
-            _ => Err(YoloscriptError::panic("string_concat: expected two String arguments", span)),
+            _ => Err(GustError::panic("string_concat: expected two String arguments", span)),
         }
     }));
 
@@ -1096,10 +1096,10 @@ fn register_builtins(env: &mut Environment) {
                 arr.borrow_mut().push(val.clone());
                 Ok(Value::Unit)
             } else {
-                Err(YoloscriptError::panic("array_push: missing value argument", span))
+                Err(GustError::panic("array_push: missing value argument", span))
             }
         } else {
-            Err(YoloscriptError::panic("array_push: expected Array as first argument", span))
+            Err(GustError::panic("array_push: expected Array as first argument", span))
         }
     }));
 
@@ -1107,7 +1107,7 @@ fn register_builtins(env: &mut Environment) {
         if let Some(Value::Array(arr)) = args.first() {
             Ok(Value::Int(arr.borrow().len() as i64))
         } else {
-            Err(YoloscriptError::panic("array_len: expected Array argument", span))
+            Err(GustError::panic("array_len: expected Array argument", span))
         }
     }));
 

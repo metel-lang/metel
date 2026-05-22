@@ -45,7 +45,7 @@ enum Value {
 
 **Recommended: Option A — owned, cloned values.**
 
-Yoloscript is Rust-inspired and the spec defines no reference-type syntax, no pointer model, and no borrow semantics. The intended runtime model is value semantics throughout. Introducing `Rc<RefCell<>>` by default would mean the interpreter's runtime behaviour diverges from what the eventual compiler will implement, defeating the interpreter's purpose as a spec-validation tool.
+Gust is Rust-inspired and the spec defines no reference-type syntax, no pointer model, and no borrow semantics. The intended runtime model is value semantics throughout. Introducing `Rc<RefCell<>>` by default would mean the interpreter's runtime behaviour diverges from what the eventual compiler will implement, defeating the interpreter's purpose as a spec-validation tool.
 
 Clone overhead is acceptable for v0.1. If a specific bottleneck appears (e.g. large string copies), `Rc<str>` can be adopted for strings in isolation without changing the overall model.
 
@@ -117,7 +117,7 @@ A `Vec` of `HashMap`s is structurally simple: `push` an empty map on scope entry
 
 **Recommended: Option A — snapshot at closure creation.**
 
-Directly follows from Questions 1 and 3. The value-semantics recommendation (Q1) rules out shared mutable state; the `Vec` environment recommendation (Q3) has no identity to share. A closure would therefore store a `Vec<HashMap<String, Value>>` snapshot taken at the moment of its creation. This matches the semantics a compiler would generate (Rust closures capture by move by default; Yoloscript's value model is analogous).
+Directly follows from Questions 1 and 3. The value-semantics recommendation (Q1) rules out shared mutable state; the `Vec` environment recommendation (Q3) has no identity to share. A closure would therefore store a `Vec<HashMap<String, Value>>` snapshot taken at the moment of its creation. This matches the semantics a compiler would generate (Rust closures capture by move by default; Gust's value model is analogous).
 
 If the spec ever introduces a `move` vs capture-by-reference distinction, that is a future spec change — not a v0.1 concern.
 

@@ -8,7 +8,7 @@ Complete an issue: verify acceptance criteria, commit with the correct format, a
 
 1. **Read the issue** to retrieve title, acceptance criteria, and milestone:
 ```bash
-wsl gh issue view <N> --repo Vladastos/Yoloscript
+wsl gh issue view <N> --repo Vladastos/Gust
 ```
 
 2. **Verify acceptance criteria.** Go through each checkbox in the issue body and confirm it is met. If any criterion is unmet, stop and tell the user what remains.
@@ -43,7 +43,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
 7. **Verify the issue closes automatically on push**, or close it manually if not pushing immediately:
 ```bash
-wsl gh issue close <N> --repo Vladastos/Yoloscript
+wsl gh issue close <N> --repo Vladastos/Gust
 ```
 
 8. **Update the GitHub Projects v2 board** status to "Done" via GraphQL.

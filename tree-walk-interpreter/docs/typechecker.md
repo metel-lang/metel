@@ -15,7 +15,7 @@ untyped AST  ──►  check()  ──►  TypedProgram
                     └─ Pass 2:   construct — re-derive concrete types, build TypedAST
 ```
 
-Entry point: `typechecker::check(program: Program) -> Result<TypedProgram, YoloscriptError>`
+Entry point: `typechecker::check(program: Program) -> Result<TypedProgram, GustError>`
 
 ---
 
@@ -92,7 +92,7 @@ id("hello") → instantiate to fun(?t2) -> ?t2, unify ?t2 = String → id("hello
 
 Generalization must only quantify type variables that are *truly local* to the function. If a variable is shared with the outer scope, quantifying it is unsound.
 
-```yoloscript
+```gust
 fun f(x) {
     let g = fun(y) { x };   // g's type: fun(?t1) -> ?t0 where ?t0 is x's type
 }
