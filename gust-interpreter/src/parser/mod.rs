@@ -578,14 +578,15 @@ fn parse_struct_literal(pair: pest::iterators::Pair<Rule>, filename: &str) -> Re
     let mut fields = vec![];
     for p in inner {
         if p.as_rule() == Rule::field_init {
+            let field_span = Span::of(&p, filename);
             let mut it = p.into_inner();
-            let name  = it.next()
-                .ok_or_else(|| GustError::internal("struct_literal: expected field name"))?
-                .as_str().to_string();
-            let value = parse_expr(
-                it.next().ok_or_else(|| GustError::internal("struct_literal: expected field value"))?,
-                filename,
-            )?;
+            let name_pair = it.next()
+                .ok_or_else(|| GustError::internal("struct_literal: expected field name"))?;
+            let name = name_pair.as_str().to_string();
+            let value = match it.next() {
+                Some(expr_pair) => parse_expr(expr_pair, filename)?,
+                None => Expr::Ident(name.clone(), field_span),
+            };
             fields.push((name, value));
         }
     }
