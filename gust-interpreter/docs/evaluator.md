@@ -188,13 +188,9 @@ Anonymous closures appear as `<closure>`. The call stack is cleared at the start
 
 ## Known Limitations
 
-### Field and index assignment — direct variable only (partial)
+### Field and index assignment — receiver must be a bare identifier
 
-`obj.field = val` only supports a bare identifier on the left-hand side (`foo.bar = 1` works; `get_foo().bar = 1` panics). `arr[expr] = val` supports arbitrary expressions as the index (fixed in v0.2). The typechecker does not validate the field-assignment shape, so a well-typed program can reach this panic. Fixing it requires the evaluator to support lvalue paths rather than just names.
-
-### Field and index assignment — direct variable only
-
-`obj.field = val` and `arr[i] = val` only support a bare identifier on the left-hand side (e.g., `foo.bar = 1` works; `get_foo().bar = 1` panics). The typechecker does not validate this shape, so a well-typed program can reach this panic. Fixing it requires the evaluator to support lvalue paths rather than just names.
+`obj.field = val` and `arr[i] = val` require a bare identifier on the receiver side (`foo.bar = 1` and `arr[complex_expr] = 1` work; `get_foo().bar = 1` and `get_array()[0] = 1` panic). The index expression may be arbitrary (fixed in v0.2), but the receiver must be a name the evaluator can look up directly. The typechecker does not validate the receiver shape, so a well-typed program can reach this panic. Fixing it requires the evaluator to support lvalue paths rather than just names.
 
 ### Generic functions — not callable
 
