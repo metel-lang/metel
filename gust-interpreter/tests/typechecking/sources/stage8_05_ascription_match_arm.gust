@@ -1,0 +1,25 @@
+// Showcase: type ascription in a match arm body.
+//
+// A match arm body is an expression context — `let` is not syntactically valid
+// there. To type an empty array literal in an arm, you either (a) ascribe the
+// type inline, or (b) wrap the arm in a block and introduce a local binding.
+// Ascription is strictly less noise: no block, no throwaway name.
+//
+// The match arm receives no expected_ty from the surrounding context — even
+// when the function's return type is known, it does not flow into arm bodies.
+// Ascription is the only way to type the literal without restructuring the arm.
+
+fun make_row(use_default: Bool, fallback: Int[]) -> Int[] {
+    match use_default {
+        true  => [] : Int[],
+        false => fallback,
+    }
+}
+
+// Alternative: block arm with a local binding — equivalent, but noisier.
+fun make_row_alt(use_default: Bool, fallback: Int[]) -> Int[] {
+    match use_default {
+        true  => { let xs: Int[] = []; xs },
+        false => fallback,
+    }
+}

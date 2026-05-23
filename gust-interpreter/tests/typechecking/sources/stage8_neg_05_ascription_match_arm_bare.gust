@@ -1,0 +1,9 @@
+// Failing version: without ascription the empty array in a match arm has no
+// type context. The function's return type does not flow into arm bodies.
+
+fun make_row(use_default: Bool, fallback: Int[]) -> Int[] {
+    match use_default {
+        true  => [],  // ERROR[T0002]
+        false => fallback,
+    }
+}

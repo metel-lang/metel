@@ -1,0 +1,19 @@
+// Showcase: ascription when two empty-array arguments need independent types.
+//
+// Function arguments are constructed without the parameter type as expected_ty
+// — the function signature does not push its param types back into arguments.
+// When both arguments are empty arrays with different element types, ascription
+// on each is the only way to resolve them without hoisting two separate bindings
+// whose names carry no meaning beyond surviving to the call site.
+
+fun zip_lengths(a: Int[], b: String[]) -> Int {
+    array_len(a) + array_len(b)
+}
+
+// Ascription form — both element types resolved inline, no extra names.
+let _: Int = zip_lengths([] : Int[], [] : String[]);
+
+// Alternative: hoist two bindings. The names exist only to carry type annotations.
+let empty_ints: Int[] = [];
+let empty_strs: String[] = [];
+let _: Int = zip_lengths(empty_ints, empty_strs);

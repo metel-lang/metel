@@ -1,0 +1,8 @@
+// Failing version: without ascription, the first empty array argument has no
+// type context. The function signature does not push param types into arguments.
+
+fun zip_lengths(a: Int[], b: String[]) -> Int {
+    array_len(a) + array_len(b)
+}
+
+let _: Int = zip_lengths([], []);  // ERROR[T0002]

@@ -460,6 +460,38 @@ mod tests {
         check_file(&format!("{}/stage8_neg_04_ascribe_wrong_struct.gust", test_dir()));
     }
 
+    // ── Stage 8 showcase: ascription where let binding is the inferior alternative ──
+
+    #[test]
+    fn stage8_ascription_match_arm() {
+        check_file(&format!("{}/stage8_05_ascription_match_arm.gust", test_dir()));
+    }
+
+    #[test]
+    fn stage8_neg_ascription_match_arm_bare() {
+        check_file(&format!("{}/stage8_neg_05_ascription_match_arm_bare.gust", test_dir()));
+    }
+
+    #[test]
+    fn stage8_ascription_two_args() {
+        check_file(&format!("{}/stage8_06_ascription_two_args.gust", test_dir()));
+    }
+
+    #[test]
+    fn stage8_neg_ascription_two_args_bare() {
+        check_file(&format!("{}/stage8_neg_06_ascription_two_args_bare.gust", test_dir()));
+    }
+
+    #[test]
+    fn stage8_ascription_nope_arg() {
+        check_file(&format!("{}/stage8_07_ascription_nope_arg.gust", test_dir()));
+    }
+
+    #[test]
+    fn stage8_neg_ascription_nope_arg_bare() {
+        check_file(&format!("{}/stage8_neg_07_ascription_nope_arg_bare.gust", test_dir()));
+    }
+
     // ── Known-limitation tests ─────────────────────────────────────────────────
 
     #[test]

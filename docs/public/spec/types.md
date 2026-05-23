@@ -81,17 +81,85 @@ Arrays are usable in `for-in` loops. `List<T>` is not available in v0.1; `T[]` i
 The `:` operator asserts that an expression has a given type without performing any runtime conversion. It is a pure type-inference hint — no code is emitted at runtime.
 
 ```gust
-// Resolve the element type of an empty array literal.
-let xs = [] : Int[];
-
-// Assert that a variable has the expected type.
-let n: Int = some_expr : Int;
-
-// Resolve an ambiguous argument.
-take_array([] : Float[]);
+let xs = [] : Int[];        // element type resolved to Int
+let x  = 1 : Int;          // identity ascription — no effect at runtime
+let y  = 1 : String;       // compile error — Int is not String
 ```
 
-Ascription fails at compile time if the expression's inferred type is incompatible with the given type. Use `as` to convert between types; use `:` only when the value already has the target type and you want to make it explicit to the type checker.
+Ascription fails at compile time if the inferred type of the sub-expression cannot be unified with the ascribed type. Use `as` to convert between types; use `:` only when the value already has the target type.
+
+### When ascription is needed
+
+Type inference flows from the outside in via `let` annotations and function return types. It does not flow from a function's parameter types back into its arguments (see [#115](https://github.com/gust-lang/gust/issues/115)), and it does not flow from a match expression's expected type into arm bodies (see [#114](https://github.com/gust-lang/gust/issues/114)). In those positions there is no binding to annotate, so ascription is the only inline option.
+
+**Argument position — empty array**
+
+The function's parameter type is not used as `expected_ty` for the argument expression. A bare `[]` at a call site has no type context and fails.
+
+```gust
+fun process(items: Int[]) { ... }
+
+process([]);             // error — element type of [] cannot be inferred
+process([] : Int[]);     // ok
+
+// Alternative: hoist a binding — correct, but adds a throwaway name.
+let items: Int[] = [];
+process(items);
+```
+
+**Argument position — `nope`**
+
+`nope` has no fields, so its type parameter cannot be resolved from the value alone.
+
+```gust
+fun find(haystack: String[], fallback: Perhaps<String>) -> String { ... }
+
+find(words, nope);                       // error — type of nope cannot be inferred
+find(words, nope : Perhaps<String>);     // ok
+
+// Alternative: hoist a binding.
+let nothing: Perhaps<String> = nope;
+find(words, nothing);
+```
+
+**Match arm body**
+
+A match arm body is an expression context — `let` is not syntactically valid there without a block wrapper. The expected type of the match expression does not currently flow into arm bodies, so ambiguous literals in arms must be ascribed.
+
+```gust
+fun default_row(use_default: Bool, fallback: Int[]) -> Int[] {
+    match use_default {
+        true  => [],          // error — element type of [] cannot be inferred
+        false => fallback,
+    }
+}
+
+fun default_row(use_default: Bool, fallback: Int[]) -> Int[] {
+    match use_default {
+        true  => [] : Int[],  // ok — ascription supplies the missing context
+        false => fallback,
+    }
+}
+
+// Alternative: block arm with a local binding — correct, but noisier.
+fun default_row(use_default: Bool, fallback: Int[]) -> Int[] {
+    match use_default {
+        true  => { let empty: Int[] = []; empty },
+        false => fallback,
+    }
+}
+```
+
+**Two ambiguous arguments**
+
+When both arguments are empty literals with different element types, neither anchors the other, and two bindings would be needed.
+
+```gust
+fun zip_lengths(a: Int[], b: String[]) -> Int { ... }
+
+zip_lengths([], []);                          // error — both [] are ambiguous
+zip_lengths([] : Int[], [] : String[]);       // ok
+```
 
 ## Type Casting
 

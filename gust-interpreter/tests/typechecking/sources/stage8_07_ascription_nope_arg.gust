@@ -1,0 +1,21 @@
+// Showcase: ascription for `nope` in argument position.
+//
+// `nope` has no fields, so its type parameter cannot be inferred from the
+// value itself. When passed directly as an argument, there is no binding to
+// annotate, and the parameter type does not flow back into the argument.
+// Ascription is the only inline option; the alternative requires a binding
+// whose only purpose is to carry the type annotation to the call site.
+
+fun first_or_default(items: Int[], fallback: Perhaps<Int>) -> Int {
+    match fallback {
+        Perhaps::Some { value } => value,
+        nope => if (array_len(items) > 0) { items[0] } else { 0 },
+    }
+}
+
+// Ascription form — type resolved inline, no extra name introduced.
+let _: Int = first_or_default([1, 2, 3], nope : Perhaps<Int>);
+
+// Alternative: introduce a binding to carry the type annotation.
+let no_fallback: Perhaps<Int> = nope;
+let _: Int = first_or_default([1, 2, 3], no_fallback);

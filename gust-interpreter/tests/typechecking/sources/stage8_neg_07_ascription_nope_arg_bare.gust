@@ -1,0 +1,11 @@
+// Failing version: without ascription, `nope` in argument position has no
+// source for its type parameter. The parameter type does not flow into arguments.
+
+fun first_or_default(items: Int[], fallback: Perhaps<Int>) -> Int {
+    match fallback {
+        Perhaps::Some { value } => value,
+        nope => if (array_len(items) > 0) { items[0] } else { 0 },
+    }
+}
+
+let _: Int = first_or_default([1, 2, 3], nope);  // ERROR[T0002]
