@@ -90,9 +90,25 @@ For every component touched during the sprint, check:
 | Evaluator (`src/evaluator/`) | `gust-interpreter/docs/evaluator.md` — Value variants, signals, builtins, known limitations |
 | Typechecker (`src/typechecker/`) | `gust-interpreter/docs/typechecker.md` — passes, constraints, inference rules |
 | Parser / grammar | `gust-interpreter/docs/architecture.md` — pipeline diagram still accurate |
-| Non-obvious design choice | `gust-interpreter/docs/decisions/` — decision record exists |
 
 Report any internal doc that is stale or missing.
+
+### Gate 7: Architectural decision records
+
+Review every commit on the sprint branch:
+```bash
+git log main..HEAD --oneline
+```
+
+For each commit, ask: did this change involve a non-obvious architectural decision? Use the criteria from AGENTS.md § Decision Records. Examples of what qualifies:
+- A choice between two plausible designs with real trade-offs (e.g. normalising in the parser vs. the type checker)
+- A deliberate deviation from a prior decision record or RFC
+- A constraint or invariant that future contributors must know to avoid breaking the design
+- A workaround for a language or library limitation that isn't obvious from the code
+
+For each qualifying decision, verify a decision record exists in `gust-interpreter/docs/decisions/`. If any are missing, create them now — before the PR is opened.
+
+List every qualifying decision found and whether a record exists or was created.
 
 ---
 
@@ -202,7 +218,7 @@ Both `Closes` lines are required — on merge, GitHub automatically closes both 
 
 > **Sprint $ARGUMENTS quality gate passed and PR is open.**
 >
-> - All 6 quality gates: ✅
+> - All 7 quality gates: ✅
 > - Review issue: #<N> — add **Next Sprint Seeds** if you have ideas.
 > - **Merge the PR** on GitHub — this automatically closes the review and kickoff issues.
 > - After merging, delete the `sprint/$ARGUMENTS` branch on GitHub.

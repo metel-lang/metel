@@ -88,7 +88,8 @@ Run `/sprint-end` to execute the full checklist. It will not produce a PR until 
    - `tree-walk-interpreter/docs/architecture.md` still accurately describes the pipeline.
    - `tree-walk-interpreter/docs/evaluator.md` reflects any new Value variants, signal types, or builtin behaviour.
    - `tree-walk-interpreter/docs/typechecker.md` reflects any new passes, constraints, or inference rules.
-   - Decision records exist for any non-obvious architectural choice made during the sprint.
+
+7. **Architectural decision records** — review every commit on the sprint branch. For each non-obvious architectural decision (a choice between plausible designs, a deliberate deviation from a prior ADR or RFC, a constraint future contributors must know, or a workaround for a limitation not obvious from the code), a decision record must exist in `tree-walk-interpreter/docs/decisions/`. Missing records must be created before the sprint PR is opened.
 
 If **any gate fails**, the sprint cannot close. Fix the issue, commit the fix to the sprint branch, and re-run the gate.
 
