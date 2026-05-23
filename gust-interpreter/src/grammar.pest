@@ -110,7 +110,8 @@ add_expr         = { mul_expr ~ (add_op ~ mul_expr)* }
 add_op           = { "+" | "-" }
 mul_expr         = { cast_expr ~ (mul_op ~ cast_expr)* }
 mul_op           = { "*" | "/" | "%" }
-cast_expr        = { unary_expr ~ ("as" ~ type_expr)* }
+cast_expr        = { asc_expr ~ ("as" ~ type_expr)* }
+asc_expr         = { unary_expr ~ (":" ~ type_expr)? }
 unary_expr       = { ("!" | "-") ~ unary_expr | postfix_expr }
 
 postfix_expr     = { primary_expr ~ postfix* }

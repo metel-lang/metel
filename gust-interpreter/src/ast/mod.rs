@@ -253,6 +253,7 @@ pub enum Expr {
     TupleAccess { object: Box<Expr>, index: usize, span: Span },
     Index { object: Box<Expr>, index: Box<Expr>, span: Span },
     Cast { expr: Box<Expr>, target_type: TypeExpr, span: Span },
+    Ascribe { expr: Box<Expr>, ann: TypeExpr, span: Span },
     Match(MatchExpr),
     If { condition: Box<Expr>, then_branch: Block, else_branch: Option<Block>, span: Span },
     Loop { body: Block, span: Span },
@@ -270,7 +271,8 @@ impl Expr {
             | Expr::Assign    { span: s, .. } | Expr::Call          { span: s, .. }
             | Expr::MethodCall { span: s, .. } | Expr::FieldAccess  { span: s, .. }
             | Expr::TupleAccess { span: s, .. } | Expr::Index       { span: s, .. }
-            | Expr::Cast      { span: s, .. } | Expr::If            { span: s, .. }
+            | Expr::Cast      { span: s, .. } | Expr::Ascribe       { span: s, .. }
+            | Expr::If            { span: s, .. }
             | Expr::Loop      { span: s, .. } | Expr::Closure       { span: s, .. }
             | Expr::StructLiteral { span: s, .. } | Expr::PropagateError { span: s, .. } => s,
             Expr::Match(m) => &m.span,

@@ -1,0 +1,14 @@
+// Stage 8: type ascription operator `:`.
+
+// Empty array element type resolved via ascription
+let n: Int[] = [] : Int[];
+
+// Identity ascription
+let x: Int = 1 : Int;
+
+// Ascription in argument position
+fun take_ints(arr: Int[]) -> Int { array_len(arr) }
+let _: Int = take_ints([] : Int[]);
+
+// as conversion still works
+let f: Float = 1 as Float;

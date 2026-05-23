@@ -573,6 +573,11 @@ fn construct_expr(
             Ok(TypedExpr::PropagateError { expr: Box::new(typed_expr), ty, span: span.clone() })
         }
         Expr::Match(m) => construct_match(m, ctx),
+        Expr::Ascribe { expr, ann, span } => {
+            let ty = resolved_to_type(&type_expr_to_infer(ann), ctx.subst, span)?;
+            construct_expr(expr, Some(&ty), ctx)
+        }
+
         Expr::Cast { expr, target_type, span } => {
             let typed_expr = construct_expr(expr, None, ctx)?;
             let ty = resolved_to_type(&type_expr_to_infer(target_type), ctx.subst, span)?;

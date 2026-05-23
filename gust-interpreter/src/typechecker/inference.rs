@@ -450,6 +450,13 @@ fn infer_expr(
                 infer_struct_literal(struct_name, fields, span, ctx, fun_generalizations)
             }
         }
+        Expr::Ascribe { expr, ann, span } => {
+            let inner_ty = infer_expr(expr, ctx, fun_generalizations)?;
+            let ascribed_ty = type_expr_to_infer(ann);
+            ctx.add_constraint(inner_ty.clone(), ascribed_ty, span.clone());
+            Ok(inner_ty)
+        }
+
         Expr::Cast { expr, target_type, span } => {
             let source_ty = infer_expr(expr, ctx, fun_generalizations)?;
             let target_ty = type_expr_to_infer(target_type);

@@ -423,6 +423,7 @@ fn parse_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Expr,
         Rule::add_expr    => parse_lr_binary(pair, filename),
         Rule::mul_expr    => parse_lr_binary(pair, filename),
         Rule::cast_expr   => parse_cast_expr(pair, filename),
+        Rule::asc_expr    => parse_asc_expr(pair, filename),
         Rule::unary_expr  => parse_unary_expr(pair, filename),
         Rule::postfix_expr => parse_postfix_expr(pair, filename),
         Rule::primary_expr => {
@@ -649,7 +650,22 @@ fn parse_lr_binary(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<
     Ok(expr)
 }
 
-// ── Cast ──────────────────────────────────────────────────────────────────────
+// ── Ascription and Cast ───────────────────────────────────────────────────────
+
+fn parse_asc_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Expr, GustError> {
+    let span = Span::of(&pair, filename);
+    let mut inner = pair.into_inner();
+    let first = inner.next()
+        .ok_or_else(|| GustError::internal("asc_expr: expected operand"))?;
+    let expr = parse_expr(first, filename)?;
+    match inner.next() {
+        Some(ty_pair) => {
+            let ann = parse_type_expr(ty_pair, filename)?;
+            Ok(Expr::Ascribe { expr: Box::new(expr), ann, span })
+        }
+        None => Ok(expr),
+    }
+}
 
 fn parse_cast_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Expr, GustError> {
     let span  = Span::of(&pair, filename);

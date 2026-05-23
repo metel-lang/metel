@@ -440,6 +440,16 @@ mod tests {
         check_file(&format!("{}/stage8_neg_01_assert_non_bool.gust", test_dir()));
     }
 
+    #[test]
+    fn stage8_type_ascription() {
+        check_file(&format!("{}/stage8_04_type_ascription.gust", test_dir()));
+    }
+
+    #[test]
+    fn stage8_neg_ascribe_type_mismatch() {
+        check_file(&format!("{}/stage8_neg_02_ascribe_type_mismatch.gust", test_dir()));
+    }
+
     // ── Known-limitation tests ─────────────────────────────────────────────────
 
     #[test]
