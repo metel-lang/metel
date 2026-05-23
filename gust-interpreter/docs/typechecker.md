@@ -170,6 +170,16 @@ A few inference cases call `ctx.solve()` eagerly to determine structural type in
 
 These partial solves are read-only (they produce a `Substitution` value but don't modify `ctx.constraints`). They are a pragmatic workaround for the fact that field/method lookup requires knowing the concrete type name — a fundamental limitation of constraint-only inference.
 
+### Type Ascription (`:` Operator)
+
+`e : T` is a pure inference hint. Inference:
+1. Infers the inner expression type `inner_ty`.
+2. Converts the annotation `T` to an `InferType` via `type_expr_to_infer`.
+3. Adds a constraint `inner_ty ~ ascribed_ty`.
+4. Returns `inner_ty` (not the annotated type directly).
+
+The constraint propagates the annotation into the solver without changing control flow. In Pass 2, the ascription node is **erased**: `construct_expr` resolves the annotation to a concrete `Type` and constructs the inner expression with that type as the expected-type hint. No `TypedExpr::Ascribe` variant exists — ascription has zero runtime cost.
+
 ---
 
 ## Pass 2 — Construction

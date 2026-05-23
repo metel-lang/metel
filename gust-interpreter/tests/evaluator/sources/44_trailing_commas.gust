@@ -1,0 +1,35 @@
+// Trailing commas are allowed in function parameter lists and argument lists.
+
+// Trailing comma in parameter list.
+fun add(a: Int, b: Int,) -> Int {
+    a + b
+}
+
+// Trailing comma in a multi-line param list.
+fun clamp(
+    value: Int,
+    lo: Int,
+    hi: Int,
+) -> Int {
+    if (value < lo) { lo } else if (value > hi) { hi } else { value }
+}
+
+// Trailing comma in closure parameter list.
+fun apply(f: fun(Int, Int) -> Int, a: Int, b: Int,) -> Int {
+    f(a, b)
+}
+
+fun main() {
+    // Trailing comma in argument list.
+    assert(add(1, 2,) == 3);
+    assert(add(10, 20,) == 30);
+
+    // Multi-line param list with trailing comma; trailing comma in args.
+    assert(clamp(5, 0, 10,) == 5);
+    assert(clamp(-1, 0, 10,) == 0);
+    assert(clamp(11, 0, 10,) == 10);
+
+    // Trailing comma in closure definition and call argument list.
+    let result = apply(fun(x: Int, y: Int,) -> Int { x * y }, 3, 4,);
+    assert(result == 12);
+}

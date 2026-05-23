@@ -36,12 +36,18 @@ pub enum Value {
     Builtin(String, fn(Vec<Value>, &Span) -> Result<Value, GustError>),
     Perhaps(Option<Box<Value>>),
     YoloResult(Result<Box<Value>, Box<Value>>),
+    Pointer(Rc<RefCell<Value>>),        // RFC-0001 placeholder — never constructed
+    MutPointer(Rc<RefCell<Value>>),     // RFC-0001 placeholder — never constructed
 }
 ```
 
 ### Array representation
 
-`Value::Array` uses `Rc<RefCell<Vec<Value>>>` so that mutations through `array_push` and index assignment are visible to all aliases of the same array. This gives reference semantics for arrays in the PoC, which matches the intended behaviour for mutable arrays passed to functions.
+`Value::Array` uses `Rc<RefCell<Vec<Value>>>` internally, but the evaluator enforces **value semantics** at every binding site. When `env.define()` or `env.set()` stores an array, it calls `deep_clone_value()` to produce a fully independent copy. This means:
+
+- Assigning an array variable to another name gives an independent copy — mutations to one do not affect the other.
+- Passing an array to a function gives the function its own copy; `array_push` inside the function does not mutate the caller's array.
+- `array_push` applied to the binding itself mutates through the `Rc<RefCell>` as expected.
 
 **Note:** `Value::Perhaps` and `Value::YoloResult` are currently unused at runtime — `Perhaps<T>` values are represented as `Value::Enum { name: "Perhaps", variant: "Some"/"Nope", .. }` and `Result<T,E>` as `Value::Enum { name: "Result", variant: "Ok"/"Err", .. }`. These variants are relics of an earlier design. They can be removed when the evaluator is rewritten.
 
@@ -155,6 +161,21 @@ The evaluator will panic with `"match: no arm matched scrutinee"` if no arm matc
 
 ---
 
+## Call Stack Trace
+
+Every user-defined function call pushes a `FrameInfo { fn_name, call_site }` onto a thread-local `CALL_STACK` before evaluating the body. On any runtime error, `attach_stack()` captures a snapshot of the stack and attaches it to the `GustError`. The stack is displayed innermost-first in the error message:
+
+```
+[R0001] runtime error: division by zero
+  at file.gust:10:5
+  in bar at file.gust:7:9    ← innermost (called from line 7)
+  in foo at file.gust:4:5    ← outermost
+```
+
+Anonymous closures appear as `<closure>`. The call stack is cleared at the start of each `evaluate()` call. `main()` itself is not pushed (it is executed directly, not via `call_function`).
+
+---
+
 ## Function Call Dispatch
 
 `call_function(func, args, span)` handles three cases:
@@ -167,9 +188,9 @@ The evaluator will panic with `"match: no arm matched scrutinee"` if no arm matc
 
 ## Known Limitations
 
-### Index assignment — identifier only
+### Field and index assignment — direct variable only (partial)
 
-`arr[expr] = val` only supports an identifier or integer literal as the index expression. Complex index expressions (`arr[f(x)] = v`) are rejected at runtime with a message asking the programmer to assign the index to a variable first. This is a PoC simplification — the typechecker does not enforce this restriction, so a valid type-checked program can produce a runtime error here.
+`obj.field = val` only supports a bare identifier on the left-hand side (`foo.bar = 1` works; `get_foo().bar = 1` panics). `arr[expr] = val` supports arbitrary expressions as the index (fixed in v0.2). The typechecker does not validate the field-assignment shape, so a well-typed program can reach this panic. Fixing it requires the evaluator to support lvalue paths rather than just names.
 
 ### Field and index assignment — direct variable only
 

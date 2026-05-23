@@ -4,6 +4,30 @@ title: "Gust Language Changelog"
 
 # Changelog
 
+## v0.2
+
+Evaluator improvements, DX features, and language quality fixes. Shipped by Sprint 1 (`sprint/1`).
+
+**New language features:**
+- Type ascription operator `:` — `[] : Int[]` guides type inference without runtime cost (RFC-0021)
+- Shorthand struct field initialisation — `Point { x, y }` desugars to `Point { x: x, y: y }`
+- Trailing commas allowed in function parameter lists and argument lists
+
+**New built-in functions:**
+- `assert(cond: Bool)` — panics with `"assertion failed"` if `cond` is `false`
+- `assert_msg(cond: Bool, msg: String)` — panics with `msg` if `cond` is `false`
+- `dbg<T>(v: T) -> T` — prints `[dbg] <value>` to stderr and returns the value unchanged
+- `print_int(n: Int)`, `println_int(n: Int)` — print an `Int` without/with newline
+- `print_float(f: Float)`, `println_float(f: Float)` — print a `Float` without/with newline
+
+**Bug fixes:**
+- Arrays now have value semantics — binding an array to a new variable produces an independent copy
+- Error spans now report `file:line:col` instead of raw byte offsets
+- Complex expressions (field access, calls) are now valid array index operands
+
+**Developer experience:**
+- Runtime panics now include a call-stack trace showing function name and call site
+
 ## v0.1
 
 Initial language version. Implemented by the tree-walk interpreter.

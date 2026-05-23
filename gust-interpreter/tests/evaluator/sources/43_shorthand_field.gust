@@ -1,0 +1,36 @@
+// Shorthand field initialisation: `Point { x, y }` desugars to `Point { x: x, y: y }`.
+
+struct Point { x: Int, y: Int }
+
+struct Named { name: String, value: Int }
+
+fun make_point(x: Int, y: Int) -> Point {
+    Point { x, y }
+}
+
+fun main() {
+    // Basic shorthand: both fields.
+    let x = 3;
+    let y = 7;
+    let p = Point { x, y };
+    assert(p.x == 3);
+    assert(p.y == 7);
+
+    // Mixed: shorthand and explicit.
+    let x2 = 10;
+    let p2 = Point { x: x2, y: 20 };
+    assert(p2.x == 10);
+    assert(p2.y == 20);
+
+    // Shorthand via function that uses it internally.
+    let p3 = make_point(5, 6);
+    assert(p3.x == 5);
+    assert(p3.y == 6);
+
+    // String field.
+    let name = "hello";
+    let value = 42;
+    let n = Named { name, value };
+    assert(n.value == 42);
+    assert(string_len(n.name) == 5);
+}

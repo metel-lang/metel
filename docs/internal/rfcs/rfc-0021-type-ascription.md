@@ -2,7 +2,7 @@
 id: rfc-0021
 title: "Type Ascription Syntax"
 date: '2026-05-23'
-status: draft
+status: incorporated
 ---
 
 ## Summary

@@ -1290,6 +1290,7 @@ fn format_value(val: &Value) -> String {
         Value::Perhaps(None) => "None".to_string(),
         Value::YoloResult(Ok(v)) => format!("Ok({})", format_value(v)),
         Value::YoloResult(Err(e)) => format!("Err({})", format_value(e)),
-        Value::Pointer(_) | Value::MutPointer(_) => unreachable!("pointer values not constructed in v0.2"),
+        // RFC-0001 (pointer syntax) placeholder variants — not constructed until that RFC is implemented.
+        Value::Pointer(_) | Value::MutPointer(_) => unreachable!("pointer values not constructed until RFC-0001 is implemented"),
     }
 }

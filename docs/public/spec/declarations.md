@@ -82,6 +82,16 @@ let p = Point { x: 1.0, y: 2.0 };
 let x = p.x;
 ```
 
+When a local variable has the same name as a field, the `: value` part can be omitted (**shorthand field init**):
+
+```gust
+let x = 1.0;
+let y = 2.0;
+let p = Point { x, y };   // equivalent to Point { x: x, y: y }
+```
+
+Shorthand and explicit fields may be mixed freely within one literal.
+
 ### Methods
 
 ```gust

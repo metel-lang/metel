@@ -21,7 +21,7 @@ ImplBlock          → "impl" ( Type "for" )? Type "{" FunDeclaration* "}"
 TraitDeclaration   → "trait" IDENTIFIER "{" TraitMethod* "}"
 TraitMethod        → "fun" IDENTIFIER "(" Params? ")" ( "->" Type )? ( Block | ";" )
 
-Params             → Param ( "," Param )*
+Params             → Param ( "," Param )* ","?
 Param              → ( "mut" )? "self" | IDENTIFIER ( ":" Type )?
 StructFields       → StructField ( "," StructField )* ","?
 StructField        → IDENTIFIER ":" Type
@@ -61,10 +61,11 @@ LogicalAndExpression    → ComparisonExpression ( "&&" ComparisonExpression )*
 ComparisonExpression    → TermExpression ( ( ">" | ">=" | "<" | "<=" | "!=" | "==" ) TermExpression )?
 TermExpression          → FactorExpression ( ( "+" | "-" ) FactorExpression )*
 FactorExpression        → CastExpression ( ( "*" | "/" | "%" ) CastExpression )*
-CastExpression          → UnaryExpression ( "as" Type )*
+CastExpression          → AscribeExpression ( "as" Type )*
+AscribeExpression       → UnaryExpression ( ":" Type )?
 UnaryExpression         → ( "!" | "-" ) UnaryExpression | PostfixExpression
 PostfixExpression       → PrimaryExpression ( "(" Arguments? ")" | "." IDENTIFIER | "[" Expression "]" | "?" )*
-Arguments               → Expression ( "," Expression )*
+Arguments               → Expression ( "," Expression )* ","?
 
 PrimaryExpression  → INT | FLOAT | STRING | "true" | "false" | "nope" | "()"
                    | "(" Expression ( "," Expression )+ ")"   // tuple
@@ -78,7 +79,7 @@ PrimaryExpression  → INT | FLOAT | STRING | "true" | "false" | "nope" | "()"
                    | ClosureExpression
 
 StructLiteral      → IDENTIFIER ( "::" IDENTIFIER )* "{" FieldInit ( "," FieldInit )* ","? "}"
-FieldInit          → IDENTIFIER ":" Expression
+FieldInit          → IDENTIFIER ( ":" Expression )?   // omitting ": Expression" uses the local variable of the same name
 
 MatchExpression    → "match" Expression "{" MatchArm ( "," MatchArm )* ","? "}"
 MatchArm           → Pattern ( "if" Expression )? "=>" Expression

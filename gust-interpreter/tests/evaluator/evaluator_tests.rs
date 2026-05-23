@@ -208,6 +208,12 @@ mod tests {
     #[test]
     fn closures_advanced() { check("42_closures_advanced.gust"); }
 
+    #[test]
+    fn shorthand_field() { check("43_shorthand_field.gust"); }
+
+    #[test]
+    fn trailing_commas() { check("44_trailing_commas.gust"); }
+
     // ── Integration tests ─────────────────────────────────────────────────────
 
     #[test]

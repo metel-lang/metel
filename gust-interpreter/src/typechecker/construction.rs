@@ -347,7 +347,6 @@ fn construct_stmt(stmt: &Stmt, ctx: &mut ConstructCtx) -> Result<TypedStmt, Gust
                 binding: fi.binding.clone(), iterable, body, span: fi.span.clone(),
             }))
         }
-        _ => Err(GustError::internal("statement not yet supported in construct")),
     }
 }
 
@@ -611,7 +610,6 @@ fn construct_expr(
             let ty = find_loop_break_type(&typed_body).unwrap_or(Type::Never);
             Ok(TypedExpr::Loop { body: typed_body, ty, span: span.clone() })
         }
-        _ => Err(GustError::internal("expression not yet supported in construct")),
     }
 }
 

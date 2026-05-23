@@ -76,6 +76,23 @@ let first = nums[0];
 
 Arrays are usable in `for-in` loops. `List<T>` is not available in v0.1; `T[]` is the only sequence type.
 
+## Type Ascription
+
+The `:` operator asserts that an expression has a given type without performing any runtime conversion. It is a pure type-inference hint — no code is emitted at runtime.
+
+```gust
+// Resolve the element type of an empty array literal.
+let xs = [] : Int[];
+
+// Assert that a variable has the expected type.
+let n: Int = some_expr : Int;
+
+// Resolve an ambiguous argument.
+take_array([] : Float[]);
+```
+
+Ascription fails at compile time if the expression's inferred type is incompatible with the given type. Use `as` to convert between types; use `:` only when the value already has the target type and you want to make it explicit to the type checker.
+
 ## Type Casting
 
 The `as` operator casts between numeric primitive types. It desugars to a call to the `From` trait and is infallible — the result is the target type directly.

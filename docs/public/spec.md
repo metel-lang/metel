@@ -2,7 +2,7 @@
 id: doc-2
 title: "Gust Language Specification"
 type: spec
-version: v0.1
+version: v0.2
 created_date: '2026-05-16'
 ---
 

@@ -281,7 +281,6 @@ fn infer_stmt(
             let _ = iter_var_span;
             Ok(InferType::unit())
         }
-        _ => Err(GustError::internal("statement not yet supported")),
     }
 }
 
@@ -568,7 +567,6 @@ fn infer_expr(
             Ok(ok_var)
         }
         Expr::Match(m) => infer_match(m, ctx, fun_generalizations),
-        _ => Err(GustError::internal("expression not yet supported")),
     }
 }
 
