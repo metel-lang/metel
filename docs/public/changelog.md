@@ -6,7 +6,7 @@ title: "Gust Language Changelog"
 
 ## v0.2
 
-Evaluator improvements, DX features, and language quality fixes. Shipped by Sprint 1 (`sprint/1`).
+Evaluator improvements, DX features, and language quality fixes. Shipped by Sprint 3 (`sprint/3`).
 
 **New language features:**
 - Type ascription operator `:` — `[] : Int[]` guides type inference without runtime cost (RFC-0021)
