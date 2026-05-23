@@ -53,11 +53,24 @@ All v0.1 programs are single-file with no stdlib beyond the [built-in functions]
 
 ---
 
+## Built-in Migration
+
+The v0.1 built-in functions (`print`, `println`, `int_to_string`, `float_to_string`, `bool_to_string`, `string_len`, `string_concat`, `array_push`, `array_len`, `clock`) are an explicit **temporary measure**. They exist only because v0.1 programs have no module system and no stdlib. When the stdlib ships, these functions move into appropriate stdlib modules and the global built-in form is removed:
+
+| Built-in          | Stdlib destination            |
+|-------------------|-------------------------------|
+| `print`, `println`| `std::io`                     |
+| `int_to_string`, `float_to_string`, `bool_to_string` | superseded by the `Display` trait (RFC-0012) |
+| `string_len`, `string_concat` | `std::string`    |
+| `array_push`, `array_len`     | `std::array` / `std::collections` |
+| `clock`           | `std::time`                   |
+
+This is not a backwards-compatibility question — built-ins are not a stable API surface. Programs written for v0.1 are expected to migrate when stdlib lands.
+
 ## Open Questions
 
 - **Module path convention**: `std::math` or `std/math` or something else? Depends on RFC-0009.
 - **Generic stdlib functions** (`min`, `max`, `List<T>`): require the trait system for bounds (`T: Comparable`). Does stdlib ship in phases alongside language versions?
-- **Built-in promotion**: should existing built-in functions (`int_to_string`, `array_len`, etc.) move into stdlib modules, or stay as globals for backwards compatibility?
 - **Versioning**: does the stdlib follow the same language version as the spec, or does it version independently?
 
 ---

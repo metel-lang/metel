@@ -11,6 +11,8 @@ Panics are triggered by:
 
 ## Built-in Functions
 
+> **Temporary.** Built-in functions are a stopgap for v0.1 programs that have no module system and no standard library. Once RFC-0009 (module system) and RFC-0016 (standard library) land, these functions will migrate into stdlib modules (`std::io`, `std::string`, `std::array`, etc.) and the global built-in form will be deprecated. Do not design new language features that depend on builtins remaining as globals.
+
 These are available globally without any `use` declaration:
 
 | Name              | Signature                           | Description                              |
