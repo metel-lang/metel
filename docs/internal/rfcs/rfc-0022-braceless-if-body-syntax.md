@@ -2,8 +2,8 @@
 id: rfc-0022
 title: "Braceless if body syntax"
 date: '2026-05-23'
-status: draft
-target:
+status: accepted
+target: v0.3
 ---
 
 ## Summary
@@ -50,11 +50,11 @@ if (condition) { expr; }
 
 ---
 
-## Open Questions
+## Decisions
 
-1. Should braceless `if`–`else` be allowed in expression position? The proposal says yes when both branches have matching types, but this could be restricted to statement-only for simplicity.
-2. Should nested braceless bodies be allowed, e.g. `if (a) if (b) expr;`? The dangling-else problem applies here.
-3. Should braceless `else` be permitted alongside a braced `then`, and vice versa? Mixing styles may reduce readability.
+1. **Braceless `if`–`else` in expression position: allowed.** When both branches have matching types, a braceless `if`–`else` may appear in expression position, identical to the braced form.
+2. **Nested braceless bodies: allowed only when the inner `if` has no `else`.** `if (a) if (b) expr;` is valid. `if (a) if (b) x; else y;` is a parse error — the outer body must use braces whenever the inner `if` has an `else` branch. This eliminates the dangling-else ambiguity entirely.
+3. **Mixing braced and braceless arms: not allowed.** Both the `then` and `else` arms must use the same style — either both braced (`block`) or both braceless (`expr`). A parse error is emitted for mismatched styles.
 
 ---
 
