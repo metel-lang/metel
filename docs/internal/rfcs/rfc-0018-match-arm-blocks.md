@@ -2,7 +2,7 @@
 id: rfc-0018
 title: "Match Arm Blocks"
 date: '2026-05-22'
-status: accepted
+status: incorporated
 ---
 
 ## Summary

@@ -2,7 +2,7 @@
 id: rfc-0019
 title: "Return Context Type Propagation"
 date: '2026-05-22'
-status: accepted
+status: incorporated
 ---
 
 ## Summary
