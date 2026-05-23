@@ -1,6 +1,6 @@
 # Gust
 
-A Rust-inspired programming language with a tree-walk interpreter written in Rust.
+A statically typed, expression-oriented language with first-class functions, explicit nullability, and a compiler at the horizon.
 
 ## Why?
 
@@ -55,7 +55,7 @@ The spec is the source of truth within each iteration — no code diverges from 
 ### Build
 
 ```bash
-cd tree-walk-interpreter
+cd gust-interpreter
 cargo build --release
 ```
 
@@ -92,7 +92,7 @@ let result = factorial(5);
 
 ```
 Gust/
-├── tree-walk-interpreter/
+├── gust-interpreter/
 │   ├── src/
 │   │   ├── parser/         # PEG grammar (pest) → untyped AST
 │   │   ├── ast/            # Untyped AST node definitions
@@ -115,10 +115,10 @@ Gust/
 ## Resources
 
 - **Language Specification:** [`docs/public/spec.md`](docs/public/spec.md)
-- **Typechecker Architecture:** [`tree-walk-interpreter/docs/typechecker.md`](tree-walk-interpreter/docs/typechecker.md)
-- **Evaluator Design:** [`tree-walk-interpreter/docs/evaluator.md`](tree-walk-interpreter/docs/evaluator.md)
+- **Typechecker Architecture:** [`gust-interpreter/docs/typechecker.md`](gust-interpreter/docs/typechecker.md)
+- **Evaluator Design:** [`gust-interpreter/docs/evaluator.md`](gust-interpreter/docs/evaluator.md)
 - **RFCs:** [`docs/internal/rfcs/`](docs/internal/rfcs/) — language change proposals and decisions
-- **Decision Records:** [`tree-walk-interpreter/docs/decisions/`](tree-walk-interpreter/docs/decisions/) — implementation rationales
+- **Decision Records:** [`gust-interpreter/docs/decisions/`](gust-interpreter/docs/decisions/) — implementation rationales
 
 ## License
 
