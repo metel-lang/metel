@@ -153,7 +153,7 @@ loop_expr   = { "loop" ~ block }
 closure_expr = { "fun" ~ "(" ~ param_list? ~ ")" ~ ("->" ~ type_expr)? ~ block }
 
 struct_literal = { type_path ~ "{" ~ field_init ~ ("," ~ field_init)* ~ ","? ~ "}" }
-field_init     = { ident ~ ":" ~ expr }
+field_init     = { ident ~ (":" ~ expr)? }
 
 path_expr = { ident ~ ("::" ~ ident)* }
 type_path = { ident ~ ("::" ~ ident)* }
