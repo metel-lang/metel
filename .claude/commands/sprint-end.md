@@ -221,7 +221,14 @@ Both `Closes` lines are required — on merge, GitHub automatically closes both 
 > - All 7 quality gates: ✅
 > - Review issue: #<N> — add **Next Sprint Seeds** if you have ideas.
 > - **Merge the PR** on GitHub — this automatically closes the review and kickoff issues.
-> - After merging, delete the `sprint/$ARGUMENTS` branch on GitHub.
+> - After merging, pull `main` and create the release tag:
+>   ```bash
+>   git pull origin main
+>   git tag -a v<X.Y> -m "v<X.Y>: <sprint theme>" && git push origin v<X.Y>
+>   ```
+> - Delete the `sprint/$ARGUMENTS` branch on GitHub.
+
+The tag must point to `main` after the merge — not the sprint branch. The tag name must match the version in `docs/public/changelog.md`.
 
 ---
 
