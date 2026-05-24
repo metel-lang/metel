@@ -4,7 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Gust is a Rust-inspired programming language with a tree-walk interpreter written in Rust. The project implements a statically typed, expression-oriented language with features like type inference, pattern matching, and generics.
+Gust is a statically typed, expression-oriented language with a Rust-inspired syntax. It runs in two first-class execution modes: a production-quality interpreter and a native compiler. Both are permanent, supported targets — the interpreter is not a stepping stone to be discarded when the compiler exists.
+
+**This dual-mode commitment is the project's core identity and competitive position.** Design decisions must be consistent with it. See `docs/internal/vision.md` for the full rationale.
+
+Key implications for agents working in this repo:
+- Do not treat the tree-walk interpreter as throwaway scaffolding. It is a product.
+- Do not design features that only make sense for a compiler unless explicitly designated compiler-only.
+- Every language feature must answer: *what does this give the programmer in interpreter mode, and in compiler mode?*
+- The spec is the contract both backends must satisfy. Ambiguity in the spec is a spec bug.
 
 ## Common Development Commands
 

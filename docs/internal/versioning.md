@@ -22,20 +22,36 @@ No patch level exists for the language itself. Spec clarifications that do not c
 
 ### Pre-1.0 era
 
-Versions before `v1.0` are the interpreter era: the tree-walk interpreter is the reference implementation and the language is actively evolving. Minor versions may introduce significant new capabilities (generics, traits, concurrency). Breaking changes before `v1.0` are possible but must be explicitly called out in the CHANGELOG.
+Versions before `v1.0` cover the period during which both the interpreter and the compiler are reaching production quality. The language is actively evolving; minor versions may introduce significant new capabilities (generics, traits, concurrency, the memory model). Breaking changes before `v1.0` are possible but must be explicitly called out in the CHANGELOG.
+
+The interpreter is the first backend to reach each language version. The compiler follows, targeting the same spec version. Both backends are permanent and supported — the interpreter is not a prototype to be discarded when the compiler exists. See `docs/internal/vision.md` for the full dual-mode commitment.
 
 ---
 
-## Interpreter Version Numbering
+## Backend Version Numbering
 
-The interpreter follows `v<major>.<minor>.<patch>`:
+Both the interpreter and the compiler follow `v<major>.<minor>.<patch>`:
 
-- `major.minor` always matches the spec version the interpreter fully implements.
+- `major.minor` always matches the spec version the backend fully implements.
 - `patch` increments for bug fixes that do not change the implemented language.
 
-`interpreter v0.2.3` means: implements spec v0.2, third patch release.
+`interpreter v0.2.3` means: implements spec v0.2, third patch release.  
+`compiler v0.3.0` means: implements spec v0.3, first release.
 
-The compiler, when it eventually exists, follows the same pattern — its `major.minor` tracks the spec version it targets.
+Backends are versioned independently — the interpreter may be at `v0.3.x` while the compiler is still at `v0.2.x` if it lags behind. The spec version is the shared reference point.
+
+### Backend milestone targets
+
+| Spec version | Interpreter | Compiler | Notes |
+|---|---|---|---|
+| v0.1 | shipped | — | Interpreter only; compiler not yet started |
+| v0.2 | target | — | Generics and traits |
+| v0.3 | target | — | Memory model (linear types, pointers, closure capture) |
+| v0.4 | target | target (v0.3 subset) | Concurrency; compiler begins targeting v0.3 |
+| v0.5 | target | target | Attributes, macros, derive; both backends in sync |
+| v1.0 | target | target | Both backends production-quality; first stable release |
+
+The compiler is not required to track the interpreter version-for-version before v1.0. It may lag by one minor version. At v1.0, both backends must implement the full spec.
 
 ---
 
@@ -45,12 +61,13 @@ The compiler, when it eventually exists, follows the same pattern — its `major
 
 ### Version tags
 
-When a version is released, two git tags are applied to the same commit:
+When a spec version is released, git tags are applied:
 
 | Tag | Meaning |
 |---|---|
 | `spec-vX.Y` | Spec snapshot at this version |
 | `interpreter-vX.Y.0` | First interpreter release for this spec version |
+| `compiler-vX.Y.0` | First compiler release for this spec version (when applicable) |
 
 **A tagged spec version is immutable.** If a spec error is discovered after tagging, it is documented as errata in the next version's CHANGELOG. Tags are never amended.
 
@@ -132,4 +149,12 @@ Implementation issues are assigned to the **version milestone** they target. Use
 
 ## Changelog
 
-Version entries live in `docs/public/changelog.md`. Each entry lists RFCs incorporated, features added, and breaking changes (if any).
+Version entries live in `docs/public/changelog.md`. Each entry lists RFCs incorporated, features added, breaking changes (if any), and backend status (which backends implement the version).
+
+---
+
+## References
+
+- Project vision and dual-mode commitment: `docs/internal/vision.md`
+- Language spec: `docs/public/spec.md`
+- Changelog: `docs/public/changelog.md`
