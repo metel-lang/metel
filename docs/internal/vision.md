@@ -19,13 +19,13 @@ Gust is a statically typed, expression-oriented language with a Rust-inspired sy
 
 ## The Competitive Position
 
-The following combination of properties is unoccupied in the current language landscape:
+The following combination of properties is unoccupied in the current language landscape. Properties marked *(planned)* are not yet implemented but are committed design targets — the claim is about the target state, not the current implementation.
 
 - **Rust-like syntax** — algebraic types, pattern matching, expression orientation, no null, explicit error handling
 - **First-class interpreter** — embeddable, scriptable, fast startup, REPL, no compile step required
-- **First-class compiler** — native code, zero-cost linear types, no GC overhead when you need performance
-- **Static type system in both modes** — the same type checker runs before execution whether you interpret or compile
-- **Opt-in memory control** — safe RC-managed memory by default; linear types for deterministic, zero-overhead allocation when needed
+- **First-class compiler** *(planned)* — native code, zero-cost linear types, no GC overhead when you need performance
+- **Static type system in both modes** — the same type checker runs before execution whether you interpret or compile *(currently interpreter only; compiler will share the same frontend)*
+- **Opt-in memory control** *(planned, RFC-0024)* — safe RC-managed memory by default; linear types for deterministic, zero-overhead allocation when needed
 
 The closest reference point is OCaml: a language that commits to both a bytecode interpreter and a native compiler with equal engineering investment. Gust occupies an analogous position but in the Rust-influenced, systems-adjacent design space that OCaml does not target.
 
