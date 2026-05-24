@@ -97,17 +97,15 @@ This is the honest story to tell programmers: *use the interpreter for scripting
 
 ## Academic Research Angles
 
-The dual-mode commitment opens specific research questions that are worth pursuing formally:
+The dual-mode commitment, combined with the linear type system design, opens specific research questions with genuine publication potential. Three claims are defensible:
 
-1. **Semantic equivalence.** Formally proving that the interpreter and compiler implement identical semantics for the linear type system — the linearity checker, the narrow `&T` read reference, branch consistency rules, and loop restrictions — under the constraint of no lifetime annotations. A mechanized proof (Lean, Coq) would be publishable.
+1. **Formal soundness of `&T` without lifetimes** — the expression-only read reference is a novel mechanism for inspection without consumption that avoids lifetime annotations. Provably sound? Under what conditions does it fail? This is pursuable with the interpreter alone.
+2. **RC/linear coexistence formal model** — the boundary rules between RC-managed and linearly-managed values (including the `Send` interaction and channel-as-consumption semantics) have not been formally analyzed in the literature.
+3. **Dual-mode semantic equivalence** — proving the interpreter and compiler implement identical semantics for the linear type system. Requires both backends; long-term.
 
-2. **Soundness of `&T` without lifetimes.** The expression-only read reference (`&T`, non-storable) is a novel design point for avoiding lifetime annotations in a linear type system. Is this system sound? Under what conditions does it admit use-after-free? A formal characterization of the safety boundary is an open research question.
+The most achievable near-term contribution is formalizing the linear type system (Claim 1) — the inference rules are already described in prose in RFC-0024 and translating them to formal notation is the primary work.
 
-3. **Gradual compilation as a development workflow.** Empirical study: do programmers who prototype in an interpreter before compiling produce better-structured code than those who compile from the start? This is a PL usability research question with real experimental design.
-
-4. **RC + opt-in linear types — formal coexistence.** The interaction between RC-managed and linearly-managed values in a single program (the boundary rules, the Send implications, the closure capture rules) has not been formally analyzed in a dual-mode setting.
-
-These are not prerequisites to shipping. They are opportunities for academic contribution if pursued alongside development.
+See `docs/internal/research.md` for the full analysis: prior work map, per-claim prerequisites, explicit non-claims, and a publication strategy.
 
 ---
 
