@@ -48,6 +48,6 @@ Initial language version. Implemented by the tree-walk interpreter.
 
 **Not included (v0.2+):**
 - User-defined generic functions and types (see [Generics](spec/types.md#generics))
-- User-defined traits and `impl Trait for Type` (see [Traits](spec/declarations.md#traits))
+- User-defined aspects and `impl Aspect for Type` (see [Aspects](spec/declarations.md#aspects))
 - `From`-based `?` coercion across different error types (see [The ? Operator](spec/functions.md#the--operator))
 - User-defined `Iterable<T>` implementations (see [For-In](spec/expressions.md#for-in))

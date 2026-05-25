@@ -18,7 +18,7 @@ FunDeclaration     → "fun" IDENTIFIER GenericParams? "(" Params? ")" ( "->" Ty
 StructDeclaration  → "struct" IDENTIFIER GenericParams? "{" StructFields "}"
 EnumDeclaration    → "enum" IDENTIFIER GenericParams? "{" EnumVariants "}"
 ImplBlock          → "impl" ( Type "for" )? Type "{" FunDeclaration* "}"
-TraitDeclaration   → "trait" IDENTIFIER "{" TraitMethod* "}"
+TraitDeclaration   → "aspect" IDENTIFIER "{" TraitMethod* "}"
 TraitMethod        → "fun" IDENTIFIER "(" Params? ")" ( "->" Type )? ( Block | ";" )
 
 Params             → Param ( "," Param )* ","?

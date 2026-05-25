@@ -168,24 +168,24 @@ impl Shape {
 
 ---
 
-## Traits
+## Aspects
 
-> **v0.2 feature.** The trait system is not available in v0.1. Built-in trait-dependent
+> **v0.2 feature.** The aspect system is not available in v0.1. Built-in aspect-dependent
 > behaviour (`as` for `Int ↔ Float`, `?` with exact error match, `for-in` over arrays
-> and ranges) is available in v0.1 as hardcoded special cases. User-defined traits,
-> `impl Trait for Type`, and trait bounds are v0.2.
+> and ranges) is available in v0.1 as hardcoded special cases. User-defined aspects,
+> `impl Aspect for Type`, and aspect bounds are v0.2.
 
 ```moonlane
-trait Printable {
+aspect Printable {
     fun print(self);
 }
 
-trait Comparable {
+aspect Comparable {
     fun compare(self, other: Self) -> Int;
 }
 ```
 
-### Implementing a Trait
+### Implementing a Aspect
 
 ```moonlane
 impl Printable for Point {
@@ -195,7 +195,7 @@ impl Printable for Point {
 }
 ```
 
-### Trait Bounds
+### Aspect Bounds
 
 ```moonlane
 fun print_all<T: Printable>(items: T[]) {
@@ -208,7 +208,7 @@ fun print_all<T: Printable>(items: T[]) {
 ### Default Method Implementations
 
 ```moonlane
-trait Greet {
+aspect Greet {
     fun name(self) -> String;
 
     fun greet(self) {                          // default implementation
@@ -219,14 +219,14 @@ trait Greet {
 
 ### The Self Type
 
-`Self` inside a trait definition refers to the concrete implementing type:
+`Self` inside a aspect definition refers to the concrete implementing type:
 
 ```moonlane
-trait Comparable {
+aspect Comparable {
     fun compare(self, other: Self) -> Int;
 }
 ```
 
 ### Static Dispatch Only
 
-Trait objects (`dyn Trait`) are not available in v0.1. All polymorphism is via generics (static dispatch).
+Aspect objects (`dyn Aspect`) are not available in v0.1. All polymorphism is via generics (static dispatch).

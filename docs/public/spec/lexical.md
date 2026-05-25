@@ -20,7 +20,7 @@ identifier := [a-zA-Z_][a-zA-Z0-9_]*
 ```
 
 By convention:
-- Types, structs, enums, and traits use `PascalCase`
+- Types, structs, enums, and aspects use `PascalCase`
 - Variables, functions, and fields use `snake_case`
 
 ## Keywords
@@ -28,7 +28,7 @@ By convention:
 ```
 and       as        break     continue  else      enum      false
 for       fun       if        impl      let       loop      match
-mut       nope      or        return    struct    trait     true
+mut       nope      or        return    struct    aspect     true
 use       where     while
 ```
 

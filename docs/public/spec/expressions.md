@@ -119,13 +119,13 @@ for (mut i = 0; i < 10; i += 1) {
 
 ### For-In
 
-`for-in` works on any type implementing the `Iterable<T>` trait. The loop variable
+`for-in` works on any type implementing the `Iterable<T>` aspect. The loop variable
 receives type `T`. `T[]` (array) and `Range` (produced by `..` and `..=`) implement
 `Iterable<T>` by default. User-defined types can be made iterable by implementing
 `Iterable<T>`:
 
 ```moonlane
-trait Iterable<T> {
+aspect Iterable<T> {
     fun next(mut self) -> Perhaps<T>;
 }
 ```
@@ -137,7 +137,7 @@ for (let i in 0..=10) { ... }   // 0, 1, ..., 10
 ```
 
 > **v0.1:** Only `T[]` and `Range` are supported as iterables. User-defined
-> `Iterable<T>` implementations are a v0.2 feature (requires the trait system).
+> `Iterable<T>` implementations are a v0.2 feature (requires the aspect system).
 
 ### Loop
 

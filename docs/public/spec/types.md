@@ -20,7 +20,7 @@ Types are inferred using the Hindley-Milner algorithm with let-polymorphism. Ann
 
 Annotations are required only where there is no expression to infer from:
 - Struct and enum field types
-- Trait method signatures
+- Aspect method signatures
 
 ```moonlane
 let x = 42;           // inferred: Int
@@ -163,7 +163,7 @@ zip_lengths([] : Int[], [] : String[]);       // ok
 
 ## Type Casting
 
-The `as` operator casts between numeric primitive types. It desugars to a call to the `From` trait and is infallible — the result is the target type directly.
+The `as` operator casts between numeric primitive types. It desugars to a call to the `From` aspect and is infallible — the result is the target type directly.
 
 ```moonlane
 let x: Int = 42;

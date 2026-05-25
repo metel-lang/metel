@@ -20,7 +20,7 @@ Moonlane is a statically typed, expression-oriented language with a Rust-inspire
 The language's core design principles are:
 
 - **Strong static typing** with full Hindley-Milner type inference
-- **No classes** — data and behaviour are defined separately via structs, enums, and traits
+- **No classes** — data and behaviour are defined separately via structs, enums, and aspects
 - **Algebraic data types** — enums with data-carrying variants and exhaustive pattern matching
 - **Explicit nullability** — absence of a value is represented by `Perhaps<T>`, never by null
 - **Explicit error handling** — errors are values, represented as `Result<T, E>`
@@ -46,7 +46,7 @@ See `docs/internal/vision.md` for the full design rationale and competitive posi
 |---|---|
 | [Lexical Structure](spec/lexical.md) | Comments, identifiers, keywords, literals, operators |
 | [Type System](spec/types.md) | Primitive types, inference, tuples, arrays, casting, generics, Never, `Perhaps<T>`, `Result<T,E>` |
-| [Declarations](spec/declarations.md) | Variables, structs, enums, traits |
+| [Declarations](spec/declarations.md) | Variables, structs, enums, aspects |
 | [Functions](spec/functions.md) | Functions, closures, the `?` operator |
 | [Expressions](spec/expressions.md) | Pattern matching, control flow |
 | [Runtime](spec/runtime.md) | Panics, built-in functions |
