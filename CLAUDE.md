@@ -192,9 +192,9 @@ Spec documents, decision records, and RFCs live in `docs/`. Read them directly â
 
 ## Current Development Focus
 
-The language is at **v0.2** (tree-walk interpreter complete). The next release is **v0.3**, which adds generics and aspects.
+The language is at **v0.3** (generics complete). The next release is **v0.4**, which adds aspects and upgrades builtins.
 
-Check open tasks: `gh issue list --milestone "v0.2"`.
+Check open tasks: `gh issue list --milestone "v0.4"`.
 
 See [`docs/internal/versioning.md`](docs/internal/versioning.md) for the versioning model.
 

@@ -256,7 +256,7 @@ Three registries live inside `TypeRegistry` (owned by `InferContext`):
 
 ### `as` Cast — Widening Only (Provisional)
 
-`Int as Float` (widening) and identity casts are supported. Narrowing (`Float as Int`) and cross-type casts are rejected. v0.3 (#12) replaces the fixed-case check with a `From<S>` aspect lookup.
+`Int as Float` (widening) and identity casts are supported. Narrowing (`Float as Int`) and cross-type casts are rejected. v0.4 (#12) replaces the fixed-case check with a `From<S>` aspect lookup.
 
 ---
 
