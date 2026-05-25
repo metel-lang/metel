@@ -2,15 +2,17 @@
   <img src="media/moonlane-logo.svg" alt="Moonlane" width="600"/>
 </p>
 
-A statically typed, expression-oriented language that runs in two first-class modes.
+An exploration in type-driven memory management.
 
 ## Why?
 
-Most languages commit to one execution model. Scripting languages are interpreted and sacrifice performance. Systems languages compile and sacrifice startup time, embeddability, and the REPL. Moonlane is an attempt to refuse that trade.
+You surely know as well as I do that the world does not need yet another amateur Rust clone, so let's not beat around the bush - the main answer to the *why* question is: I wanted to create my own programming language.
 
-The closest reference point is OCaml — a language with equal engineering investment in its bytecode interpreter and native compiler. Moonlane tries to occupy an analogous position in the Rust-influenced design space: **Rust-like expressiveness and safety, in both a scriptable and a compilable form, without the mandatory borrow checker.**
+It began as "Yoloscript," a silly experiment based on Lox from Crafting Interpreters. But somewhere along the way, it got ambitious. Statically typed? Sure. Written in Rust? Why not. Operator overloads, pointers, concurrency? Let's try it all.
 
-The mechanism is opt-in linear types instead of mandatory ownership. The goal is that the interpreter catches your resource management bugs at type-check time, and the compiler eliminates the runtime overhead on top of that — genuine value in both modes, not just one. Whether that holds up in practice is what this project is trying to find out.
+The current frontier is linear types—baked in as an opt-in pillar of the memory model. The mission: discover what this system can express and where it breaks.
+
+> Fair warning: this project is powered by some serious AI machinery. I get it if that's not your cup of tea, but there's no other way around it.
 
 ## What?
 
@@ -40,24 +42,6 @@ The mechanism is opt-in linear types instead of mandatory ownership. The goal is
 - **C FFI** — `extern "C"` blocks declare functions callable via the C ABI. Calls require an `unsafe` block. The primary use case is Rust crate interop: any Rust crate can be exposed to Moonlane through a thin `#[no_mangle] extern "C"` shim, giving access to the full `crates.io` ecosystem.
 
 See the [Language Specification](docs/public/spec.md) and [RFCs](docs/internal/rfcs/) for the complete design.
-
-## How?
-
-The spec and the interpreter are developed in parallel, in a tight loop:
-
-```
-Define a feature in the spec
-        ↓
-Implement it in the interpreter
-        ↓
-Write real programs using it
-        ↓
-Observe gaps, wrong assumptions, usability issues
-        ↓
-Refine the spec  →  implement the refinement  →  next feature
-```
-
-The spec is the contract both the interpreter and the future compiler must satisfy. Any behaviour not described in the spec is a bug in whichever backend exhibits it. The interpreter is not scaffolding to be discarded when the compiler arrives — it is a permanent, supported execution mode with its own product requirements: embeddable as a library, a REPL, good error messages, stable public API.
 
 ## Quick Start
 
