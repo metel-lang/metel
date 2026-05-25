@@ -128,7 +128,12 @@ Three hoisting steps run before Pass 1:
 
 `hoist_fun_decls` is also called at block entry in `infer_block`, so nested functions support forward references within their block.
 
-Struct and enum declarations are registered globally by `build_registry`, regardless of where they appear in the source. `build_registry` recursively walks all function bodies (and nested blocks — `While`, `For`, `ForIn`) in addition to the top-level declaration list, so a `struct` declared inside a function body is registered in the same global `TypeRegistry` as a top-level `struct`. This means locally-declared structs are **visible across the entire compilation unit**, not just the enclosing function. There is currently no scope concept in the registry.
+Struct and enum declarations follow **lexical scope rules** matching Rust's model:
+
+- `build_registry` registers only top-level `struct`/`enum` declarations. These are globally visible for the entire compilation unit.
+- Struct/enum declarations inside function bodies (or any nested block) are registered at block entry by `infer_block` using `TypeRegistry::push_struct_scope` / `register_struct_fields` / `pop_struct_scope`. On scope exit, all names registered in that scope are removed from the registry.
+- `construct_block` in Pass 2 mirrors this: it pushes a new struct scope, builds concrete field types from the substitution, and pops on exit.
+- A locally-declared struct is **not visible outside its enclosing block**. Two functions may declare structs with the same name without collision.
 
 ---
 

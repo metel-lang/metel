@@ -429,7 +429,10 @@ pub struct EnumInfo {
 /// Immutable store of type definitions built during the pre-pass.
 /// Created by `build_registry` and injected into `InferContext` before inference begins.
 pub struct TypeRegistry {
-    struct_env: HashMap<String, Vec<(String, InferType)>>,
+    struct_env:         HashMap<String, Vec<(String, InferType)>>,
+    /// Tracks which struct names were registered in each lexical scope so they
+    /// can be removed on scope exit. Empty when outside any scoped block.
+    struct_scope_stack: Vec<Vec<String>>,
     method_env: HashMap<String, HashMap<String, InferType>>,
     enum_env:   HashMap<String, EnumInfo>,
 }
@@ -437,14 +440,30 @@ pub struct TypeRegistry {
 impl TypeRegistry {
     pub fn new() -> Self {
         Self {
-            struct_env: HashMap::new(),
-            method_env: HashMap::new(),
-            enum_env:   HashMap::new(),
+            struct_env:         HashMap::new(),
+            struct_scope_stack: Vec::new(),
+            method_env:         HashMap::new(),
+            enum_env:           HashMap::new(),
         }
     }
 
     pub fn register_struct_fields(&mut self, name: String, fields: Vec<(String, InferType)>) {
-        self.struct_env.insert(name, fields);
+        self.struct_env.insert(name.clone(), fields);
+        if let Some(scope) = self.struct_scope_stack.last_mut() {
+            scope.push(name);
+        }
+    }
+
+    pub fn push_struct_scope(&mut self) {
+        self.struct_scope_stack.push(Vec::new());
+    }
+
+    pub fn pop_struct_scope(&mut self) {
+        if let Some(names) = self.struct_scope_stack.pop() {
+            for name in names {
+                self.struct_env.remove(&name);
+            }
+        }
     }
 
     pub fn register_method(&mut self, type_name: String, method_name: String, fun_ty: InferType) {
@@ -523,6 +542,9 @@ impl InferContext {
     pub fn register_struct_fields(&mut self, name: String, fields: Vec<(String, InferType)>) {
         self.registry.register_struct_fields(name, fields);
     }
+
+    pub fn push_struct_scope(&mut self) { self.registry.push_struct_scope(); }
+    pub fn pop_struct_scope(&mut self)  { self.registry.pop_struct_scope(); }
 
     pub fn register_method(&mut self, type_name: String, method_name: String, fun_ty: InferType) {
         self.registry.register_method(type_name, method_name, fun_ty);
