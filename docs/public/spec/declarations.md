@@ -170,10 +170,10 @@ impl Shape {
 
 ## Aspects
 
-> **v0.4 feature.** The aspect system is not available in v0.1–v0.3. Built-in aspect-dependent
+> **v0.4.0 feature.** The aspect system is not available in v0.1.0–v0.3.0. Built-in aspect-dependent
 > behaviour (`as` for `Int ↔ Float`, `?` with exact error match, `for-in` over arrays
-> and ranges) is available in v0.1 as hardcoded special cases. User-defined aspects,
-> `impl Aspect for Type`, and aspect bounds are v0.4.
+> and ranges) is available in v0.1.0 as hardcoded special cases. User-defined aspects,
+> `impl Aspect for Type`, and aspect bounds are v0.4.0.
 
 ```moonlane
 aspect Printable {
@@ -229,4 +229,4 @@ aspect Comparable {
 
 ### Static Dispatch Only
 
-Aspect objects (`dyn Aspect`) are not available in v0.1. All polymorphism is via generics (static dispatch).
+Aspect objects (`dyn Aspect`) are not available in v0.1.0. All polymorphism is via generics (static dispatch).

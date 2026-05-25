@@ -29,7 +29,7 @@ These are available globally without any `use` declaration:
 | `assert_msg`      | `(cond: Bool, msg: String)`          | Panic with `msg` if `cond` is `false`   |
 | `dbg`             | `<T>(v: T) -> T`                     | Print `[dbg] <value>` to stderr and return the value unchanged |
 
-**Deprecated in v0.4** (use `.to_string()` and `print`/`println` instead):
+**Deprecated in v0.4.0** (use `.to_string()` and `print`/`println` instead):
 
 | Name              | Replacement                           |
 |-------------------|---------------------------------------|

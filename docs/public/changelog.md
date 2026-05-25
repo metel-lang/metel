@@ -4,7 +4,7 @@ title: "Moonlane Language Changelog"
 
 # Changelog
 
-## v0.4
+## v0.4.0
 
 Aspects and upgraded builtins. Shipped by Sprint 6 (`sprint/6`).
 
@@ -25,7 +25,7 @@ Aspects and upgraded builtins. Shipped by Sprint 6 (`sprint/6`).
 - Keyword-prefix identifiers (`break_sum`, `return_value`, `let_x`) now parse correctly as identifiers
 - Multiple `impl From<X> for Y` blocks with different source types now dispatch independently
 
-## v0.3
+## v0.3.0
 
 Generics and type-inference improvements. Shipped by Sprint 5 (`sprint/5`).
 
@@ -42,7 +42,7 @@ Generics and type-inference improvements. Shipped by Sprint 5 (`sprint/5`).
 - Callee parameter types propagate into argument construction — `find(words, nope)` resolves without ascription when the parameter type is `Perhaps<String>`
 - Lvalue path assignment — `obj.field = val` and `arr[i] = val` work on non-bare receivers (e.g. `get_foo().bar = 1`)
 
-## v0.2
+## v0.2.0
 
 Evaluator improvements, DX features, and language quality fixes. Shipped by Sprint 3 (`sprint/3`).
 
@@ -66,7 +66,7 @@ Evaluator improvements, DX features, and language quality fixes. Shipped by Spri
 **Developer experience:**
 - Runtime panics now include a call-stack trace showing function name and call site
 
-## v0.1
+## v0.1.0
 
 Initial language version. Implemented by the tree-walk interpreter.
 
@@ -76,7 +76,7 @@ Initial language version. Implemented by the tree-walk interpreter.
 - Functions: first-class values, closures with mutable capture, `?` operator (exact error type match only)
 - Structs: literals, field access, methods (`impl`), `mut self`, associated functions
 - Enums: unit and struct-like variants, `impl` blocks
-- Built-in generic types: `Perhaps<T>`, `Result<T, E>`, `Array<T>` / `T[]` (as special cases; user-defined generics are v0.3)
+- Built-in generic types: `Perhaps<T>`, `Result<T, E>`, `Array<T>` / `T[]` (as special cases; user-defined generics are v0.3.0)
 - Exhaustive pattern matching: all pattern kinds (see [Pattern Kinds](spec/expressions.md#pattern-kinds))
 - Control flow: `if`/`else`, `while`, `for`, `for-in` (arrays and ranges only), `loop`, `break`/`continue`, `return`
 - Type casting: `as` for `Int ↔ Float`
@@ -84,7 +84,7 @@ Initial language version. Implemented by the tree-walk interpreter.
 - Tuples
 - Built-in functions (see [Built-in Functions](spec/runtime.md#built-in-functions))
 
-**Not included (v0.3+):**
+**Not included (v0.3.0+):**
 - User-defined generic functions and types (see [Generics](spec/types.md#generics))
 - User-defined aspects and `impl Aspect for Type` (see [Aspects](spec/declarations.md#aspects))
 - `From`-based `?` coercion across different error types (see [The ? Operator](spec/functions.md#the--operator))

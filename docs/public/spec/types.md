@@ -74,7 +74,7 @@ Index access uses `[]` with an `Int` index. Out-of-bounds access causes a panic.
 let first = nums[0];
 ```
 
-Arrays are usable in `for-in` loops. `List<T>` is not available in v0.1; `T[]` is the only sequence type.
+Arrays are usable in `for-in` loops. `List<T>` is not available in v0.1.0; `T[]` is the only sequence type.
 
 ## Type Ascription
 
@@ -179,9 +179,9 @@ Because `as` desugars to `From`, user-defined types become castable by implement
 
 ## Generics
 
-> **v0.3 feature.** User-defined generic functions and types are available from v0.3.
+> **v0.3.0 feature.** User-defined generic functions and types are available from v0.3.0.
 > Built-in generic types (`Perhaps<T>`, `Result<T, E>`, `T[]`) were supported as
-> special cases from v0.1.
+> special cases from v0.1.0.
 
 Types and functions can be parameterized with `<T>` syntax.
 

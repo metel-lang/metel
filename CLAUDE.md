@@ -105,7 +105,7 @@ Use the `gh` CLI to manage issues:
 ```bash
 gh issue list                                          # list open tasks
 gh issue list --state closed                           # list done tasks
-gh issue list --milestone "v0.3"                       # filter by milestone
+gh issue list --milestone "v0.5.0"                     # filter by milestone
 gh issue view <number>                                 # read a task
 gh issue create --title "..." --label "..." --milestone "..."  # create a task
 gh issue close <number>                                # mark done
@@ -115,7 +115,7 @@ gh issue edit <number> --add-label "status:in-progress"        # mark in-progres
 
 **Labels:** `evaluator`, `generics`, `aspects`, `integration`, `tooling`, `dx`, `migration`, `docs`, `typechecker`, `type-inference`, `architecture`, `priority:low/medium/high`, `status:backlog`, `status:in-progress`, `archived`
 
-**Milestones:** Version milestones (`v0.2`, `v0.3`, …). See [`docs/internal/versioning.md`](docs/internal/versioning.md) for the full model.
+**Milestones:** Version milestones (`v0.4.0`, `v0.5.0`, …). See [`docs/internal/versioning.md`](docs/internal/versioning.md) for the full model.
 
 ### Docs and Decisions
 
@@ -145,7 +145,7 @@ Spec documents, decision records, and RFCs live in `docs/`. Read them directly �
 - **GitHub Projects v2** (https://github.com/users/Vladastos/projects/1) is the source of truth for task status and planning
 - Issues are the unit of work; the project board is the canonical status view
 - Before creating a task, search first: `gh issue list --search "keyword"` to avoid duplicates
-- Apply labels and a milestone when creating: `--label "evaluator" --milestone "v0.3"`
+- Apply labels and a milestone when creating: `--label "evaluator" --milestone "v0.5.0"`
 - Use `gh issue edit <number> --add-label "status:in-progress"` when starting a task — update the project Status field to **In Progress** as well
 - **Task state changes require no commit** — the project board is the source of truth, not files in the repo
 - **The main repo only gets a commit when actual code is written**
@@ -192,9 +192,9 @@ Spec documents, decision records, and RFCs live in `docs/`. Read them directly �
 
 ## Current Development Focus
 
-The language is at **v0.3** (generics complete). The next release is **v0.4**, which adds aspects and upgrades builtins.
+The language is at **v0.4.0** (aspects complete). The next release is **v0.5.0**.
 
-Check open tasks: `gh issue list --milestone "v0.4"`.
+Check open tasks: `gh issue list --milestone "v0.5.0"`.
 
 See [`docs/internal/versioning.md`](docs/internal/versioning.md) for the versioning model.
 

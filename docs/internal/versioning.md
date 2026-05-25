@@ -11,47 +11,25 @@ This document is the authority on version numbering, the RFC lifecycle, and docu
 
 ---
 
-## Language Version Numbering
+## Version Numbering
 
-Language versions follow `v<major>.<minor>`:
+All Moonlane releases — language spec and interpreter — share a single three-digit version number: `v<major>.<minor>.<patch>`.
 
-- **Minor bump** (`v0.1 → v0.2`): backward-compatible additions — new syntax, new builtins, or features incorporated from accepted RFCs.
-- **Major bump** (`v0.x → v1.0`, `v1.x → v2.0`): breaking changes to the syntax or semantics of existing programs.
+| Segment | When to increment | Examples |
+|---|---|---|
+| **major** | Breaking changes to existing programs | `v0.x → v1.0` |
+| **minor** | New language features; spec changes incorporated from accepted RFCs | `v0.4.0 → v0.5.0` |
+| **patch** | Interpreter-only changes — bug fixes, refactors, performance — with **no spec changes** | `v0.4.0 → v0.4.1` |
 
-No patch level exists for the language itself. Spec clarifications that do not change behaviour are committed to the living spec document and noted in the CHANGELOG without incrementing the version.
+**Rule:** `patch > 0` always means the spec is unchanged from the `.0` release of that minor version. A patch release never adds, removes, or alters any language-visible behaviour.
 
 ### Pre-1.0 era
 
-Versions before `v1.0` cover the period during which both the interpreter and the compiler are reaching production quality. The language is actively evolving; minor versions may introduce significant new capabilities (generics, traits, concurrency, the memory model). Breaking changes before `v1.0` are possible but must be explicitly called out in the CHANGELOG.
+Versions before `v1.0` cover the active development period. Minor versions may introduce significant new capabilities (generics, aspects, concurrency, the memory model). Breaking changes before `v1.0` are possible but must be called out explicitly in the CHANGELOG.
 
-The interpreter is the first backend to reach each language version. The compiler follows, targeting the same spec version. Both backends are permanent and supported — the interpreter is not a prototype to be discarded when the compiler exists. See `docs/internal/vision.md` for the full dual-mode commitment.
+### Historical note
 
----
-
-## Backend Version Numbering
-
-Both the interpreter and the compiler follow `v<major>.<minor>.<patch>`:
-
-- `major.minor` always matches the spec version the backend fully implements.
-- `patch` increments for bug fixes that do not change the implemented language.
-
-`interpreter v0.2.3` means: implements spec v0.2, third patch release.  
-`compiler v0.3.0` means: implements spec v0.3, first release.
-
-Backends are versioned independently — the interpreter may be at `v0.3.x` while the compiler is still at `v0.2.x` if it lags behind. The spec version is the shared reference point.
-
-### Backend milestone targets
-
-| Spec version | Interpreter | Compiler | Notes |
-|---|---|---|---|
-| v0.1 | shipped | — | Interpreter only; compiler not yet started |
-| v0.2 | target | — | Generics and traits |
-| v0.3 | target | — | Memory model (linear types, pointers, closure capture) |
-| v0.4 | target | target (v0.3 subset) | Concurrency; compiler begins targeting v0.3 |
-| v0.5 | target | target | Attributes, macros, derive; both backends in sync |
-| v1.0 | target | target | Both backends production-quality; first stable release |
-
-The compiler is not required to track the interpreter version-for-version before v1.0. It may lag by one minor version. At v1.0, both backends must implement the full spec.
+Versions v0.1 through v0.4 were tagged with two-digit identifiers (`v0.3`, `v0.4`) before this scheme was adopted. They are treated as equivalent to `v0.1.0`–`v0.4.0`. New releases use three digits.
 
 ---
 
@@ -61,13 +39,12 @@ The compiler is not required to track the interpreter version-for-version before
 
 ### Version tags
 
-When a spec version is released, git tags are applied:
+When a version is released, a single git tag is applied:
 
 | Tag | Meaning |
 |---|---|
-| `spec-vX.Y` | Spec snapshot at this version |
-| `interpreter-vX.Y.0` | First interpreter release for this spec version |
-| `compiler-vX.Y.0` | First compiler release for this spec version (when applicable) |
+| `vX.Y.0` | First release of spec version X.Y (spec + interpreter) |
+| `vX.Y.Z` (Z > 0) | Patch release — interpreter only, spec unchanged |
 
 **A tagged spec version is immutable.** If a spec error is discovered after tagging, it is documented as errata in the next version's CHANGELOG. Tags are never amended.
 
@@ -77,11 +54,9 @@ Spec sections are annotated to indicate which version introduced or changed a fe
 
 | Situation | Annotation |
 |---|---|
-| Feature added in a specific version | `> *Since vX.Y.*` |
-| Existing feature changed in a version | `> *Changed in vX.Y: description.*` |
-| Feature planned for a future version | `> **vX.Y feature.** description...` |
-
-The existing `> **v0.1:**` and `> **v0.2 feature.**` callouts in the spec conform to this convention.
+| Feature added in a specific version | `> *Since vX.Y.Z.*` |
+| Existing feature changed in a version | `> *Changed in vX.Y.Z: description.*` |
+| Feature planned for a future version | `> **vX.Y.Z feature.** description...` |
 
 ---
 
@@ -95,7 +70,7 @@ RFCs are the mechanism for proposing language changes. An RFC must be accepted a
 |---|---|
 | `draft` | Being written; not yet ready for review |
 | `under-review` | Ready for evaluation; set manually by the author |
-| `accepted` | Design decided; `target: vX.Y` assigned; implementation may begin |
+| `accepted` | Design decided; `target: vX.Y.0` assigned; implementation may begin |
 | `rejected` | Will not be implemented; reason recorded in `## Decision` |
 | `deferred` | Not rejected, but not scheduled for any version |
 | `incorporated` | Implemented and shipped in the target version |
@@ -111,14 +86,14 @@ status: draft          # one of the states above
 ---
 ```
 
-The target version is **not** stored in the RFC frontmatter. It lives in exactly one place: the GitHub issue milestone. The `## Decision` section records it in prose (`**Target:** vX.Y`) as a human-readable audit trail, but the milestone is the authoritative field.
+The target version is **not** stored in the RFC frontmatter. It lives in exactly one place: the GitHub issue milestone. The `## Decision` section records it in prose (`**Target:** vX.Y.0`) as a human-readable audit trail, but the milestone is the authoritative field.
 
 ### Acceptance process
 
 1. Author sets `status: under-review` when the RFC is ready for evaluation.
 2. Discussion happens in the linked GitHub issue.
 3. The project owner records the outcome in a `## Decision` section at the bottom of the RFC file.
-4. **If accepted**: set `status: accepted`, assign the RFC's GitHub issue to the target version milestone, and record `**Target:** vX.Y` in the `## Decision` section.
+4. **If accepted**: set `status: accepted`, assign the RFC's GitHub issue to the target version milestone, and record `**Target:** vX.Y.0` in the `## Decision` section.
 5. **If rejected or deferred**: set status accordingly; record the reason in `## Decision`.
 
 Once the RFC's target version ships (git tag applied), set `status: incorporated`.
@@ -129,7 +104,7 @@ Once the RFC's target version ships (git tag applied), set `status: incorporated
 ## Decision
 
 **Outcome:** Accepted / Rejected / Deferred  
-**Target:** vX.Y *(if accepted)*
+**Target:** vX.Y.0 *(if accepted)*
 
 Brief rationale — why this design was chosen (or not), what alternatives were considered, and any constraints that drove the decision.
 ```
@@ -140,16 +115,17 @@ Brief rationale — why this design was chosen (or not), what alternatives were 
 
 | Milestone type | Examples | Purpose |
 |---|---|---|
-| **Version** | `v0.2`, `v0.3`, `v1.0` | Release planning — what ships in which version |
-| **Epic** | `Epic 003 - Generics` | Implementation grouping — related issues within an area |
+| **Version** | `v0.4.0`, `v0.5.0`, `v1.0.0` | Release planning — what ships in which version |
 
-Implementation issues are assigned to the **version milestone** they target. Use label-based filtering (`--label "generics"`) for epic-level CLI queries — it works regardless of which milestone an issue is in.
+Implementation issues are assigned to the **version milestone** they target. Use label-based filtering (`--label "generics"`) for area-level CLI queries.
 
 ---
 
 ## Changelog
 
-Version entries live in `docs/public/changelog.md`. Each entry lists RFCs incorporated, features added, breaking changes (if any), and backend status (which backends implement the version).
+Version entries live in `docs/public/changelog.md`. Each entry lists RFCs incorporated, features added, breaking changes (if any), and whether it includes spec changes.
+
+Patch releases (`vX.Y.Z` with Z > 0) get a short entry listing only the interpreter changes — no spec section needed.
 
 ---
 

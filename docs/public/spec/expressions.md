@@ -154,8 +154,8 @@ for (let i in 0..10) { ... }    // 0, 1, ..., 9
 for (let i in 0..=10) { ... }   // 0, 1, ..., 10
 ```
 
-> **v0.1–v0.3:** Only `T[]` and `Range` are supported as iterables. User-defined
-> `Iterable<T>` implementations are a v0.4 feature.
+> **v0.1.0–v0.3.0:** Only `T[]` and `Range` are supported as iterables. User-defined
+> `Iterable<T>` implementations are a v0.4.0 feature.
 
 ### Loop
 

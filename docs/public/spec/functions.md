@@ -71,4 +71,4 @@ fun parse_and_double(s: String) -> Result<Int, String> {
 
 The inner expression's error type `E1` and the function's return error type `E2` must satisfy `E2: From<E1>`. When `E1 == E2` no conversion is performed. When they differ, `From::from` is called automatically on the error value before re-wrapping in `Err`.
 
-> **v0.1–v0.3:** Error types must match exactly (`E1 == E2`). `From`-based coercion between different error types is a v0.4 feature.
+> **v0.1.0–v0.3.0:** Error types must match exactly (`E1 == E2`). `From`-based coercion between different error types is a v0.4.0 feature.
