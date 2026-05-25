@@ -246,7 +246,7 @@ Gate raw memory operations behind an `unsafe` boundary, as in Rust. Rejected as 
 
 ## Timing Recommendation
 
-Linear types depend on generics (v0.2, RFC-0024 needs `fun<T: Linear>`). Target **v0.3** after generics and aspects are stable. The `@T` read reference form is syntactically resolved (see Conflict 1 in the cluster report — D1 decided). The `@` sigil is distinct from `&` (RFC-0001 address-of).
+Linear types depend on generics (v0.2, RFC-0024 needs `fun<T: Linear>`). Target **v0.4+** after generics and aspects are stable. The `@T` read reference form is syntactically resolved (see Conflict 1 in the cluster report — D1 decided). The `@` sigil is distinct from `&` (RFC-0001 address-of).
 
 ---
 

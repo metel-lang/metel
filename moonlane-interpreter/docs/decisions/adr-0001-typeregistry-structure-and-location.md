@@ -23,7 +23,7 @@ Constraints:
   so the structure only needs to handle monomorphic types for now.
 - v0.3 will need to instantiate generic types at use sites — the structure
   should not require a full rewrite to support that.
-- v0.3 will need to store aspect implementations per type — should be addable
+- v0.4 will need to store aspect implementations per type — should be addable
   without restructuring the registry.
 
 ## Options Considered — Structure
@@ -68,7 +68,7 @@ pre-pass. Callers ask by name and get back a typed result or a located error.
 - v0.3 (generics) path is clear: change `Vec<(String, InferType)>` to
   `Vec<(String, TypeScheme)>` and make `field_type` instantiate with fresh vars;
   the method signature stays the same
-- v0.3 (aspects) path is clear: add `impls: Vec<ImplInfo>` to `StructInfo`/`EnumInfo`
+- v0.4 (aspects) path is clear: add `impls: Vec<ImplInfo>` to `StructInfo`/`EnumInfo`
   or keep a parallel `ImplTable` — either fits without restructuring
 
 **Cons:**
@@ -182,7 +182,7 @@ The two choices reflect a consistent design philosophy: the pre-pass produces fu
 - `InferContext::new` signature changes to accept a `TypeRegistry`
 - The registry is read-only for the entire inference walk — no mutations after construction
 - v0.3 (generics): extend `StructInfo`/`EnumInfo` field types from `InferType` to `TypeScheme`; `field_type` gains instantiation logic; call sites unchanged
-- v0.3 (aspects): add `impls` to `StructInfo`/`EnumInfo` or a parallel `ImplTable`; registry structure accommodates either without restructuring
+- v0.4 (aspects): add `impls` to `StructInfo`/`EnumInfo` or a parallel `ImplTable`; registry structure accommodates either without restructuring
 
 ## References
 
