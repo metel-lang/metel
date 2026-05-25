@@ -176,6 +176,29 @@ fn infer_block(
     fun_generalizations: &mut Vec<FunGeneralization>,
 ) -> Result<InferType, MoonlaneError> {
     ctx.push_scope();
+    ctx.push_struct_scope();
+    // Hoist struct/enum declarations defined in this block before inferring any stmt,
+    // so they can be referenced anywhere within the block regardless of order.
+    for decl in &block.stmts {
+        match decl {
+            Decl::Struct(sd) => {
+                let fields = sd.fields.iter()
+                    .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann)))
+                    .collect();
+                ctx.register_struct_fields(sd.name.clone(), fields);
+            }
+            Decl::Enum(ed) => {
+                let variants = ed.variants.iter().map(|v| VariantInfo {
+                    name: v.name.clone(),
+                    fields: v.fields.iter()
+                        .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann)))
+                        .collect(),
+                }).collect();
+                ctx.register_enum(ed.name.clone(), EnumInfo { type_params: vec![], variants });
+            }
+            _ => {}
+        }
+    }
     hoist_fun_decls(&block.stmts, ctx);
     let mut last_stmt_ty = InferType::unit();
     for stmt in &block.stmts {
@@ -185,6 +208,7 @@ fn infer_block(
         Some(tail) => infer_expr(tail, ctx, fun_generalizations)?,
         None       => last_stmt_ty,
     };
+    ctx.pop_struct_scope();
     ctx.pop_scope();
     Ok(ty)
 }

@@ -12,14 +12,14 @@ use super::conversions::{infer_type_to_type, resolved_to_type, type_expr_to_infe
 /// Scope-aware context for Pass 2. Mirrors InferContext's scope management but
 /// holds concrete `Type` values; no constraint emission.
 struct ConstructCtx<'a> {
-    subst:      &'a Substitution,
-    scheme_env: &'a SchemeEnv,
-    env:        Vec<HashMap<String, Type>>,
-    struct_env: HashMap<String, Vec<(String, Type)>>,
-    method_env: HashMap<String, HashMap<String, Type>>,
-    enum_env:   &'a HashMap<String, EnumInfo>,
+    subst:        &'a Substitution,
+    scheme_env:   &'a SchemeEnv,
+    env:          Vec<HashMap<String, Type>>,
+    struct_scopes: Vec<HashMap<String, Vec<(String, Type)>>>,
+    method_env:   HashMap<String, HashMap<String, Type>>,
+    enum_env:     &'a HashMap<String, EnumInfo>,
     /// Shared generator continued from Pass 1; keeps TypeVar identities globally unique.
-    gen:        TypeVarGenerator,
+    gen:          TypeVarGenerator,
     /// Return type of the innermost enclosing function (None = unit / unknown).
     current_return_ty: Option<Type>,
     /// Break value type of the innermost enclosing `loop` (None = no loop or bare break).
@@ -38,7 +38,8 @@ impl<'a> ConstructCtx<'a> {
         let mut ctx = Self {
             subst, scheme_env,
             env: vec![HashMap::new()],
-            struct_env, method_env, enum_env, gen,
+            struct_scopes: vec![struct_env],  // global scope pre-pushed
+            method_env, enum_env, gen,
             current_return_ty: None,
             current_break_ty:  None,
         };
@@ -67,6 +68,17 @@ impl<'a> ConstructCtx<'a> {
 
     fn push_scope(&mut self) { self.env.push(HashMap::new()); }
     fn pop_scope(&mut self)  { self.env.pop(); }
+
+    fn push_struct_scope(&mut self) { self.struct_scopes.push(HashMap::new()); }
+    fn pop_struct_scope(&mut self)  { self.struct_scopes.pop(); }
+
+    fn register_local_struct(&mut self, name: String, fields: Vec<(String, Type)>) {
+        self.struct_scopes.last_mut().unwrap().insert(name, fields);
+    }
+
+    fn get_struct_fields(&self, name: &str) -> Option<&Vec<(String, Type)>> {
+        self.struct_scopes.iter().rev().find_map(|s| s.get(name))
+    }
 
     fn bind(&mut self, name: impl Into<String>, ty: Type) {
         self.env.last_mut().unwrap().insert(name.into(), ty);
@@ -265,6 +277,21 @@ fn construct_block(
     ctx: &mut ConstructCtx,
 ) -> Result<TypedBlock, MoonlaneError> {
     ctx.push_scope();
+    ctx.push_struct_scope();
+    // Hoist struct/enum declarations defined in this block so they are available
+    // for any expression in the block regardless of declaration order.
+    for decl in &block.stmts {
+        if let Decl::Struct(sd) = decl {
+            let dummy = &sd.span;
+            let fields = sd.fields.iter()
+                .map(|f| {
+                    let ty = resolved_to_type(&type_expr_to_infer(&f.type_ann), ctx.subst, dummy)?;
+                    Ok((f.name.clone(), ty))
+                })
+                .collect::<Result<_, MoonlaneError>>()?;
+            ctx.register_local_struct(sd.name.clone(), fields);
+        }
+    }
     let mut stmts = vec![];
     for stmt in &block.stmts {
         stmts.push(construct_decl(stmt, ctx)?);
@@ -273,6 +300,7 @@ fn construct_block(
         Some(e) => Some(Box::new(construct_expr(e, expected_tail_ty, ctx)?)),
         None    => None,
     };
+    ctx.pop_struct_scope();
     ctx.pop_scope();
     Ok(TypedBlock { stmts, tail, span: block.span.clone() })
 }
@@ -451,7 +479,7 @@ fn construct_expr(
                     format!("field access on non-struct type {t}")
                 )),
             };
-            let field_ty = ctx.struct_env.get(&struct_name)
+            let field_ty = ctx.get_struct_fields(&struct_name)
                 .and_then(|fs| fs.iter().find(|(n, _)| n == field))
                 .map(|(_, ty)| ty.clone())
                 .ok_or_else(|| MoonlaneError::internal(
