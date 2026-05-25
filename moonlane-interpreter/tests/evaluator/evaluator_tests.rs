@@ -238,6 +238,9 @@ mod tests {
     #[test]
     fn braceless_if() { check("47_braceless_if.mln"); }
 
+    #[test]
+    fn generics() { check("48_generics.mln"); }
+
     // ── Integration tests ─────────────────────────────────────────────────────
 
     #[test]

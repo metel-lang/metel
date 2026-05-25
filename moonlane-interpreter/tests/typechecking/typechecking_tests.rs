@@ -504,6 +504,13 @@ mod tests {
         check_file(&format!("{}/stage9_neg_01_local_struct_not_exported.mln", test_dir()));
     }
 
+    // ── Stage 10: generics ────────────────────────────────────────────────────
+
+    #[test]
+    fn stage10_generic_function() {
+        check_file(&format!("{}/stage10_01_generic_function.mln", test_dir()));
+    }
+
     // ── Known-limitation tests ─────────────────────────────────────────────────
 
     #[test]

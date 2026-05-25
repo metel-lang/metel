@@ -27,6 +27,7 @@ fn snapshot_stack() -> Vec<FrameInfo> {
 fn attach_stack(err: MoonlaneError) -> MoonlaneError {
     err.with_stack(snapshot_stack())
 }
+use crate::ast::{Block, Decl, Expr, LetDecl, MutDecl, Stmt};
 use crate::typed_ast::{FunBody, TypedBlock, TypedDecl, TypedExpr, TypedForInit, TypedProgram, TypedStmt};
 
 // ── Runtime values ────────────────────────────────────────────────────────────
@@ -52,11 +53,20 @@ pub enum Value {
     MutPointer(Rc<RefCell<Value>>),
 }
 
+/// The body of a closure — either a fully type-checked block (monomorphic) or the
+/// original untyped block (generic / let-polymorphic). The evaluator dispatches on
+/// this to choose between `eval_block` and `eval_untyped_block`.
+#[derive(Debug, Clone)]
+pub enum ClosureBody {
+    Typed(TypedBlock),
+    Untyped(Block),
+}
+
 #[derive(Debug, Clone)]
 pub struct ClosureValue {
     pub name:     Option<String>,
     pub params:   Vec<Param>,
-    pub body:     TypedBlock,
+    pub body:     ClosureBody,
     pub captured: Environment,
 }
 
@@ -201,8 +211,8 @@ pub fn evaluate(program: TypedProgram) -> Result<(), MoonlaneError> {
         match decl {
             TypedDecl::Fun(f) => {
                 let body = match &f.body {
-                    FunBody::Typed(b) => b.clone(),
-                    FunBody::Generic(_) => continue, // called in v0.1 → internal error at call site
+                    FunBody::Typed(b) => ClosureBody::Typed(b.clone()),
+                    FunBody::Generic(b) => ClosureBody::Untyped(b.clone()),
                 };
                 let captured = env.clone();
                 env.set(&f.name, Value::Closure(Rc::new(ClosureValue {
@@ -216,8 +226,8 @@ pub fn evaluate(program: TypedProgram) -> Result<(), MoonlaneError> {
                 if let crate::ast::TypeExpr::Named(type_name, _) = &impl_block.target_type {
                     for method in &impl_block.methods {
                         let body = match &method.body {
-                            FunBody::Typed(b) => b.clone(),
-                            FunBody::Generic(_) => continue,
+                            FunBody::Typed(b) => ClosureBody::Typed(b.clone()),
+                            FunBody::Generic(b) => ClosureBody::Untyped(b.clone()),
                         };
                         let key = format!("{}::{}", type_name, method.name);
                         let captured = env.clone();
@@ -243,17 +253,23 @@ pub fn evaluate(program: TypedProgram) -> Result<(), MoonlaneError> {
 
     // Call main() by executing its body directly in the full env so that any
     // top-level let/mut bindings from Pass 2 are visible.
+    // Call main() by executing its body in the full top-level env so that any
+    // top-level let/mut bindings from Pass 2 are visible.
     let dummy = Span { start: 0, end: 0, filename: "<program>".to_string(), line: 0, col: 0 };
     let main_body = match env.get("main") {
         Some(Value::Closure(rc)) => rc.body.clone(),
         Some(Value::Unit) =>
-            return Err(MoonlaneError::panic(RuntimeErrorCode::R0002, "main() is generic — not supported in v0.1", &dummy)),
+            return Err(MoonlaneError::panic(RuntimeErrorCode::R0002, "main() is generic — not supported", &dummy)),
         Some(_) =>
             return Err(MoonlaneError::panic(RuntimeErrorCode::R0002, "`main` is not a function", &dummy)),
         None =>
             return Err(MoonlaneError::panic(RuntimeErrorCode::R0001, "no main() function defined", &dummy)),
     };
-    match eval_block(&main_body, &mut env)? {
+    let main_sig = match &main_body {
+        ClosureBody::Typed(b)   => eval_block(b, &mut env),
+        ClosureBody::Untyped(b) => eval_untyped_block(b, &mut env),
+    };
+    match main_sig? {
         Signal::Value(_) | Signal::Return(_) => Ok(()),
         other => Err(MoonlaneError::internal(
             format!("unexpected signal from main(): {other:?}"),
@@ -302,10 +318,8 @@ fn eval_decl(decl: &TypedDecl, env: &mut Environment) -> Result<Signal, Moonlane
         }
         TypedDecl::Fun(f) => {
             let body = match &f.body {
-                FunBody::Typed(b) => b.clone(),
-                FunBody::Generic(_) => return Err(MoonlaneError::not_implemented(
-                    "generic functions are not supported in v0.1",
-                )),
+                FunBody::Typed(b) => ClosureBody::Typed(b.clone()),
+                FunBody::Generic(b) => ClosureBody::Untyped(b.clone()),
             };
             // Define a placeholder first so the closure can see itself via shared Rc
             // (enables self-recursion for functions defined inside other functions).
@@ -464,6 +478,509 @@ fn range_field(fields: &HashMap<String, Value>, name: &str, _span: &Span) -> Res
     match fields.get(name) {
         Some(Value::Int(n)) => Ok(*n),
         _ => Err(MoonlaneError::internal(format!("range: missing or non-Int field `{name}`"))),
+    }
+}
+
+// ── Untyped evaluation (for generic / let-polymorphic closures) ───────────────
+//
+// These functions mirror eval_block / eval_decl / eval_stmt / eval_expr but operate
+// on the untyped AST (`ast::Block`, `ast::Decl`, etc.).  Type annotations are absent
+// or ignored; all dispatch is on the runtime `Value` kind.
+
+fn eval_untyped_block(block: &Block, env: &mut Environment) -> Result<Signal, MoonlaneError> {
+    env.push_scope();
+    for decl in &block.stmts {
+        let sig = eval_untyped_decl(decl, env)?;
+        match sig {
+            Signal::Value(_) => {}
+            other => {
+                env.pop_scope();
+                return Ok(other);
+            }
+        }
+    }
+    let result = match &block.tail {
+        Some(tail) => eval_untyped_expr(tail, env),
+        None       => Ok(Signal::Value(Value::Unit)),
+    };
+    env.pop_scope();
+    result
+}
+
+fn eval_untyped_decl(decl: &Decl, env: &mut Environment) -> Result<Signal, MoonlaneError> {
+    match decl {
+        Decl::Let(d) => {
+            match eval_untyped_expr(&d.value, env)? {
+                Signal::Value(val) => { env.define(&d.name, val); Ok(Signal::Value(Value::Unit)) }
+                other => Ok(other),
+            }
+        }
+        Decl::Mut(d) => {
+            match eval_untyped_expr(&d.value, env)? {
+                Signal::Value(val) => { env.define(&d.name, val); Ok(Signal::Value(Value::Unit)) }
+                other => Ok(other),
+            }
+        }
+        Decl::Fun(f) => {
+            let body = ClosureBody::Untyped(f.body.clone());
+            env.define(&f.name, Value::Unit);
+            let captured = env.clone();
+            let closure = Value::Closure(Rc::new(ClosureValue {
+                name:     Some(f.name.clone()),
+                params:   f.params.clone(),
+                body,
+                captured,
+            }));
+            env.set(&f.name, closure);
+            Ok(Signal::Value(Value::Unit))
+        }
+        Decl::Struct(_) | Decl::Enum(_) | Decl::Impl(_) | Decl::Trait(_) => {
+            Ok(Signal::Value(Value::Unit))
+        }
+        Decl::Stmt(stmt) => eval_untyped_stmt(stmt, env),
+    }
+}
+
+fn eval_untyped_stmt(stmt: &Stmt, env: &mut Environment) -> Result<Signal, MoonlaneError> {
+    use crate::ast::{ForInit, Stmt};
+    match stmt {
+        Stmt::Expr(e) => {
+            match eval_untyped_expr(e, env)? {
+                Signal::Value(_) => Ok(Signal::Value(Value::Unit)),
+                other            => Ok(other),
+            }
+        }
+        Stmt::Return(r) => {
+            let val = match &r.value {
+                Some(e) => eval_untyped_expr(e, env)?.into_value(),
+                None    => Value::Unit,
+            };
+            Ok(Signal::Return(val))
+        }
+        Stmt::Break(b) => {
+            let val = match &b.value {
+                Some(e) => eval_untyped_expr(e, env)?.into_value(),
+                None    => Value::Unit,
+            };
+            Ok(Signal::Break(val))
+        }
+        Stmt::Continue(_) => Ok(Signal::Continue),
+
+        Stmt::While(w) => {
+            loop {
+                match eval_untyped_expr(&w.condition, env)? {
+                    Signal::Value(Value::Bool(false)) => break,
+                    Signal::Value(Value::Bool(true))  => {}
+                    Signal::Value(_) => return Err(MoonlaneError::internal("while: expected Bool condition")),
+                    other => return Ok(other),
+                }
+                match eval_untyped_block(&w.body, env)? {
+                    Signal::Value(_) | Signal::Continue => {}
+                    Signal::Break(_)        => break,
+                    Signal::Return(v)       => return Ok(Signal::Return(v)),
+                    Signal::PropagateErr(v) => return Ok(Signal::PropagateErr(v)),
+                }
+            }
+            Ok(Signal::Value(Value::Unit))
+        }
+
+        Stmt::For(f) => {
+            env.push_scope();
+            if let Some(init) = &f.init {
+                match init {
+                    ForInit::Mut(d) => {
+                        let val = eval_untyped_expr(&d.value, env)?.into_value();
+                        env.define(&d.name, val);
+                    }
+                    ForInit::Expr(e) => { eval_untyped_expr(e, env)?; }
+                }
+            }
+            let result = loop {
+                if let Some(cond) = &f.condition {
+                    match eval_untyped_expr(cond, env)? {
+                        Signal::Value(Value::Bool(false)) => break Ok(Signal::Value(Value::Unit)),
+                        Signal::Value(Value::Bool(true))  => {}
+                        Signal::Value(_) => break Err(MoonlaneError::internal("for: expected Bool condition")),
+                        other => break Ok(other),
+                    }
+                }
+                match eval_untyped_block(&f.body, env)? {
+                    Signal::Value(_) | Signal::Continue => {}
+                    Signal::Break(_)        => break Ok(Signal::Value(Value::Unit)),
+                    Signal::Return(v)       => break Ok(Signal::Return(v)),
+                    Signal::PropagateErr(v) => break Ok(Signal::PropagateErr(v)),
+                }
+                if let Some(step) = &f.step {
+                    eval_untyped_expr(step, env)?;
+                }
+            };
+            env.pop_scope();
+            result
+        }
+
+        Stmt::ForIn(fi) => {
+            let iterable = eval_untyped_expr(&fi.iterable, env)?.into_value();
+            let items: Vec<Value> = match iterable {
+                Value::Array(ref rc) => rc.borrow().clone(),
+                Value::Struct { ref name, ref fields } if name == "Range" => {
+                    let s = range_field(fields, "start", &fi.span)?;
+                    let e = range_field(fields, "end",   &fi.span)?;
+                    (s..e).map(Value::Int).collect()
+                }
+                Value::Struct { ref name, ref fields } if name == "RangeInclusive" => {
+                    let s = range_field(fields, "start", &fi.span)?;
+                    let e = range_field(fields, "end",   &fi.span)?;
+                    (s..=e).map(Value::Int).collect()
+                }
+                _ => return Err(MoonlaneError::panic(RuntimeErrorCode::R0011, "for-in: expected Array or Range", &fi.span)),
+            };
+            for item in items {
+                env.push_scope();
+                env.define(&fi.binding, item);
+                let sig = eval_untyped_block(&fi.body, env)?;
+                env.pop_scope();
+                match sig {
+                    Signal::Value(_) | Signal::Continue => {}
+                    Signal::Break(_)        => break,
+                    Signal::Return(v)       => return Ok(Signal::Return(v)),
+                    Signal::PropagateErr(v) => return Ok(Signal::PropagateErr(v)),
+                }
+            }
+            Ok(Signal::Value(Value::Unit))
+        }
+    }
+}
+
+fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, MoonlaneError> {
+    use crate::ast::{AssignOp, AssignTarget, Expr};
+    match expr {
+        Expr::Literal(lit, _) => {
+            let val = match lit {
+                Literal::Int(n)   => Value::Int(*n),
+                Literal::Float(f) => Value::Float(*f),
+                Literal::Bool(b)  => Value::Bool(*b),
+                Literal::Str(s)   => Value::Str(s.clone()),
+                Literal::Nope     => Value::Perhaps(None),
+                Literal::Unit     => Value::Unit,
+            };
+            Ok(Signal::Value(val))
+        }
+
+        Expr::Ident(name, span) => {
+            match env.get(name) {
+                Some(val) => Ok(Signal::Value(val)),
+                None => Err(MoonlaneError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span)),
+            }
+        }
+
+        Expr::Path(segments, _) => {
+            if segments.len() == 1 {
+                let name = &segments[0];
+                let span = expr.span();
+                match env.get(name) {
+                    Some(val) => Ok(Signal::Value(val)),
+                    None => Err(MoonlaneError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span)),
+                }
+            } else {
+                let name    = segments[segments.len() - 2].clone();
+                let variant = segments[segments.len() - 1].clone();
+                Ok(Signal::Value(Value::Enum { name, variant, fields: HashMap::new() }))
+            }
+        }
+
+        Expr::Tuple(elems, _) => {
+            let vals = elems.iter()
+                .map(|e| eval_untyped_expr(e, env).map(Signal::into_value))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(Signal::Value(Value::Tuple(vals)))
+        }
+
+        Expr::Array(elems, _) => {
+            let vals = elems.iter()
+                .map(|e| eval_untyped_expr(e, env).map(Signal::into_value))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(Signal::Value(Value::Array(Rc::new(RefCell::new(vals)))))
+        }
+
+        Expr::BinOp(lhs, op, rhs, span) => {
+            if matches!(op, BinOp::And) {
+                let l = eval_untyped_expr(lhs, env)?.into_value();
+                return match l {
+                    Value::Bool(false) => Ok(Signal::Value(Value::Bool(false))),
+                    Value::Bool(true)  => eval_untyped_expr(rhs, env),
+                    _ => Err(MoonlaneError::internal("&&: expected Bool")),
+                };
+            }
+            if matches!(op, BinOp::Or) {
+                let l = eval_untyped_expr(lhs, env)?.into_value();
+                return match l {
+                    Value::Bool(true)  => Ok(Signal::Value(Value::Bool(true))),
+                    Value::Bool(false) => eval_untyped_expr(rhs, env),
+                    _ => Err(MoonlaneError::internal("||: expected Bool")),
+                };
+            }
+            let lv = eval_untyped_expr(lhs, env)?.into_value();
+            let rv = eval_untyped_expr(rhs, env)?.into_value();
+            eval_binop(op, lv, rv, span)
+        }
+
+        Expr::UnaryOp(op, operand, _) => {
+            let v = eval_untyped_expr(operand, env)?.into_value();
+            let result = match (op, v) {
+                (UnaryOp::Neg, Value::Int(n))   => Value::Int(-n),
+                (UnaryOp::Neg, Value::Float(f)) => Value::Float(-f),
+                (UnaryOp::Not, Value::Bool(b))  => Value::Bool(!b),
+                (UnaryOp::Neg, _) => return Err(MoonlaneError::internal("unary `-`: expected Int or Float")),
+                (UnaryOp::Not, _) => return Err(MoonlaneError::internal("unary `!`: expected Bool")),
+            };
+            Ok(Signal::Value(result))
+        }
+
+        Expr::Cast { expr: inner, target_type, .. } => {
+            let v = eval_untyped_expr(inner, env)?.into_value();
+            let result = match (&v, target_type) {
+                (Value::Int(n), crate::ast::TypeExpr::Named(t, _)) if t == "Float" => Value::Float(*n as f64),
+                (Value::Int(_),   crate::ast::TypeExpr::Named(t, _)) if t == "Int"   => v,
+                (Value::Float(_), crate::ast::TypeExpr::Named(t, _)) if t == "Float" => v,
+                _ => return Err(MoonlaneError::internal("cast: unsupported coercion")),
+            };
+            Ok(Signal::Value(result))
+        }
+
+        Expr::Ascribe { expr: inner, .. } => eval_untyped_expr(inner, env),
+
+        Expr::TupleAccess { object, index, span } => {
+            let v = eval_untyped_expr(object, env)?.into_value();
+            match v {
+                Value::Tuple(elems) => elems.into_iter().nth(*index).map(Signal::Value).ok_or_else(|| {
+                    MoonlaneError::panic(RuntimeErrorCode::R0005, format!("tuple index {index} out of bounds"), span)
+                }),
+                _ => Err(MoonlaneError::internal("tuple access on non-tuple")),
+            }
+        }
+
+        Expr::Index { object, index, span } => {
+            let arr = eval_untyped_expr(object, env)?.into_value();
+            let idx = eval_untyped_expr(index, env)?.into_value();
+            match (arr, idx) {
+                (Value::Array(rc), Value::Int(i)) => {
+                    let borrowed = rc.borrow();
+                    let len = borrowed.len() as i64;
+                    if i < 0 || i >= len {
+                        Err(MoonlaneError::panic(RuntimeErrorCode::R0004, format!("index {i} out of bounds (len {len})"), span))
+                    } else {
+                        Ok(Signal::Value(borrowed[i as usize].clone()))
+                    }
+                }
+                _ => Err(MoonlaneError::internal("index: expected Array[Int]")),
+            }
+        }
+
+        Expr::If { condition, then_branch, else_branch, .. } => {
+            match eval_untyped_expr(condition, env)? {
+                Signal::Value(Value::Bool(true))  => eval_untyped_block(then_branch, env),
+                Signal::Value(Value::Bool(false)) => match else_branch {
+                    Some(branch) => eval_untyped_block(branch, env),
+                    None         => Ok(Signal::Value(Value::Unit)),
+                },
+                Signal::Value(_) => Err(MoonlaneError::internal("if: expected Bool condition")),
+                other => Ok(other),
+            }
+        }
+
+        Expr::Loop { body, .. } => {
+            loop {
+                match eval_untyped_block(body, env)? {
+                    Signal::Value(_) | Signal::Continue => {}
+                    Signal::Break(val)      => return Ok(Signal::Value(val)),
+                    Signal::Return(v)       => return Ok(Signal::Return(v)),
+                    Signal::PropagateErr(v) => return Ok(Signal::PropagateErr(v)),
+                }
+            }
+        }
+
+        Expr::Match(m) => {
+            let scrutinee = eval_untyped_expr(&m.scrutinee, env)?.into_value();
+            for arm in &m.arms {
+                let mut bindings = HashMap::new();
+                if !match_pattern(&arm.pattern, &scrutinee, &mut bindings) { continue; }
+                if let Some(guard) = &arm.guard {
+                    env.push_scope();
+                    for (k, v) in &bindings { env.define(k, v.clone()); }
+                    let guard_val = eval_untyped_expr(guard, env)?.into_value();
+                    env.pop_scope();
+                    match guard_val {
+                        Value::Bool(true)  => {}
+                        Value::Bool(false) => continue,
+                        _ => return Err(MoonlaneError::internal("match guard: expected Bool")),
+                    }
+                }
+                env.push_scope();
+                for (k, v) in bindings { env.define(&k, v); }
+                let result = eval_untyped_block(&arm.body, env);
+                env.pop_scope();
+                return result;
+            }
+            Err(MoonlaneError::panic(RuntimeErrorCode::R0006, "match: no arm matched scrutinee", &m.span))
+        }
+
+        Expr::Assign { target, op, value, span } => {
+            let rhs = eval_untyped_expr(value, env)?.into_value();
+            match target {
+                AssignTarget::Ident(name, _) => {
+                    let new_val = if matches!(op, AssignOp::Assign) {
+                        rhs
+                    } else {
+                        let cur = env.get(name).ok_or_else(|| {
+                            MoonlaneError::panic(RuntimeErrorCode::R0003, format!("assign: undefined `{name}`"), span)
+                        })?;
+                        apply_assign_op(op, cur, rhs, span)?
+                    };
+                    if !env.set(name, new_val) {
+                        return Err(MoonlaneError::panic(RuntimeErrorCode::R0003, format!("assign: undefined `{name}`"), span));
+                    }
+                    Ok(Signal::Value(Value::Unit))
+                }
+                AssignTarget::Index { object, index, span: tspan } => {
+                    let i = eval_untyped_index(index, env, tspan)?;
+                    let arr_val = eval_untyped_lvalue_value(object, env, tspan)?;
+                    match arr_val {
+                        Value::Array(rc) => {
+                            let len = rc.borrow().len() as i64;
+                            if i < 0 || i >= len {
+                                return Err(MoonlaneError::panic(RuntimeErrorCode::R0004, format!("index {i} out of bounds (len {len})"), span));
+                            }
+                            let new_val = if matches!(op, AssignOp::Assign) {
+                                rhs
+                            } else {
+                                let cur = rc.borrow()[i as usize].clone();
+                                apply_assign_op(op, cur, rhs, span)?
+                            };
+                            rc.borrow_mut()[i as usize] = new_val;
+                            Ok(Signal::Value(Value::Unit))
+                        }
+                        _ => Err(MoonlaneError::internal("index assign: receiver is not an Array")),
+                    }
+                }
+                AssignTarget::FieldAccess { object, field, span: tspan } => {
+                    let (root, path) = extract_lvalue_path(object, tspan)?;
+                    let rc = env.get_rc(root).ok_or_else(|| {
+                        MoonlaneError::panic(RuntimeErrorCode::R0003, format!("assign: `{root}` not found"), tspan)
+                    })?;
+                    let mut borrowed = rc.borrow_mut();
+                    let mut cur: &mut Value = &mut *borrowed;
+                    for segment in &path {
+                        cur = match cur {
+                            Value::Struct { fields, .. } | Value::Enum { fields, .. } => {
+                                fields.get_mut(*segment).ok_or_else(|| {
+                                    MoonlaneError::panic(RuntimeErrorCode::R0008, format!("field assign: no field `{segment}`"), tspan)
+                                })?
+                            }
+                            _ => return Err(MoonlaneError::internal(format!("field assign: `{segment}` is not a struct/enum"))),
+                        };
+                    }
+                    let fields = match cur {
+                        Value::Struct { fields, .. } | Value::Enum { fields, .. } => fields,
+                        _ => return Err(MoonlaneError::internal("field assign: receiver is not a struct/enum")),
+                    };
+                    let new_val = if matches!(op, AssignOp::Assign) {
+                        rhs
+                    } else {
+                        let cur = fields.get(field).cloned().ok_or_else(|| {
+                            MoonlaneError::panic(RuntimeErrorCode::R0008, format!("field assign: no field `{field}`"), tspan)
+                        })?;
+                        apply_assign_op(op, cur, rhs, span)?
+                    };
+                    fields.insert(field.clone(), new_val);
+                    Ok(Signal::Value(Value::Unit))
+                }
+            }
+        }
+
+        Expr::StructLiteral { path, fields, span: _ } => {
+            let mut field_vals: HashMap<String, Value> = HashMap::new();
+            for (name, expr) in fields {
+                field_vals.insert(name.clone(), eval_untyped_expr(expr, env)?.into_value());
+            }
+            if path.len() == 2 {
+                Ok(Signal::Value(Value::Enum { name: path[0].clone(), variant: path[1].clone(), fields: field_vals }))
+            } else {
+                let name = path.last().ok_or_else(|| MoonlaneError::internal("struct literal: empty path"))?.clone();
+                Ok(Signal::Value(Value::Struct { name, fields: field_vals }))
+            }
+        }
+
+        Expr::FieldAccess { object, field, span } => {
+            let val = eval_untyped_expr(object, env)?.into_value();
+            let fields = match &val {
+                Value::Struct { fields, .. } | Value::Enum { fields, .. } => fields,
+                _ => return Err(MoonlaneError::internal("field access on non-struct/enum")),
+            };
+            fields.get(field).cloned().map(Signal::Value).ok_or_else(|| {
+                MoonlaneError::panic(RuntimeErrorCode::R0008, format!("no field `{field}` on value"), span)
+            })
+        }
+
+        Expr::MethodCall { receiver, method, args, span } => {
+            let recv_val = eval_untyped_expr(receiver, env)?.into_value();
+            let arg_vals: Vec<Value> = args.iter()
+                .map(|a| eval_untyped_expr(a, env).map(Signal::into_value))
+                .collect::<Result<_, _>>()?;
+            if let (Value::Str(s), "len") = (&recv_val, method.as_str()) {
+                return Ok(Signal::Value(Value::Int(s.chars().count() as i64)));
+            }
+            let type_name = match &recv_val {
+                Value::Struct { name, .. } | Value::Enum { name, .. } => name.clone(),
+                _ => return Err(MoonlaneError::panic(RuntimeErrorCode::R0009, format!("method `{method}` not found on this value"), span)),
+            };
+            let key = format!("{type_name}::{method}");
+            let func = env.get(&key).ok_or_else(|| {
+                MoonlaneError::panic(RuntimeErrorCode::R0009, format!("no method `{method}` on `{type_name}`"), span)
+            })?;
+            let mut all_args = vec![recv_val];
+            all_args.extend(arg_vals);
+            call_function(func, all_args, span)
+        }
+
+        Expr::Call { callee, args, span } => {
+            let func_val = eval_untyped_expr(callee, env)?.into_value();
+            let arg_vals: Vec<Value> = args.iter()
+                .map(|a| eval_untyped_expr(a, env).map(Signal::into_value))
+                .collect::<Result<_, _>>()?;
+            call_function(func_val, arg_vals, span)
+        }
+
+        Expr::Closure { params, body, .. } => {
+            let captured = env.clone();
+            Ok(Signal::Value(Value::Closure(Rc::new(ClosureValue {
+                name:     None,
+                params:   params.clone(),
+                body:     ClosureBody::Untyped(body.clone()),
+                captured,
+            }))))
+        }
+
+        Expr::PropagateError { expr, span } => {
+            let val = eval_untyped_expr(expr, env)?.into_value();
+            match val {
+                Value::YoloResult(Ok(v))  => Ok(Signal::Value(*v)),
+                Value::YoloResult(Err(e)) => Ok(Signal::PropagateErr(*e)),
+                Value::Enum { ref name, ref variant, ref fields } if name == "Result" => {
+                    match variant.as_str() {
+                        "Ok" => {
+                            let v = fields.get("value").cloned().ok_or_else(|| MoonlaneError::internal("Result::Ok: missing `value` field"))?;
+                            Ok(Signal::Value(v))
+                        }
+                        "Err" => {
+                            let e = fields.get("error").cloned().ok_or_else(|| MoonlaneError::internal("Result::Err: missing `error` field"))?;
+                            Ok(Signal::PropagateErr(e))
+                        }
+                        v => Err(MoonlaneError::internal(format!("?: unknown Result variant `{v}`"))),
+                    }
+                }
+                _ => Err(MoonlaneError::panic(RuntimeErrorCode::R0012, "?: expected a Result value", span)),
+            }
+        }
     }
 }
 
@@ -842,7 +1359,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
             Ok(Signal::Value(Value::Closure(Rc::new(ClosureValue {
                 name:     None,
                 params:   params.clone(),
-                body:     body.clone(),
+                body:     ClosureBody::Typed(body.clone()),
                 captured,
             }))))
         }
@@ -947,7 +1464,10 @@ fn call_function(func: Value, args: Vec<Value>, span: &Span) -> Result<Signal, M
             for (param, val) in closure.params.iter().zip(args.iter()) {
                 call_env.define(&param.name, val.clone());
             }
-            let result = eval_block(&closure.body, &mut call_env);
+            let result = match &closure.body {
+                ClosureBody::Typed(b)   => eval_block(b, &mut call_env),
+                ClosureBody::Untyped(b) => eval_untyped_block(b, &mut call_env),
+            };
             let result = result.map_err(attach_stack);
             pop_frame();
             let sig = result?;
@@ -963,7 +1483,7 @@ fn call_function(func: Value, args: Vec<Value>, span: &Span) -> Result<Signal, M
         }
 
         Value::Unit =>
-            Err(attach_stack(MoonlaneError::panic(RuntimeErrorCode::R0002, "call: target is a generic function (not supported in v0.1)", span))),
+            Err(attach_stack(MoonlaneError::panic(RuntimeErrorCode::R0002, "call: target is Unit, not a function", span))),
 
         other => Err(attach_stack(MoonlaneError::panic(
             RuntimeErrorCode::R0010,

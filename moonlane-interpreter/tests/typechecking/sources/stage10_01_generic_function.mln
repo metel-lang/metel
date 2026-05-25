@@ -1,0 +1,13 @@
+// Positive: generic function declarations and calls type-check correctly.
+
+fun id<T>(x: T) -> T { x }
+fun swap<A, B>(a: A, b: B) -> (B, A) { (b, a) }
+fun apply<T>(f: fun(T) -> T, x: T) -> T { f(x) }
+
+fun use_generics() -> Int {
+    let n: Int = id(42);
+    let s: Bool = id(true);
+    let pair: (Bool, Int) = swap(1, true);
+    let doubled: Int = apply(fun(x: Int) -> Int { x * 2 }, 5);
+    n + doubled
+}

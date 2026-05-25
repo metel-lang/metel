@@ -6,7 +6,7 @@ use crate::typeinference::*;
 use crate::types::Type;
 
 use super::FunGeneralization;
-use super::conversions::type_expr_to_infer;
+use super::conversions::{type_expr_to_infer, type_expr_to_infer_with_generics};
 
 /// Register the names of all direct `FunDecl`s in `decls` with fresh type
 /// variables so that forward references and mutual recursion work.
@@ -78,19 +78,25 @@ fn infer_fun_decl(
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
 ) -> Result<(), MoonlaneError> {
-    if !fun.generics.is_empty() {
-        return Err(MoonlaneError::internal(format!(
-            "generic function `{}` not yet supported",
-            fun.name
-        )));
-    }
+    // For generic functions, create fresh type variables for each parameter name.
+    let generic_map: HashMap<String, TypeVar> = fun.generics.iter()
+        .map(|g| (g.name.clone(), ctx.fresh_type_var_raw()))
+        .collect();
+
+    let te_to_infer = |te: &TypeExpr| -> InferType {
+        if generic_map.is_empty() {
+            type_expr_to_infer(te)
+        } else {
+            type_expr_to_infer_with_generics(te, &generic_map)
+        }
+    };
 
     let param_types: Vec<InferType> = fun.params.iter().map(|p| {
-        if let Some(ann) = &p.type_ann { type_expr_to_infer(ann) } else { ctx.fresh_var() }
+        if let Some(ann) = &p.type_ann { te_to_infer(ann) } else { ctx.fresh_var() }
     }).collect();
 
     let ret_ty = if let Some(ann) = &fun.return_type {
-        type_expr_to_infer(ann)
+        te_to_infer(ann)
     } else {
         ctx.fresh_var()
     };
@@ -134,23 +140,30 @@ fn infer_impl_method(
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
 ) -> Result<(), MoonlaneError> {
-    if !method.generics.is_empty() {
-        return Err(MoonlaneError::internal(format!(
-            "generic method `{}` not yet supported", method.name
-        )));
-    }
+    let generic_map: HashMap<String, TypeVar> = method.generics.iter()
+        .map(|g| (g.name.clone(), ctx.fresh_type_var_raw()))
+        .collect();
+
+    let te_to_infer = |te: &TypeExpr| -> InferType {
+        if generic_map.is_empty() {
+            type_expr_to_infer(te)
+        } else {
+            type_expr_to_infer_with_generics(te, &generic_map)
+        }
+    };
+
     let self_ty = InferType::Named(target_name.to_string(), vec![]);
     let param_types: Vec<InferType> = method.params.iter().map(|p| {
         if p.name == "self" {
             self_ty.clone()
         } else if let Some(ann) = &p.type_ann {
-            type_expr_to_infer(ann)
+            te_to_infer(ann)
         } else {
             ctx.fresh_var()
         }
     }).collect();
     let ret_ty = method.return_type.as_ref()
-        .map(type_expr_to_infer)
+        .map(|ann| te_to_infer(ann))
         .unwrap_or_else(InferType::unit);
 
     ctx.push_scope();
