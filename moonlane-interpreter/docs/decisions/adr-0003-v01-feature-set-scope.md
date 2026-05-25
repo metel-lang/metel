@@ -16,13 +16,13 @@ The guiding question for every candidate feature was: *"If we implement this now
 
 We scoped v0.1 to the features already fully designed in the spec, plus a small set of roadmap items whose design was settled enough to commit to without risk of future breakage. Everything else was explicitly deferred.
 
-**Included:** the full spec as it stood at this date — primitives, variables, functions, closures, structs, enums, traits, pattern matching, arrays, tuples, `Perhaps<T>`, `Result<T,E>`, `?`, `as`/`From`, `loop`/`break`/`continue`, compound assignment, associated functions, `mut self`, closure type signatures, panics, and the built-in functions. See [docs/public/spec.md](../../../docs/public/spec.md) for the authoritative description of each.
+**Included:** the full spec as it stood at this date — primitives, variables, functions, closures, structs, enums, aspects, pattern matching, arrays, tuples, `Perhaps<T>`, `Result<T,E>`, `?`, `as`/`From`, `loop`/`break`/`continue`, compound assignment, associated functions, `mut self`, closure type signatures, panics, and the built-in functions. See [docs/public/spec.md](../../../docs/public/spec.md) for the authoritative description of each.
 
-**Deferred:** module system, visibility, `UInt`, string interpolation, trait objects, derived traits, operator overloading traits, `?` error coercion, `List<T>`, and integer overflow semantics. These are tracked in `Backlog.md`.
+**Deferred:** module system, visibility, `UInt`, string interpolation, aspect objects, derived aspects, operator overloading aspects, `?` error coercion, `List<T>`, and integer overflow semantics. These are tracked in `Backlog.md`.
 
 The deferred features share a common property: their *design* is not yet settled — syntax, semantics, or interaction with other features is still open. Implementing them now would mean either implementing a known-incomplete design or having to revisit and break the implementation later. All of the included features were fully specified before implementation began.
 
-A secondary criterion was additive safety: deferred features can all be added later without requiring changes to existing v0.1 programs. No v0.1 syntax will be invalidated by adding a module system, `dyn Trait`, or derive macros.
+A secondary criterion was additive safety: deferred features can all be added later without requiring changes to existing v0.1 programs. No v0.1 syntax will be invalidated by adding a module system, `dyn Aspect`, or derive macros.
 
 ## Consequences
 

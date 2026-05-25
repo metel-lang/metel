@@ -1,7 +1,7 @@
 # Typechecker Implementation Notes
 
 > Status: v0.1 complete.  
-> Extension points for v0.3 (generics and traits) are called out inline.
+> Extension points for v0.3 (generics and aspects) are called out inline.
 
 ---
 
@@ -239,7 +239,7 @@ Three registries live inside `TypeRegistry` (owned by `InferContext`):
 
 ### `as` Cast — Widening Only (Provisional)
 
-`Int as Float` (widening) and identity casts are supported. Narrowing (`Float as Int`) and cross-type casts are rejected. v0.3 (#12) replaces the fixed-case check with a `From<S>` trait lookup.
+`Int as Float` (widening) and identity casts are supported. Narrowing (`Float as Int`) and cross-type casts are rejected. v0.3 (#12) replaces the fixed-case check with a `From<S>` aspect lookup.
 
 ---
 
@@ -252,9 +252,9 @@ Three registries live inside `TypeRegistry` (owned by `InferContext`):
 3. Replace `FunBody::Generic(untyped_block)` with monomorphization.
 4. `let_polymorphism` (#10) is partially in place via `generalize/instantiate` — main work is generic structs and the monomorphization engine (#9).
 
-### v0.3 — Traits
+### v0.3 — Aspects
 
-1. Add `impl_env: HashMap<(String, String), Vec<MethodInfo>>` (type × trait → methods) or extend `TypeRegistry` with trait-impl storage.
-2. Replace the provisional `as` cast with a `From<S>` trait check.
+1. Add `impl_env: HashMap<(String, String), Vec<MethodInfo>>` (type × aspect → methods) or extend `TypeRegistry` with aspect-impl storage.
+2. Replace the provisional `as` cast with a `From<S>` aspect check.
 3. Replace the provisional `?` error type match with a `From<E>` coercion lookup.
-4. Upgrade `for-in` from Array/Range only to an `Iterable<T>` trait check (#11).
+4. Upgrade `for-in` from Array/Range only to an `Iterable<T>` aspect check (#11).

@@ -40,7 +40,7 @@ The goal of v0.1 is spec validation, not performance. A tree-walker can be built
 
 **Chosen: Option A — static type checker pass.**
 
-The spec defines Moonlane as statically typed. Implementing only runtime type checking would validate the runtime behaviour of the interpreter but not the type system itself — which is one of the most complex and most important parts of the spec (inference, generics, trait bounds, `Perhaps<T>`, `Result<T,E>`). A static type checker validates those spec sections directly. It is also a prerequisite for the LLVM compiler, which will need a fully typed AST. Building it now avoids rebuilding it later.
+The spec defines Moonlane as statically typed. Implementing only runtime type checking would validate the runtime behaviour of the interpreter but not the type system itself — which is one of the most complex and most important parts of the spec (inference, generics, aspect bounds, `Perhaps<T>`, `Result<T,E>`). A static type checker validates those spec sections directly. It is also a prerequisite for the LLVM compiler, which will need a fully typed AST. Building it now avoids rebuilding it later.
 
 The type checker runs as a distinct pass: `source → parse → AST → type check → (typed AST) → evaluate`.
 

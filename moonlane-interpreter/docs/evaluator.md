@@ -212,7 +212,7 @@ The PoC's `Rc<RefCell<Value>>` environment gives closures reference semantics fo
 
 Replace the `FunBody::Generic` early-return in `eval_decl` with monomorphization. At call time, specialize the untyped body against the concrete argument types (requires a mini type-check pass or a pre-monomorphized TypedAST).
 
-### v0.3 — Traits / `?` coercion
+### v0.3 — Aspects / `?` coercion
 
 `PropagateError` currently requires `Value::Enum { name: "Result", .. }`. Upgrading `?` to use `From<E>` coercion (spec [The ? Operator](../../docs/public/spec/functions.md#the--operator)) requires looking up a `From` impl at the call site and applying the conversion before wrapping.
 
