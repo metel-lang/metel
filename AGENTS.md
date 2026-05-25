@@ -139,6 +139,7 @@ If **any gate fails**, the sprint cannot close. Fix the issue, commit the fix to
 - **Follow the spec exactly.** If behaviour is not described in the spec, it does not exist. Add it to the spec before implementing it.
 - **If an ambiguity surfaces mid-implementation**: stop, decide (write a decision record if non-obvious), update the spec, then continue. Never implement an undocumented behaviour and "fix the docs later."
 - **If a spec section turns out to be wrong or impractical**: stop, write a decision record superseding the previous understanding, update the spec, then implement against the updated spec.
+- **If an unexpected, undocumented limitation is encountered** (a constraint not described in any spec, doc, or known-limitations section): add an entry to the relevant known-limitations section immediately, then surface it to the user before continuing. Do not silently work around it.
 - **Do not expand scope.** If you discover necessary work outside the task boundary, open a new issue for it. Finish the current task first unless the out-of-scope work is a hard blocker.
 
 ### Before closing a task (in-progress → done)
