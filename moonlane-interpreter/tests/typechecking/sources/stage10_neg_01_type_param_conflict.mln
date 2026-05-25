@@ -1,0 +1,7 @@
+// Negative: type parameter T bound to two different types at the same call site.
+
+fun first<T>(a: T, b: T) -> T { a }
+
+fun use_conflict() -> Int {
+    first(1, true) // ERROR[T0001]
+}

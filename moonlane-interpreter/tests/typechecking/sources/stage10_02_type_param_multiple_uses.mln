@@ -1,0 +1,21 @@
+// Positive: same type parameter used in multiple parameter positions enforces consistency.
+
+// T appears in two params — both args must have the same type.
+fun first<T>(a: T, b: T) -> T { a }
+fun second<T>(a: T, b: T) -> T { b }
+
+// T in param and return — return type is constrained by the arg.
+fun identity_constrained<T>(a: T, _b: T) -> T { a }
+
+// Two independent type params.
+fun make_pair<A, B>(a: A, b: B) -> (A, B) { (a, b) }
+
+fun use_multi() -> Int {
+    let a = first(10, 20);
+    let b = second(1, 2);
+    let c = identity_constrained(5, 5);
+    let p = make_pair(true, 99);
+    let _x: Bool = p.0;
+    let _y: Int  = p.1;
+    a + b + c
+}

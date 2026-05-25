@@ -241,6 +241,15 @@ mod tests {
     #[test]
     fn generics() { check("48_generics.mln"); }
 
+    #[test]
+    fn generic_higher_order() { check("49_generic_higher_order.mln"); }
+
+    #[test]
+    fn generic_consistency() { check("50_generic_consistency.mln"); }
+
+    #[test]
+    fn generic_nested_types() { check("51_generic_nested_types.mln"); }
+
     // ── Integration tests ─────────────────────────────────────────────────────
 
     #[test]
@@ -312,4 +321,7 @@ mod tests {
 
     #[test]
     fn neg_braceless_if_mixed_arms() { check("neg_20_braceless_if_mixed_arms.mln"); }
+
+    #[test]
+    fn neg_generic_type_conflict() { check("neg_21_generic_type_conflict.mln"); }
 }

@@ -1,0 +1,27 @@
+// Positive: generic functions that accept function-typed parameters.
+
+// Single type param: f maps T to T.
+fun apply<T>(f: fun(T) -> T, x: T) -> T { f(x) }
+
+// Two type params: f maps A to B.
+fun transform<A, B>(f: fun(A) -> B, x: A) -> B { f(x) }
+
+// Three-step pipeline: g(f(x)).
+fun pipe<A, B, C>(f: fun(A) -> B, g: fun(B) -> C, x: A) -> C { g(f(x)) }
+
+fun use_ho() -> Int {
+    let doubled: Int = apply(fun(n: Int) -> Int { n * 2 }, 5);
+    let negated: Bool = apply(fun(b: Bool) -> Bool { !b }, false);
+    let _b: Bool = negated;
+
+    let to_bool: Bool = transform(fun(n: Int) -> Bool { n > 0 }, 3);
+    let _b2: Bool = to_bool;
+
+    let result: Int = pipe(
+        fun(n: Int) -> Bool { n > 0 },
+        fun(b: Bool) -> Int { if (b) 1 else 0 },
+        10
+    );
+
+    doubled + result
+}

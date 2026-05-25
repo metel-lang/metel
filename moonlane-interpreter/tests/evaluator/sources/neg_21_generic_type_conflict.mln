@@ -1,0 +1,10 @@
+// TYPECHECK_ERROR[cannot unify]
+
+// Calling a generic function with conflicting types for the same type parameter
+// must be rejected at typecheck time.
+
+fun first<T>(a: T, b: T) -> T { a }
+
+fun main() {
+    let _x = first(1, true);
+}

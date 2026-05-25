@@ -1,0 +1,55 @@
+// Generic higher-order functions: passing and returning functions with type parameters.
+
+// apply: T mapped to itself via f.
+fun apply<T>(f: fun(T) -> T, x: T) -> T { f(x) }
+
+// transform: A mapped to B.
+fun transform<A, B>(f: fun(A) -> B, x: A) -> B { f(x) }
+
+// pipe: two-step composition A→B→C.
+fun pipe<A, B, C>(f: fun(A) -> B, g: fun(B) -> C, x: A) -> C { g(f(x)) }
+
+fun main() {
+    // apply at Int.
+    let r1 = apply(fun(n: Int) -> Int { n * 2 }, 5);
+    assert(r1 == 10);
+
+    // apply at Bool.
+    let r2 = apply(fun(b: Bool) -> Bool { !b }, false);
+    assert(r2);
+
+    // apply at String (identity).
+    let r3 = apply(fun(s: String) -> String { s }, "hello");
+    assert(r3 == "hello");
+
+    // Nested apply: apply applied to result of apply.
+    let r4 = apply(fun(n: Int) -> Int { n + 1 }, apply(fun(n: Int) -> Int { n * 3 }, 4));
+    assert(r4 == 13);
+
+    // transform: Int → Bool.
+    let r5 = transform(fun(n: Int) -> Bool { n > 0 }, 3);
+    assert(r5);
+
+    let r6 = transform(fun(n: Int) -> Bool { n > 0 }, 0);
+    assert(!r6);
+
+    // transform: Bool → Int.
+    let r7 = transform(fun(b: Bool) -> Int { if (b) 1 else 0 }, true);
+    assert(r7 == 1);
+
+    // pipe: Int → Bool → Int.
+    let r8 = pipe(
+        fun(n: Int) -> Bool { n > 0 },
+        fun(b: Bool) -> Int { if (b) 10 else -1 },
+        5
+    );
+    assert(r8 == 10);
+
+    // pipe: Int → Int → Int (two arithmetic steps).
+    let r9 = pipe(
+        fun(n: Int) -> Int { n * 2 },
+        fun(n: Int) -> Int { n + 1 },
+        7
+    );
+    assert(r9 == 15);
+}

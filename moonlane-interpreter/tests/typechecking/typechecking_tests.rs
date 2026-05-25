@@ -511,6 +511,38 @@ mod tests {
         check_file(&format!("{}/stage10_01_generic_function.mln", test_dir()));
     }
 
+    #[test]
+    fn stage10_type_param_multiple_uses() {
+        check_file(&format!("{}/stage10_02_type_param_multiple_uses.mln", test_dir()));
+    }
+
+    #[test]
+    fn stage10_generic_return_tuple() {
+        check_file(&format!("{}/stage10_03_generic_return_tuple.mln", test_dir()));
+    }
+
+    #[test]
+    fn stage10_generic_higher_order() {
+        check_file(&format!("{}/stage10_04_generic_higher_order.mln", test_dir()));
+    }
+
+    #[test]
+    fn stage10_generic_nested_types() {
+        check_file(&format!("{}/stage10_05_generic_nested_types.mln", test_dir()));
+    }
+
+    // ── Stage 10 negative tests ───────────────────────────────────────────────
+
+    #[test]
+    fn stage10_neg_type_param_conflict() {
+        check_file(&format!("{}/stage10_neg_01_type_param_conflict.mln", test_dir()));
+    }
+
+    #[test]
+    fn stage10_neg_return_type_conflict() {
+        check_file(&format!("{}/stage10_neg_02_return_type_conflict.mln", test_dir()));
+    }
+
     // ── Known-limitation tests ─────────────────────────────────────────────────
 
     #[test]

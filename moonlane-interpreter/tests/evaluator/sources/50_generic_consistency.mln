@@ -1,0 +1,48 @@
+// Generic functions with T in multiple param positions — consistency enforced at runtime.
+
+// Both args and return must share the same type.
+fun first<T>(a: T, b: T) -> T { a }
+fun second<T>(a: T, b: T) -> T { b }
+
+// Pair both args into a tuple.
+fun dup_pair<T>(x: T) -> (T, T) { (x, x) }
+
+// Pass-through: two T params, returns (T, T).
+fun wrap<T>(a: T, b: T) -> (T, T) { (a, b) }
+
+fun main() {
+    // first/second at Int.
+    assert(first(10, 20) == 10);
+    assert(second(10, 20) == 20);
+
+    // first/second at Bool.
+    assert(first(true, false));
+    assert(!second(true, false));
+
+    // first/second at String.
+    assert(first("a", "b") == "a");
+    assert(second("x", "y") == "y");
+
+    // dup_pair at different types.
+    let p1 = dup_pair(42);
+    assert(p1.0 == 42);
+    assert(p1.1 == 42);
+
+    let p2 = dup_pair(true);
+    assert(p2.0);
+    assert(p2.1);
+
+    // wrap at Int.
+    let w1 = wrap(3, 7);
+    assert(w1.0 == 3);
+    assert(w1.1 == 7);
+
+    // wrap at Bool.
+    let w2 = wrap(true, false);
+    assert(w2.0);
+    assert(!w2.1);
+
+    // Chained: first(second(a,b), c).
+    let chained = first(second(1, 2), 99);
+    assert(chained == 2);
+}

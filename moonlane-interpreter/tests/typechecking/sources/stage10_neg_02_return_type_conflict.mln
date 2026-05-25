@@ -1,0 +1,9 @@
+// Negative: generic body fixes T to a concrete type; call site provides a conflicting annotation.
+
+// Body always returns 42, so T is inferred as Int.
+// The caller annotates the result as Bool — type mismatch.
+fun always_int<T>(_x: T) -> T { 42 }
+
+fun use_bad() {
+    let _s: Bool = always_int(true); // ERROR[T0001]
+}
