@@ -468,8 +468,8 @@ mod tests {
     }
 
     #[test]
-    fn stage8_neg_ascription_match_arm_bare() {
-        check_file(&format!("{}/stage8_neg_05_ascription_match_arm_bare.mln", test_dir()));
+    fn stage8_ascription_match_arm_bare() {
+        check_file(&format!("{}/stage8_05_ascription_match_arm_bare.mln", test_dir()));
     }
 
     #[test]

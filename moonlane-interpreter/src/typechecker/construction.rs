@@ -571,7 +571,7 @@ fn construct_expr(
             };
             Ok(TypedExpr::PropagateError { expr: Box::new(typed_expr), ty, span: span.clone() })
         }
-        Expr::Match(m) => construct_match(m, ctx),
+        Expr::Match(m) => construct_match(m, expected_ty, ctx),
         Expr::Ascribe { expr, ann, span } => {
             let ty = resolved_to_type(&type_expr_to_infer(ann), ctx.subst, span)?;
             construct_expr(expr, Some(&ty), ctx)
@@ -648,7 +648,7 @@ fn find_break_in_expr(expr: &TypedExpr) -> Option<Type> {
     }
 }
 
-fn construct_match(m: &MatchExpr, ctx: &mut ConstructCtx) -> Result<TypedExpr, MoonlaneError> {
+fn construct_match(m: &MatchExpr, expected_ty: Option<&Type>, ctx: &mut ConstructCtx) -> Result<TypedExpr, MoonlaneError> {
     let scrutinee = construct_expr(&m.scrutinee, None, ctx)?;
     let scrutinee_ty = scrutinee.ty().clone();
     let mut typed_arms = vec![];
@@ -659,7 +659,7 @@ fn construct_match(m: &MatchExpr, ctx: &mut ConstructCtx) -> Result<TypedExpr, M
             Some(g) => Some(construct_expr(g, None, ctx)?),
             None    => None,
         };
-        let body = construct_block(&arm.body, None, ctx)?;
+        let body = construct_block(&arm.body, expected_ty, ctx)?;
         typed_arms.push(TypedMatchArm {
             pattern: arm.pattern.clone(),
             guard,
