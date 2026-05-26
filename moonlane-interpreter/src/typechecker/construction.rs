@@ -184,7 +184,7 @@ fn construct_decl(decl: &Decl, ctx: &mut ConstructCtx) -> Result<TypedDecl, Moon
             name: td.name.clone(), generics: td.generics.clone(),
             methods: td.methods.clone(), span: td.span.clone(),
         })),
-        Decl::Stmt(stmt) => Ok(TypedDecl::Stmt(construct_stmt(stmt, ctx)?)),
+        Decl::Stmt(stmt) => Ok(TypedDecl::Stmt(Box::new(construct_stmt(stmt, ctx)?))),
     }
 }
 
@@ -370,7 +370,7 @@ fn construct_stmt(stmt: &Stmt, ctx: &mut ConstructCtx) -> Result<TypedStmt, Moon
             };
             let body = construct_block(&fs.body, None, ctx)?;
             ctx.pop_scope();
-            Ok(TypedStmt::For(TypedForStmt { init, condition, step, body, span: fs.span.clone() }))
+            Ok(TypedStmt::For(Box::new(TypedForStmt { init, condition, step, body, span: fs.span.clone() })))
         }
         Stmt::ForIn(fi) => {
             let iterable = construct_expr(&fi.iterable, None, ctx)?;
@@ -398,9 +398,9 @@ fn construct_stmt(stmt: &Stmt, ctx: &mut ConstructCtx) -> Result<TypedStmt, Moon
             ctx.bind(&fi.binding, elem_ty);
             let body = construct_block(&fi.body, None, ctx)?;
             ctx.pop_scope();
-            Ok(TypedStmt::ForIn(TypedForInStmt {
+            Ok(TypedStmt::ForIn(Box::new(TypedForInStmt {
                 binding: fi.binding.clone(), iterable, body, span: fi.span.clone(),
-            }))
+            })))
         }
     }
 }
