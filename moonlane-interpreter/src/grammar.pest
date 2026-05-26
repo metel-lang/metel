@@ -140,7 +140,7 @@ primary_expr = {
   | int_lit
   | string_lit
   | bool_lit
-  | nope_lit
+  | none_lit
   | unit_lit
   | tuple_or_paren
   | array_lit
@@ -173,7 +173,7 @@ type_path = { ident ~ ("::" ~ ident)* }
 
 pattern = {
     ("_" ~ !(ASCII_ALPHANUMERIC | "_"))   // wildcard — must not match _foo
-  | nope_lit                              // nope literal (with word-boundary guard)
+  | none_lit                              // None literal (with word-boundary guard)
   | tuple_pattern
   | enum_pattern
   | literal_pattern
@@ -214,7 +214,7 @@ string_char = _{ "\\" ~ escape_seq | (!("\"" | "\\") ~ ANY) }
 escape_seq  = _{ "n" | "t" | "r" | "\\" | "\"" }
 
 bool_lit  = @{ ("true" | "false") ~ !(ASCII_ALPHANUMERIC | "_") }
-nope_lit  = @{ "nope" ~ !(ASCII_ALPHANUMERIC | "_") }
+none_lit  = @{ "None" ~ !(ASCII_ALPHANUMERIC | "_") }
 unit_lit  = @{ "()" }
 
 ident = @{
@@ -224,7 +224,7 @@ ident = @{
 keyword = @{
     ("and" | "as" | "break" | "continue" | "else" | "enum" | "false" |
      "for" | "fun" | "if" | "impl" | "let" | "loop" | "match" |
-     "mut" | "nope" | "or" | "return" | "struct" | "aspect" | "true" |
+     "mut" | "or" | "return" | "struct" | "aspect" | "true" |
      "use" | "where" | "while")
     ~ !(ASCII_ALPHANUMERIC | "_")
 }

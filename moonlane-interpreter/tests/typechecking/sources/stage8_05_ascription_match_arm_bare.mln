@@ -1,5 +1,5 @@
 // expected_ty from the function return type flows into match arm bodies,
-// so bare [] and nope resolve without requiring explicit ascription.
+// so bare [] and None resolve without requiring explicit ascription.
 
 fun make_row(use_default: Bool, fallback: Int[]) -> Int[] {
     match use_default {

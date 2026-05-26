@@ -27,7 +27,7 @@ impl Iterable<Int> for Counter {
             self.current = self.current + 1;
             Perhaps::Some { value: v }
         } else {
-            nope
+            None
         }
     }
 }
@@ -46,7 +46,7 @@ impl Iterable<Int> for Countdown {
             self.current = self.current - 1;
             Perhaps::Some { value: v }
         } else {
-            nope
+            None
         }
     }
 }

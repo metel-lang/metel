@@ -196,7 +196,7 @@ fun find_first<T>(arr: T[], pred: fun(T) -> Bool) -> Perhaps<T> {
     for (let x in arr) {
         if (pred(x)) { return Perhaps::Some { value: x }; }
     }
-    nope
+    None
 }
 
 fun perhaps_or<T>(p: Perhaps<T>, default: T) -> T {

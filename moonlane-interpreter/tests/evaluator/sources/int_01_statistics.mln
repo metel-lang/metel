@@ -4,7 +4,7 @@
 //   arrays, structs/impl, Float arithmetic, bubble sort, binary search,
 //   for-in (array + range), while, C-style for, higher-order closures,
 //   Perhaps<T>, Result<T,E>, ? operator, match-with-blocks (RFC-0018),
-//   return nope / return Err (RFC-0019), Int-as-Float casting, tuples,
+//   return None / return Err (RFC-0019), Int-as-Float casting, tuples,
 //   string operations, recursive functions.
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ fun sort_floats(arr: Float[]) -> Float[] {
 
 // Binary search in a sorted Float[].  Returns Perhaps<Int> with the index.
 fun binary_search(sorted: Float[], target: Float) -> Perhaps<Int> {
-    if (array_len(sorted) == 0) { return nope; }
+    if (array_len(sorted) == 0) { return None; }
     mut lo = 0;
     mut hi = array_len(sorted) - 1;
     while (lo <= hi) {
@@ -77,7 +77,7 @@ fun binary_search(sorted: Float[], target: Float) -> Perhaps<Int> {
             hi = mid - 1;
         }
     }
-    nope
+    None
 }
 
 // ── Stats struct ──────────────────────────────────────────────────────────────
@@ -138,11 +138,11 @@ fun compute_stats(data: Float[]) -> Result<Stats, String> {
     Result::Ok { value: Stats { count: n, sum: total, mean: mean, variance: variance, min: mn, max: mx } }
 }
 
-// Median of a Float[].  Returns nope for empty input (RFC-0019: types nope as
+// Median of a Float[].  Returns None for empty input (RFC-0019: types None as
 // Perhaps<Float> from the return annotation).
 fun median(data: Float[]) -> Perhaps<Float> {
     let n = array_len(data);
-    if (n == 0) { return nope; }
+    if (n == 0) { return None; }
     let sorted = sort_floats(data);
     let mid = n / 2;
     if (n % 2 == 1) {
@@ -234,14 +234,14 @@ fun main() {
     let fnd = binary_search(srt, 4.0);
     match fnd {
         Perhaps::Some { value } => assert(value == 4),
-        nope => assert_msg(false, "expected Some"),
+        None => assert_msg(false, "expected Some"),
     };
     let miss = binary_search(srt, 7.0);
-    match miss { Perhaps::Some { value } => assert_msg(false, "expected nope"), nope => (), };
-    // Searching an empty array returns nope.
+    match miss { Perhaps::Some { value } => assert_msg(false, "expected None"), None => (), };
+    // Searching an empty array returns None.
     let empty_f: Float[] = [];
     let empty_srch = binary_search(empty_f, 1.0);
-    match empty_srch { Perhaps::Some { value } => assert_msg(false, "expected nope"), nope => (), };
+    match empty_srch { Perhaps::Some { value } => assert_msg(false, "expected None"), None => (), };
 
     // 3. Descriptive statistics — match with blocks (RFC-0018).
     let d5: Float[] = [1.0, 2.0, 3.0, 4.0, 5.0];
@@ -275,16 +275,16 @@ fun main() {
     let med5 = median(d5);
     match med5 {
         Perhaps::Some { value } => assert(value == 3.0),
-        nope => assert_msg(false, "expected Some"),
+        None => assert_msg(false, "expected Some"),
     };
     let d4: Float[] = [4.0, 1.0, 3.0, 2.0];
     let med4 = median(d4);
     match med4 {
         Perhaps::Some { value } => assert(value == 2.5),
-        nope => assert_msg(false, "expected Some"),
+        None => assert_msg(false, "expected Some"),
     };
     let med_e = median(empty);
-    match med_e { Perhaps::Some { value } => assert_msg(false, "expected nope"), nope => (), };
+    match med_e { Perhaps::Some { value } => assert_msg(false, "expected None"), None => (), };
 
     // 6. Error propagation with ?
     let zr = z_score(d5, 5.0);

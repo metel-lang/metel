@@ -107,18 +107,18 @@ let items: Int[] = [];
 process(items);
 ```
 
-**Argument position — `nope`**
+**Argument position — `None`**
 
-`nope` has no fields, so its type parameter cannot be resolved from the value alone.
+`None` has no fields, so its type parameter cannot be resolved from the value alone.
 
 ```moonlane
 fun find(haystack: String[], fallback: Perhaps<String>) -> String { ... }
 
-find(words, nope);                       // error — type of nope cannot be inferred
-find(words, nope : Perhaps<String>);     // ok
+find(words, None);                       // error — type of None cannot be inferred
+find(words, None : Perhaps<String>);     // ok
 
 // Alternative: hoist a binding.
-let nothing: Perhaps<String> = nope;
+let nothing: Perhaps<String> = None;
 find(words, nothing);
 ```
 
@@ -223,15 +223,15 @@ let diverge: Int = loop { };           // ! coerces to Int — dead code after
 
 `Perhaps<T>` is the built-in optional type. There is no null — all absence is expressed via `Perhaps<T>`.
 
-The type of `nope` is `Perhaps<T>` for some `T` that must be determinable from context. If no context constrains `T` — for example, a bare `let x = nope` with no annotation and no subsequent use that pins the element type — the program is a type error. An explicit annotation is required in that case:
+The type of `None` is `Perhaps<T>` for some `T` that must be determinable from context. If no context constrains `T` — for example, a bare `let x = None` with no annotation and no subsequent use that pins the element type — the program is a type error. An explicit annotation is required in that case:
 
 ```moonlane
-let x = nope;              // ERROR: cannot infer type of `nope`
-let x: Perhaps<Int> = nope; // OK
+let x = None;              // ERROR: cannot infer type of `None`
+let x: Perhaps<Int> = None; // OK
 ```
 
 ```moonlane
-let result: Perhaps<Int> = nope;
+let result: Perhaps<Int> = None;
 let value: Perhaps<Int> = 42;
 ```
 
@@ -240,11 +240,11 @@ Use `match` to unwrap safely:
 ```moonlane
 match find_user(1) {
     Perhaps::Some { value } => println(value.name),
-    Perhaps::Nope => println("not found"),
+    Perhaps::None => println("not found"),
 }
 ```
 
-`.yolo()` unwraps, panicking if the value is `nope`:
+`.yolo()` unwraps, panicking if the value is `None`:
 
 ```moonlane
 let user = find_user(1).yolo();

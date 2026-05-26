@@ -725,7 +725,7 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Moonl
                 Literal::Float(f) => Value::Float(*f),
                 Literal::Bool(b)  => Value::Bool(*b),
                 Literal::Str(s)   => Value::Str(s.clone()),
-                Literal::Nope     => Value::Perhaps(None),
+                Literal::None     => Value::Perhaps(None),
                 Literal::Unit     => Value::Unit,
             };
             Ok(Signal::Value(val))
@@ -755,7 +755,7 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Moonl
                 }
                 let name    = segments[segments.len() - 2].clone();
                 let variant = segments[segments.len() - 1].clone();
-                if name == "Perhaps" && variant == "Nope" {
+                if name == "Perhaps" && variant == "None" {
                     return Ok(Signal::Value(Value::Perhaps(None)));
                 }
                 Ok(Signal::Value(Value::Enum { name, variant, fields: HashMap::new() }))
@@ -982,7 +982,7 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Moonl
                         let v = field_vals.remove("value").ok_or_else(|| MoonlaneError::internal("Perhaps::Some: missing `value` field"))?;
                         Ok(Signal::Value(Value::Perhaps(Some(Box::new(v)))))
                     }
-                    ("Perhaps", "Nope") => Ok(Signal::Value(Value::Perhaps(None))),
+                    ("Perhaps", "None") => Ok(Signal::Value(Value::Perhaps(None))),
                     ("Result", "Ok") => {
                         let v = field_vals.remove("value").ok_or_else(|| MoonlaneError::internal("Result::Ok: missing `value` field"))?;
                         Ok(Signal::Value(Value::Result(Ok(Box::new(v)))))
@@ -1070,7 +1070,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
                 Literal::Float(f) => Value::Float(*f),
                 Literal::Bool(b)  => Value::Bool(*b),
                 Literal::Str(s)   => Value::Str(s.clone()),
-                Literal::Nope     => Value::Perhaps(None),
+                Literal::None     => Value::Perhaps(None),
                 Literal::Unit     => Value::Unit,
             };
             Ok(Signal::Value(val))
@@ -1110,7 +1110,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
                 }
                 let name    = segments[segments.len() - 2].clone();
                 let variant = segments[segments.len() - 1].clone();
-                if name == "Perhaps" && variant == "Nope" {
+                if name == "Perhaps" && variant == "None" {
                     return Ok(Signal::Value(Value::Perhaps(None)));
                 }
                 Ok(Signal::Value(Value::Enum {
@@ -1388,7 +1388,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
                         let v = field_vals.remove("value").ok_or_else(|| MoonlaneError::internal("Perhaps::Some: missing `value` field"))?;
                         Ok(Signal::Value(Value::Perhaps(Some(Box::new(v)))))
                     }
-                    ("Perhaps", "Nope") => Ok(Signal::Value(Value::Perhaps(None))),
+                    ("Perhaps", "None") => Ok(Signal::Value(Value::Perhaps(None))),
                     ("Result", "Ok") => {
                         let v = field_vals.remove("value").ok_or_else(|| MoonlaneError::internal("Result::Ok: missing `value` field"))?;
                         Ok(Signal::Value(Value::Result(Ok(Box::new(v)))))
@@ -1512,7 +1512,7 @@ fn match_pattern(pattern: &Pattern, value: &Value, out: &mut HashMap<String, Val
     match pattern {
         Pattern::Wildcard(_) => true,
 
-        Pattern::Nope(_) => matches!(value, Value::Perhaps(None)),
+        Pattern::None(_) => matches!(value, Value::Perhaps(None)),
 
         Pattern::Literal(lit, _) => match (lit, value) {
             (Literal::Int(a),   Value::Int(b))          => a == b,
@@ -1520,7 +1520,7 @@ fn match_pattern(pattern: &Pattern, value: &Value, out: &mut HashMap<String, Val
             (Literal::Bool(a),  Value::Bool(b))         => a == b,
             (Literal::Str(a),   Value::Str(b))          => a == b,
             (Literal::Unit,     Value::Unit)             => true,
-            (Literal::Nope,     Value::Perhaps(None))   => true,
+            (Literal::None,     Value::Perhaps(None))   => true,
             _ => false,
         },
 
@@ -1547,7 +1547,7 @@ fn match_pattern(pattern: &Pattern, value: &Value, out: &mut HashMap<String, Val
                     }
                     true
                 }
-                ("Perhaps", "Nope", Value::Perhaps(None)) => true,
+                ("Perhaps", "None", Value::Perhaps(None)) => true,
                 ("Result", "Ok", Value::Result(Ok(v))) => {
                     if let Some(field_name) = fields.first() {
                         out.insert(field_name.clone(), *v.clone());

@@ -27,12 +27,12 @@ let area: Float = match s1 {
 
 // Built-in Perhaps<T>
 let some_val: Perhaps<Int> = Perhaps::Some { value: 42 };
-let no_val: Perhaps<Int> = Perhaps::Nope;
+let no_val: Perhaps<Int> = Perhaps::None;
 
 // Match on Perhaps
 let result_int: Int = match some_val {
     Perhaps::Some { value } => value,
-    nope => 0,
+    None => 0,
 };
 
 // Built-in Result<T, E>

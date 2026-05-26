@@ -4,6 +4,13 @@ title: "Moonlane Language Changelog"
 
 # Changelog
 
+## v0.4.2
+
+Evaluator refactor, test restructure, and keyword cleanup. Shipped by Sprint 8 (`sprint/8`).
+
+**Breaking changes:**
+- `Perhaps::Nope` renamed to `Perhaps::None`; the standalone `nope` keyword is now `None`
+
 ## v0.4.1
 
 Technical debt, bug fixes, and internal cleanup. Shipped by Sprint 7 (`sprint/7`).

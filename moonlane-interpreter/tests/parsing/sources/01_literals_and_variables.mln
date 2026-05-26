@@ -26,11 +26,11 @@ fun main() {
     let quoted = "she said \"hi\"";
     println(quoted);                    // she said "hi"
 
-    // --- nope literal ---
-    let maybe: Perhaps<Int> = nope;
+    // --- None literal ---
+    let maybe: Perhaps<Int> = None;
     match maybe {
         Perhaps::Some { value } => println(int_to_string(value)),
-        Perhaps::Nope => println("nope"),   // nope
+        Perhaps::None => println("nope"),   // nope
     }
 
     // --- mutable bindings ---

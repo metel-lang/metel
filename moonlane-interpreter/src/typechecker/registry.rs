@@ -78,7 +78,7 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
         type_params: vec![t],
         variants: vec![
             VariantInfo { name: "Some".into(), fields: vec![("value".into(), InferType::Var(t))] },
-            VariantInfo { name: "Nope".into(), fields: vec![] },
+            VariantInfo { name: "None".into(), fields: vec![] },
         ],
     });
     let t = gen.fresh();

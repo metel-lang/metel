@@ -2,7 +2,7 @@
 //
 // Feature coverage:
 //   enums (unit + field variants), structs/impl, tuples as return values,
-//   match-with-blocks (RFC-0018), return nope / return Err (RFC-0019),
+//   match-with-blocks (RFC-0018), return None / return Err (RFC-0019),
 //   Perhaps<T>, closures as strategy values, while loop, for-in (range + array),
 //   C-style for, higher-order functions, string operations, arrays of structs,
 //   closure capture, named-function as closure argument.
@@ -156,10 +156,10 @@ fun total_party_hp(party: Fighter[]) -> Int {
     total
 }
 
-// Index of the fighter with highest attack.  Returns nope for an empty party.
+// Index of the fighter with highest attack.  Returns None for an empty party.
 fun best_attacker_idx(party: Fighter[]) -> Perhaps<Int> {
     let n = array_len(party);
-    if (n == 0) { return nope; }
+    if (n == 0) { return None; }
     mut best = 0;
     for (mut i = 1; i < n; i += 1) {
         if (party[i].attack > party[best].attack) {
@@ -193,8 +193,8 @@ fun simulate_rounds(
 // ── Battle simulation ─────────────────────────────────────────────────────────
 
 // Simulate up to `max_rounds` alternating rounds.
-// Returns Perhaps::Some with the winner's name, or nope for a draw.
-// Uses RFC-0019: `return Perhaps::Some { value: ... }` and `return nope`.
+// Returns Perhaps::Some with the winner's name, or None for a draw.
+// Uses RFC-0019: `return Perhaps::Some { value: ... }` and `return None`.
 fun battle(
     f1_init:    Fighter,
     s1:         fun(Fighter, Fighter) -> Action,
@@ -224,7 +224,7 @@ fun battle(
         }
         round += 1;
     }
-    nope
+    None
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -336,12 +336,12 @@ fun main() {
     let result1 = battle(knight, always_attack, goblin, always_attack, 10);
     match result1 {
         Perhaps::Some { value } => assert(string_len(value) > 0),
-        nope => assert_msg(false, "expected Some"),
+        None => assert_msg(false, "expected Some"),
     };
 
     // 15. Battle: draw when max_rounds = 0 (no rounds fought).
     let draw = battle(knight, always_attack, goblin, always_attack, 0);
-    match draw { Perhaps::Some { value } => assert_msg(false, "expected nope"), nope => (), };
+    match draw { Perhaps::Some { value } => assert_msg(false, "expected None"), None => (), };
 
     // 16. Battle with inline closure strategy and named-function strategy.
     //   Mage (atk=30, def=1) always attacks; Healer uses smart_healer.
@@ -356,7 +356,7 @@ fun main() {
     );
     match result2 {
         Perhaps::Some { value } => (),
-        nope => assert_msg(false, "expected Some"),
+        None => assert_msg(false, "expected Some"),
     };
 
     // 17. Closure capturing an outer variable (hp threshold for heal decision).
@@ -391,12 +391,12 @@ fun main() {
     let best_idx = best_attacker_idx(party);
     match best_idx {
         Perhaps::Some { value } => assert(value == 1),
-        nope => assert_msg(false, "expected Some"),
+        None => assert_msg(false, "expected Some"),
     };
-    // Empty party returns nope.
+    // Empty party returns None.
     let empty_party: Fighter[] = [];
     let no_best = best_attacker_idx(empty_party);
-    match no_best { Perhaps::Some { value } => assert_msg(false, "expected nope"), nope => (), };
+    match no_best { Perhaps::Some { value } => assert_msg(false, "expected None"), None => (), };
 
     // 19. Count alive fighters in party via for-in (all have hp > 0).
     mut alive_count = 0;

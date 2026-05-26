@@ -1,11 +1,11 @@
 // Param types from the callee signature flow into argument construction,
-// so bare `nope` resolves without requiring ascription.
+// so bare `None` resolves without requiring ascription.
 
 fun first_or_default(items: Int[], fallback: Perhaps<Int>) -> Int {
     match fallback {
         Perhaps::Some { value } => value,
-        nope => if (array_len(items) > 0) { items[0] } else { 0 },
+        None => if (array_len(items) > 0) { items[0] } else { 0 },
     }
 }
 
-let _: Int = first_or_default([1, 2, 3], nope);
+let _: Int = first_or_default([1, 2, 3], None);

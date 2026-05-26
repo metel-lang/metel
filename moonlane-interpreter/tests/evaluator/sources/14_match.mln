@@ -17,9 +17,9 @@ fun main() {
     // Guard.
     let r5 = match 5 { n if n < 3 => 0, n if n < 7 => 1, _ => 2, };
     assert(r5 == 1);
-    // Nope pattern.
-    let maybe: Perhaps<Int> = nope;
-    let r6 = match maybe { nope => 1, _ => 0, };
+    // None pattern.
+    let maybe: Perhaps<Int> = None;
+    let r6 = match maybe { None => 1, _ => 0, };
     assert(r6 == 1);
     // String literal pattern.
     let r7 = match "hello" { "world" => 1, "hello" => 2, _ => 3, };

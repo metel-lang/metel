@@ -821,8 +821,8 @@ fn check_match_exhaustiveness(
         }
         Type::Perhaps(_) => {
             let has_some = arms.iter().any(|a| a.guard.is_none() && pattern_covers_variant(&a.pattern, "Perhaps", "Some"));
-            let has_nope = arms.iter().any(|a| a.guard.is_none() && pattern_covers_variant(&a.pattern, "Perhaps", "Nope"));
-            has_some && has_nope
+            let has_none = arms.iter().any(|a| a.guard.is_none() && pattern_covers_variant(&a.pattern, "Perhaps", "None"));
+            has_some && has_none
         }
         Type::Result(_, _) => {
             let has_ok  = arms.iter().any(|a| a.guard.is_none() && pattern_covers_variant(&a.pattern, "Result", "Ok"));
@@ -869,8 +869,8 @@ fn is_bool_literal_pattern(pattern: &Pattern, expected: bool) -> bool {
 /// Returns true if `pattern` (unguarded) covers variant `variant_name` of enum `enum_name`.
 fn pattern_covers_variant(pattern: &Pattern, enum_name: &str, variant_name: &str) -> bool {
     match pattern {
-        // `nope` covers the "Nope" variant of "Perhaps".
-        Pattern::Nope(_) => enum_name == "Perhaps" && variant_name == "Nope",
+        // `None` covers the "None" variant of "Perhaps".
+        Pattern::None(_) => enum_name == "Perhaps" && variant_name == "None",
         Pattern::EnumVariant { path, .. } => {
             path.first().map(String::as_str) == Some(enum_name)
                 && path.get(1).map(String::as_str) == Some(variant_name)
@@ -885,7 +885,7 @@ fn construct_pattern_bindings(
     ctx: &mut ConstructCtx,
 ) -> Result<(), MoonlaneError> {
     match pattern {
-        Pattern::Wildcard(_) | Pattern::Literal(_, _) | Pattern::Nope(_) => {}
+        Pattern::Wildcard(_) | Pattern::Literal(_, _) | Pattern::None(_) => {}
         Pattern::Binding(name, _) => {
             ctx.bind(name, scrutinee_ty.clone());
         }
@@ -969,7 +969,7 @@ fn construct_enum_literal_ty(
     }
 
     // Apply the local substitution to recover concrete type arguments.
-    // If a type param remains unresolved (fieldless variants like `Perhaps::Nope`),
+    // If a type param remains unresolved (fieldless variants like `Perhaps::None`),
     // fall back to the annotation's args.
     // type_to_infer normalises Perhaps/Result into Named for uniform handling.
     let hint_args: Vec<Type> = expected_ty
@@ -1058,7 +1058,7 @@ fn construct_call(
     ctx:    &mut ConstructCtx,
 ) -> Result<TypedExpr, MoonlaneError> {
     // For monomorphic callee identifiers already in scope, extract param types as hints so
-    // inherently ambiguous args (bare `[]`, `nope`) can resolve without requiring ascription.
+    // inherently ambiguous args (bare `[]`, `None`) can resolve without requiring ascription.
     // Generic (scheme-based) callees need arg types first for instantiation — no hints there.
     let param_hints: Vec<Option<Type>> = match callee {
         Expr::Ident(name, _) => {
@@ -1157,13 +1157,13 @@ fn construct_literal_type(
         Literal::Bool(_)  => Ok(Type::Bool),
         Literal::Str(_)   => Ok(Type::Str),
         Literal::Unit     => Ok(Type::Unit),
-        // nope's type cannot be re-derived from the literal alone. Pass 2 must receive
+        // None's type cannot be re-derived from the literal alone. Pass 2 must receive
         // the expected type from the enclosing binding's annotation (propagated via
         // construct_expr's expected_ty parameter). If no annotation, E0002 — but Pass 1
         // should have already caught the unannotated case via an unresolved type var.
-        Literal::Nope     => expected_ty.cloned().ok_or_else(|| MoonlaneError::type_error(
+        Literal::None     => expected_ty.cloned().ok_or_else(|| MoonlaneError::type_error(
             TypeErrorCode::T0002,
-            "cannot infer type of `nope`; add a type annotation",
+            "cannot infer type of `None`; add a type annotation",
             span,
         )),
     }

@@ -311,7 +311,7 @@ pub struct MatchArm {
 #[derive(Debug, Clone)]
 pub enum Pattern {
     Wildcard(Span),
-    Nope(Span),
+    None(Span),
     Literal(Literal, Span),
     Binding(String, Span),
     EnumVariant { path: Vec<String>, fields: Vec<String>, span: Span },
@@ -367,7 +367,7 @@ pub enum Literal {
     Float(f64),
     Bool(bool),
     Str(String),
-    Nope,
+    None,
     Unit,
 }
 

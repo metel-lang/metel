@@ -440,7 +440,7 @@ fn parse_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Expr,
         }
         // Terminals and composites reachable from primary_expr
         Rule::int_lit | Rule::float_lit | Rule::string_lit
-        | Rule::bool_lit | Rule::nope_lit | Rule::unit_lit => parse_literal_expr(pair, filename),
+        | Rule::bool_lit | Rule::none_lit | Rule::unit_lit => parse_literal_expr(pair, filename),
         Rule::path_expr     => parse_path_expr(pair, filename),
         Rule::tuple_or_paren => parse_tuple_or_paren(pair, filename),
         Rule::array_lit     => parse_array_lit(pair, filename),
@@ -475,7 +475,7 @@ fn parse_literal_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resu
         ),
         Rule::string_lit => Literal::Str(unescape(&text[1..text.len()-1])),
         Rule::bool_lit   => Literal::Bool(text == "true"),
-        Rule::nope_lit   => Literal::Nope,
+        Rule::none_lit   => Literal::None,
         Rule::unit_lit   => Literal::Unit,
         r => return Err(MoonlaneError::internal(format!("parse_literal_expr: unexpected rule {r:?}"))),
     };
@@ -878,7 +878,7 @@ fn parse_pattern(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Pa
                 .ok_or_else(|| MoonlaneError::internal("pattern: missing inner rule"))?;
             parse_pattern(inner, filename)
         }
-        Rule::nope_lit => Ok(Pattern::Nope(Span::of(&pair, filename))),
+        Rule::none_lit => Ok(Pattern::None(Span::of(&pair, filename))),
         Rule::tuple_pattern => {
             let span = Span::of(&pair,filename);
             let pats = pair.into_inner()

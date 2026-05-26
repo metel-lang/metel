@@ -23,7 +23,7 @@ match msg {
     Perhaps::Some { value } => {
         let v = value;
     },
-    nope => {},
+    None => {},
 };
 
 // Mixed: one arm is a bare expr, one is a block.

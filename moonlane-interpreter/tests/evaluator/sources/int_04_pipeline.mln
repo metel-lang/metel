@@ -77,7 +77,7 @@ impl Iterable<Int> for NumberList {
             self.pos = self.pos + 1;
             Perhaps::Some { value: v }
         } else {
-            nope
+            None
         }
     }
 }

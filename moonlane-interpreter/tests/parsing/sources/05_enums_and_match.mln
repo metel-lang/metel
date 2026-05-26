@@ -107,11 +107,11 @@ fun main() {
 
     match safe_head(full) {
         Perhaps::Some { value } => println(int_to_string(value)),  // 10
-        Perhaps::Nope => println("empty"),
+        Perhaps::None => println("empty"),
     }
     match safe_head(empty) {
         Perhaps::Some { value } => println(int_to_string(value)),
-        Perhaps::Nope => println("empty"),                          // empty
+        Perhaps::None => println("empty"),                          // empty
     }
 
     // --- .yolo() unwrap ---

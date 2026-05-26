@@ -11,10 +11,10 @@
 //   y : Float        (annotation Float, value infers Float)
 //   z : Bool         (annotation Bool, value infers Bool)
 //   s : String       (annotation String, value infers String)
-//   n : Perhaps<Int> (nope literal; type comes from annotation — Pass 2 expected_ty path)
+//   n : Perhaps<Int> (None literal; type comes from annotation — Pass 2 expected_ty path)
 
 let x: Int = 100;
 let y: Float = 2.718;
 let z: Bool = false;
 let s: String = "moonlane";
-let n: Perhaps<Int> = nope;
+let n: Perhaps<Int> = None;

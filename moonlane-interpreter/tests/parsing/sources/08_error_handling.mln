@@ -68,11 +68,11 @@ fun main() {
 
     match lookup(items, 1) {
         Perhaps::Some { value } => println(value),                        // banana
-        Perhaps::Nope => println("not found"),
+        Perhaps::None => println("not found"),
     }
     match lookup(items, 10) {
         Perhaps::Some { value } => println(value),
-        Perhaps::Nope => println("not found"),                            // not found
+        Perhaps::None => println("not found"),                            // not found
     }
 
     // --- .yolo() on a present value ---

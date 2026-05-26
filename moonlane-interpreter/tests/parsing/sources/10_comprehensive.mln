@@ -136,26 +136,26 @@ fun main() {
 
     match s.peek() {
         Perhaps::Some { value } => println(int_to_string(value)),   // 30
-        Perhaps::Nope => println("empty"),
+        Perhaps::None => println("empty"),
     }
 
     match s.pop() {
         Perhaps::Some { value } => println(int_to_string(value)),   // 30
-        Perhaps::Nope => println("empty"),
+        Perhaps::None => println("empty"),
     }
     println(int_to_string(s.size()));        // 2
 
     match s.pop() {
         Perhaps::Some { value } => println(int_to_string(value)),   // 20
-        Perhaps::Nope => println("empty"),
+        Perhaps::None => println("empty"),
     }
     match s.pop() {
         Perhaps::Some { value } => println(int_to_string(value)),   // 10
-        Perhaps::Nope => println("empty"),
+        Perhaps::None => println("empty"),
     }
     match s.pop() {
         Perhaps::Some { value } => println(int_to_string(value)),
-        Perhaps::Nope => println("stack empty"),                     // stack empty
+        Perhaps::None => println("stack empty"),                     // stack empty
     }
 
     // --- Tokens ---

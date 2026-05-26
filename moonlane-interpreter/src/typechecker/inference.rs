@@ -743,7 +743,7 @@ fn infer_pattern(
         Pattern::Binding(name, _) => {
             ctx.bind_mono(name, scrutinee_ty.clone(), false);
         }
-        Pattern::Nope(_) => {
+        Pattern::None(_) => {
             let fresh = ctx.fresh_var();
             ctx.add_constraint(
                 scrutinee_ty.clone(),
@@ -778,7 +778,7 @@ fn infer_pattern(
 
 fn pattern_span(pattern: &Pattern) -> &Span {
     match pattern {
-        Pattern::Wildcard(s) | Pattern::Nope(s) | Pattern::Binding(_, s)
+        Pattern::Wildcard(s) | Pattern::None(s) | Pattern::Binding(_, s)
         | Pattern::Literal(_, s) | Pattern::Tuple(_, s)
         | Pattern::EnumVariant { span: s, .. } => s,
     }
@@ -802,7 +802,7 @@ fn infer_literal(lit: &Literal, ctx: &mut InferContext) -> InferType {
         Literal::Bool(_)  => InferType::bool(),
         Literal::Str(_)   => InferType::str(),
         Literal::Unit     => InferType::unit(),
-        Literal::Nope     => InferType::Named("Perhaps".to_string(), vec![ctx.fresh_var()]),
+        Literal::None     => InferType::Named("Perhaps".to_string(), vec![ctx.fresh_var()]),
     }
 }
 

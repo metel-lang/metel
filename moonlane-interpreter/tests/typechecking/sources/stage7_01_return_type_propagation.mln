@@ -1,10 +1,10 @@
 // Stage 7: return type propagation from function context.
 // Pass 2 must propagate the declared return type into return/break expressions
-// so that nope and bare enum variants can be typed without a local annotation.
+// so that None and bare enum variants can be typed without a local annotation.
 
-// Return nope in a Perhaps<Int>-returning function.
+// Return None in a Perhaps<Int>-returning function.
 fun find(arr: Int[], target: Int) -> Perhaps<Int> {
-    return nope;
+    return None;
 }
 
 // Return Result::Err where T is not present in Err's fields.
@@ -15,10 +15,10 @@ fun divide(a: Float, b: Float) -> Result<Float, String> {
     return Result::Ok { value: a / b };
 }
 
-// Break nope in a loop whose result is annotated as Perhaps<Int>.
+// Break None in a loop whose result is annotated as Perhaps<Int>.
 fun first_positive(arr: Int[]) -> Perhaps<Int> {
     let result: Perhaps<Int> = loop {
-        break nope;
+        break None;
     };
     result
 }

@@ -22,7 +22,7 @@ impl Iterable<Int> for Counter {
             self.current = self.current + 1;
             return Perhaps::Some { value: val };
         }
-        return nope;
+        return None;
     }
 }
 

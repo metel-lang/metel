@@ -95,7 +95,7 @@ impl Iterable<Float> for AreaList {
             self.pos = self.pos + 1;
             Perhaps::Some { value: v }
         } else {
-            nope
+            None
         }
     }
 }
