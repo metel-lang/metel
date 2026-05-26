@@ -45,7 +45,7 @@ pub enum Decl {
     Enum(EnumDecl),
     Impl(ImplBlock),
     Aspect(AspectDecl),
-    Stmt(Stmt),
+    Stmt(Box<Stmt>),
 }
 
 #[derive(Debug, Clone)]
@@ -186,8 +186,8 @@ pub struct Block {
 #[derive(Debug, Clone)]
 pub enum Stmt {
     While(WhileStmt),
-    For(ForStmt),
-    ForIn(ForInStmt),
+    For(Box<ForStmt>),
+    ForIn(Box<ForInStmt>),
     Return(ReturnStmt),
     Break(BreakStmt),
     Continue(Span),

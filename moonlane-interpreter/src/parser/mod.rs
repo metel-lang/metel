@@ -67,7 +67,7 @@ fn parse_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Decl,
         Rule::enum_decl   => Ok(Decl::Enum(parse_enum_decl(inner, filename)?)),
         Rule::impl_block  => Ok(Decl::Impl(parse_impl_block(inner, filename)?)),
         Rule::aspect_decl => Ok(Decl::Aspect(parse_aspect_decl(inner, filename)?)),
-        Rule::stmt        => Ok(Decl::Stmt(parse_stmt(inner, filename)?)),
+        Rule::stmt        => Ok(Decl::Stmt(Box::new(parse_stmt(inner, filename)?))),
         r => Err(MoonlaneError::internal(format!("decl: unexpected rule {r:?}"))),
     }
 }
@@ -326,8 +326,8 @@ fn parse_stmt(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Stmt,
         .ok_or_else(|| MoonlaneError::internal("stmt: missing inner rule"))?;
     match inner.as_rule() {
         Rule::while_stmt   => Ok(Stmt::While(parse_while_stmt(inner, filename)?)),
-        Rule::for_stmt     => Ok(Stmt::For(parse_for_stmt(inner, filename)?)),
-        Rule::for_in_stmt  => Ok(Stmt::ForIn(parse_for_in_stmt(inner, filename)?)),
+        Rule::for_stmt     => Ok(Stmt::For(Box::new(parse_for_stmt(inner, filename)?))),
+        Rule::for_in_stmt  => Ok(Stmt::ForIn(Box::new(parse_for_in_stmt(inner, filename)?))),
         Rule::return_stmt  => Ok(Stmt::Return(parse_return_stmt(inner, filename)?)),
         Rule::break_stmt   => Ok(Stmt::Break(parse_break_stmt(inner, filename)?)),
         Rule::continue_stmt => Ok(Stmt::Continue(Span::of(&inner, filename))),
@@ -1082,7 +1082,7 @@ fn parse_block(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Bloc
                             Rule::loop_expr  => parse_loop_expr(expr_pair, filename)?,
                             r => return Err(MoonlaneError::internal(format!("block_expr_stmt: unexpected rule {r:?}"))),
                         };
-                        stmts.push(Decl::Stmt(Stmt::Expr(expr)));
+                        stmts.push(Decl::Stmt(Box::new(Stmt::Expr(expr))));
                     }
                     Rule::decl => stmts.push(parse_decl(inner, filename)?),
                     r => return Err(MoonlaneError::internal(format!("block_item: unexpected rule {r:?}"))),

@@ -27,7 +27,7 @@ pub enum TypedDecl {
     Enum(#[allow(dead_code)] TypedEnumDecl),
     Impl(TypedImplBlock),
     Aspect(#[allow(dead_code)] TypedAspectDecl),
-    Stmt(TypedStmt),
+    Stmt(Box<TypedStmt>),
 }
 
 #[derive(Debug, Clone)]
@@ -124,8 +124,8 @@ pub struct TypedAspectDecl {
 #[derive(Debug, Clone)]
 pub enum TypedStmt {
     While(TypedWhileStmt),
-    For(TypedForStmt),
-    ForIn(TypedForInStmt),
+    For(Box<TypedForStmt>),
+    ForIn(Box<TypedForInStmt>),
     Return(TypedReturnStmt),
     Break(TypedBreakStmt),
     Continue(#[allow(dead_code)] Span),
