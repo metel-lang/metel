@@ -1601,8 +1601,16 @@ fn call_function(func: Value, args: Vec<Value>, span: &Span) -> Result<Signal, M
     }
 }
 
-/// Like `call_function` but also returns the updated `self` binding after the call.
-/// Used by the for-in loop so that `mut self` mutations in `next()` persist across iterations.
+/// Like `call_function` but also returns the final value of the `self` parameter after the call.
+///
+/// This exists because the language currently has no mutable references. Structs are value types,
+/// so when `next(&mut self)` mutates iterator state, those mutations are local to the call frame
+/// and invisible to the caller. Returning `updated_self` lets the for-in loop thread the mutated
+/// iterator forward to the next iteration without shared mutable state.
+///
+/// Once a memory model with mutable references is adopted (see RFC-0001 and related issues),
+/// `next` can take `&mut self` and mutate in place. At that point this function becomes
+/// unnecessary and `eval_for_in` can call `call_function` directly.
 fn call_function_mut_self(func: Value, args: Vec<Value>, span: &Span) -> Result<(Signal, Value), MoonlaneError> {
     match func {
         Value::Closure(rc) => {
