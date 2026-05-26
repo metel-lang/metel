@@ -52,7 +52,7 @@ fn parse_program(pairs: &mut Pairs<Rule>, filename: &str) -> Result<Program, Moo
             _ => {}
         }
     }
-    Ok(Program { decls: decls })
+    Ok(Program { decls })
 }
 
 fn parse_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Decl, MoonlaneError> {
@@ -985,6 +985,7 @@ fn expr_to_assign_target(expr: Expr) -> Result<AssignTarget, MoonlaneError> {
 }
 
 
+#[allow(clippy::only_used_in_recursion)]
 fn parse_type_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<TypeExpr, MoonlaneError> {
     match pair.as_rule() {
         Rule::type_expr => {

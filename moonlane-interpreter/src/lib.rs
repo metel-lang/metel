@@ -1,5 +1,5 @@
-/// Moonlane language interpreter library.
-/// Exposes modules for use in tests and external code.
+//! Moonlane language interpreter library.
+//! Exposes modules for use in tests and external code.
 
 pub mod ast;
 pub mod error;
