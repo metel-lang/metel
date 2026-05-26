@@ -127,6 +127,10 @@ pub struct Environment {
     scopes: Vec<HashMap<String, Rc<RefCell<Value>>>>,
 }
 
+impl Default for Environment {
+    fn default() -> Self { Self::new() }
+}
+
 impl Environment {
     pub fn new() -> Self {
         Self { scopes: vec![HashMap::new()] }
@@ -272,8 +276,6 @@ pub fn evaluate(program: TypedProgram) -> Result<(), MoonlaneError> {
         }
     }
 
-    // Call main() by executing its body directly in the full env so that any
-    // top-level let/mut bindings from Pass 2 are visible.
     // Call main() by executing its body in the full top-level env so that any
     // top-level let/mut bindings from Pass 2 are visible.
     let dummy = Span { start: 0, end: 0, filename: "<program>".to_string(), line: 0, col: 0 };
@@ -946,7 +948,7 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Moonl
                         MoonlaneError::panic(RuntimeErrorCode::R0003, format!("assign: `{root}` not found"), tspan)
                     })?;
                     let mut borrowed = rc.borrow_mut();
-                    let mut cur: &mut Value = &mut *borrowed;
+                    let mut cur: &mut Value = &mut borrowed;
                     for segment in &path {
                         cur = match cur {
                             Value::Struct { fields, .. } | Value::Enum { fields, .. } => {
@@ -1340,7 +1342,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
                     })?;
                     let mut borrowed = rc.borrow_mut();
                     // Navigate intermediate path segments to reach the parent struct.
-                    let mut cur: &mut Value = &mut *borrowed;
+                    let mut cur: &mut Value = &mut borrowed;
                     for segment in &path {
                         cur = match cur {
                             Value::Struct { fields, .. } | Value::Enum { fields, .. } => {
@@ -1920,7 +1922,7 @@ fn register_builtins(env: &mut Environment) {
     }));
 
     env.define("string_concat", Value::Builtin("string_concat".to_string(), |args, _span| {
-        match (args.get(0), args.get(1)) {
+        match (args.first(), args.get(1)) {
             (Some(Value::Str(a)), Some(Value::Str(b))) => Ok(Value::Str(a.clone() + b)),
             _ => Err(MoonlaneError::internal("string_concat: expected two String arguments")),
         }

@@ -586,11 +586,9 @@ fn construct_expr(
                     }
                     // Match each field value type to its raw InferType param; resolve via subst.
                     for (fname, fexpr) in &typed_fields {
-                        if let Some((_, raw_ty)) = raw_fields.iter().find(|(n, _)| n == fname) {
-                            if let InferType::Var(v) = raw_ty {
-                                if type_params.contains(v) {
-                                    remap.insert(*v, type_to_infer(&fexpr.ty()));
-                                }
+                        if let Some((_, InferType::Var(v))) = raw_fields.iter().find(|(n, _)| n == fname) {
+                            if type_params.contains(v) {
+                                remap.insert(*v, type_to_infer(fexpr.ty()));
                             }
                         }
                     }

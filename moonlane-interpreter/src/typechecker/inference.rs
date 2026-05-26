@@ -212,7 +212,7 @@ fn infer_impl_method(
         }
     }).collect();
     let ret_ty = method.return_type.as_ref()
-        .map(|ann| te_to_infer(ann))
+        .map(te_to_infer)
         .unwrap_or_else(InferType::unit);
 
     ctx.push_scope();

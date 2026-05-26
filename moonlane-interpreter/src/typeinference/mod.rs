@@ -1,9 +1,7 @@
-/// Type inference module for Moonlane.
-///
-/// This module is being built incrementally with comprehensive tests.
-/// See tasks in docs/Moonlane/tasks/epic-001-typechecker/ for the step-by-step breakdown.
-///
-/// Current status: Foundation phase (type variables)
+//! Type inference module for Moonlane.
+//!
+//! Implements Hindley-Milner type inference with let-polymorphism.
+//! See `docs/internal/typechecker.md` for theory background and implementation notes.
 
 use crate::ast::Span;
 use crate::types::Type;
@@ -758,7 +756,7 @@ impl InferContext {
     /// Set the expected return type for the current function, returning the previous value.
     /// Call `pop_return_type` with the returned value to restore on function exit.
     pub fn push_return_type(&mut self, ty: InferType) -> Option<InferType> {
-        std::mem::replace(&mut self.current_return_type, Some(ty))
+        self.current_return_type.replace(ty)
     }
 
     /// Restore the return type context after leaving a function body.
@@ -772,7 +770,7 @@ impl InferContext {
     }
 
     pub fn push_break_type(&mut self, ty: InferType) -> Option<InferType> {
-        std::mem::replace(&mut self.current_break_type, Some(ty))
+        self.current_break_type.replace(ty)
     }
 
     pub fn pop_break_type(&mut self, prev: Option<InferType>) {
