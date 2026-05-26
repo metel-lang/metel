@@ -1,0 +1,4 @@
+// Negative test: ordering comparison on non-comparable type (T0005)
+// Bool does not support ordering comparisons.
+
+let x = true < false; // ERROR[T0005]

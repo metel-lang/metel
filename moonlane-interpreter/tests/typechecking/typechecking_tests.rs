@@ -106,6 +106,21 @@ mod tests {
         check_file(&format!("{}/neg_02_annotation_required.mln", test_dir()));
     }
 
+    #[test]
+    fn stage1_neg_arithmetic_on_bool() {
+        check_file(&format!("{}/neg_03_arithmetic_on_bool.mln", test_dir()));
+    }
+
+    #[test]
+    fn stage1_neg_neg_on_bool() {
+        check_file(&format!("{}/neg_04_neg_on_bool.mln", test_dir()));
+    }
+
+    #[test]
+    fn stage1_neg_ordering_on_bool() {
+        check_file(&format!("{}/neg_05_ordering_on_bool.mln", test_dir()));
+    }
+
     // ── Stage 2 positive tests ────────────────────────────────────────────────
 
     #[test]

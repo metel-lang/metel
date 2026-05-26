@@ -1,0 +1,4 @@
+// Negative test: arithmetic operator on non-numeric type (T0005)
+// Bool is not a valid operand for arithmetic.
+
+let x = true + false; // ERROR[T0005]

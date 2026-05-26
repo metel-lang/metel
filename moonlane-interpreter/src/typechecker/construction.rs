@@ -1179,8 +1179,29 @@ fn construct_binop(
     let lhs = construct_expr(lhs, None, ctx)?;
     let rhs = construct_expr(rhs, None, ctx)?;
     let ty = match op {
-        BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => lhs.ty().clone(),
-        BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => Type::Bool,
+        BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => {
+            let t = lhs.ty();
+            if !matches!(t, Type::Int | Type::Float | Type::Never) {
+                return Err(MoonlaneError::type_error(
+                    TypeErrorCode::T0005,
+                    format!("arithmetic operator requires Int or Float operands, got `{t}`"),
+                    span,
+                ));
+            }
+            t.clone()
+        }
+        BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => {
+            let t = lhs.ty();
+            if !matches!(t, Type::Int | Type::Float | Type::Str | Type::Never) {
+                return Err(MoonlaneError::type_error(
+                    TypeErrorCode::T0005,
+                    format!("ordering comparison requires Int, Float, or String operands, got `{t}`"),
+                    span,
+                ));
+            }
+            Type::Bool
+        }
+        BinOp::Eq | BinOp::Ne => Type::Bool,
         BinOp::And | BinOp::Or => Type::Bool,
         BinOp::Range | BinOp::RangeInclusive => Type::Named("Range".to_string(), vec![Type::Int]),
     };
@@ -1195,7 +1216,17 @@ fn construct_unaryop(
 ) -> Result<TypedExpr, MoonlaneError> {
     let operand = construct_expr(operand, None, ctx)?;
     let ty = match op {
-        UnaryOp::Neg => operand.ty().clone(),
+        UnaryOp::Neg => {
+            let t = operand.ty();
+            if !matches!(t, Type::Int | Type::Float | Type::Never) {
+                return Err(MoonlaneError::type_error(
+                    TypeErrorCode::T0005,
+                    format!("unary negation requires Int or Float operand, got `{t}`"),
+                    span,
+                ));
+            }
+            t.clone()
+        }
         UnaryOp::Not => Type::Bool,
     };
     Ok(TypedExpr::UnaryOp(op.clone(), Box::new(operand), ty, span.clone()))
