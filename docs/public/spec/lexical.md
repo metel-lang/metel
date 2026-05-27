@@ -26,10 +26,10 @@ By convention:
 ## Keywords
 
 ```
-and       as        break     continue  else      enum      false
-for       fun       if        impl      let       loop      match
-mut       or        return    struct    aspect     true
-use       where     while
+and       as        aspect    break     continue  else      enum
+false     for       fun       if        impl      let       loop
+match     mod       mut       or        pub       return    root
+self      struct    super     true      use       where     while
 ```
 
 ## Literals

@@ -1,7 +1,20 @@
 # Grammar
 
 ```
-Program            → Declaration* EOF
+Program            → ModDeclaration* UseDeclaration* Declaration* EOF
+
+ModDeclaration     → "mod" IDENTIFIER ";"
+                   | "pub" "mod" IDENTIFIER ";"
+
+UseDeclaration     → "use" UsePath ";"
+                   | "pub" "use" UsePath ";"
+UsePath            → PathRoot "::" UseTree
+PathRoot           → "root" | "std" | "self" | "super" | IDENTIFIER
+UseTree            → IDENTIFIER
+                   | IDENTIFIER "as" IDENTIFIER
+                   | "{" UseTree ( "," UseTree )* ","? "}"
+                   | "*"
+                   | IDENTIFIER "::" UseTree
 
 Declaration        → LetDeclaration
                    | MutDeclaration
@@ -71,14 +84,16 @@ PrimaryExpression  → INT | FLOAT | STRING | "true" | "false" | "None" | "()"
                    | "(" Expression ( "," Expression )+ ")"   // tuple
                    | "(" Expression ")"
                    | "[" ( Expression ( "," Expression )* ","? )? "]"  // array literal
-                   | IDENTIFIER ( "::" IDENTIFIER )*
+                   | Path
                    | StructLiteral
                    | MatchExpression
                    | IfExpression
                    | LoopExpression
                    | ClosureExpression
 
-StructLiteral      → IDENTIFIER ( "::" IDENTIFIER )* "{" FieldInit ( "," FieldInit )* ","? "}"
+Path               → ( "root" | "std" | "self" | "super" | IDENTIFIER ) ( "::" IDENTIFIER )*
+
+StructLiteral      → Path "{" FieldInit ( "," FieldInit )* ","? "}"
 FieldInit          → IDENTIFIER ( ":" Expression )?   // omitting ": Expression" uses the local variable of the same name
 
 MatchExpression    → "match" Expression "{" MatchArm ( "," MatchArm )* ","? "}"

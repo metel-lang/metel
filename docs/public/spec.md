@@ -45,6 +45,7 @@ See `docs/internal/vision.md` for the full design rationale and competitive posi
 | File | Contents |
 |---|---|
 | [Lexical Structure](spec/lexical.md) | Comments, identifiers, keywords, literals, operators |
+| [Modules](spec/modules.md) | Files, modules, imports, path roots, visibility, re-exports |
 | [Type System](spec/types.md) | Primitive types, inference, tuples, arrays, casting, generics, Never, `Perhaps<T>`, `Result<T,E>` |
 | [Declarations](spec/declarations.md) | Variables, structs, enums, aspects |
 | [Functions](spec/functions.md) | Functions, closures, the `?` operator |
