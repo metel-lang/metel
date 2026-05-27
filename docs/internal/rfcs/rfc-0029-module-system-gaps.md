@@ -2,7 +2,7 @@
 id: rfc-0029
 title: "Module System — Gaps and Clarifications"
 date: '2026-05-27'
-status: draft
+status: accepted
 ---
 
 ## Summary
@@ -25,32 +25,47 @@ Without this, it is unclear whether a `mod` declaration makes the submodule part
 ```moonlane
 // parser/mod.mln
 
-mod ast;       // internal — callers should not import crate::parser::ast directly
-pub mod lexer; // public — crate::parser::lexer is part of the API
+mod ast;       // internal — callers should not import root::parser::ast directly
+pub mod lexer; // public — root::parser::lexer is part of the API
 ```
 
 **Options:**
 
-- **Option A — `pub mod` / `mod` distinction (Rust-style).** A bare `mod name;` declares a private submodule — it exists and is accessible within the declaring module, but `crate::parser::ast::*` is not a valid path for external callers. `pub mod name;` makes the submodule publicly reachable. `pub use` is still needed to re-export individual names from a private submodule.
-- **Option B — All declared modules are implicitly public.** A `mod name;` declaration always makes `crate::…::name` reachable from outside. Module privacy is controlled entirely by `pub` on the individual declarations inside the module, not on the module itself. Simpler surface, but no way to hide an entire internal submodule without qualifying every item.
-- **Option C — All declared modules are implicitly private; `pub use` is the only export path.** You can never import `crate::parser::ast::Ast` directly; you must go through re-exports declared in a `pub use` chain. Maximum encapsulation, but verbose for straightforward hierarchies.
+- **Option A — `pub mod` / `mod` distinction (Rust-style).** A bare `mod name;` declares a private submodule — it exists and is accessible within the declaring module, but `root::parser::ast::*` is not a valid path for external callers. `pub mod name;` makes the submodule publicly reachable. `pub use` is still needed to re-export individual names from a private submodule.
+- **Option B — All declared modules are implicitly public.** A `mod name;` declaration always makes `root::…::name` reachable from outside. Module privacy is controlled entirely by `pub` on the individual declarations inside the module, not on the module itself. Simpler surface, but no way to hide an entire internal submodule without qualifying every item.
+- **Option C — All declared modules are implicitly private; `pub use` is the only export path.** You can never import `root::parser::ast::Ast` directly; you must go through re-exports declared in a `pub use` chain. Maximum encapsulation, but verbose for straightforward hierarchies.
+
+**Decision:** Accept **Option A**. A bare `mod name;` declares a private submodule. `pub mod name;` makes the submodule publicly reachable.
+
+This matches RFC-0009's existing `pub use` example, where an internal submodule can remain hidden while selected names are re-exported through the parent module.
+
+Grammar impact:
+
+```
+mod-decl ::= 'mod' identifier ';'
+           | 'pub' 'mod' identifier ';'
+```
 
 ---
 
-### OQ-2 — `crate` root definition
+### OQ-2 — root path definition
 
-RFC-0009 says `crate` refers to "the file containing the entry point" but does not define what that file is or how it is determined.
+RFC-0009 says `crate` refers to "the file containing the entry point" but does not define what that file is or how it is determined. This RFC also rejects the `crate` spelling in favour of `root::`.
 
 Two cases need a rule:
 
 1. **Binary programs** (have `main()`): which file is the root? The file passed directly to the compiler? Always `main.mln`? A project manifest?
-2. **Library modules** (no `main()`): what file is `crate::` rooted at? How does a caller of the library address its root?
+2. **Library modules** (no `main()`): what file is `root::` rooted at? How does a caller of the library address its root?
 
 **Options:**
 
-- **Option A — `crate` root is always the file passed to the compiler CLI.** `moonlane run src/main.mln` makes `src/main.mln` the crate root. Libraries are compiled with `moonlane build src/lib.mln`. Simple, explicit, no manifest needed.
-- **Option B — `crate` root is always a fixed filename.** Binary: `main.mln`. Library: `lib.mln`. The compiler looks for these names in the source root. Predictable, convention-based.
+- **Option A — Root is always the file passed to the compiler CLI.** `moonlane run src/main.mln` makes `src/main.mln` the root module. Libraries are compiled with `moonlane build src/lib.mln`. Simple, explicit, no manifest needed.
+- **Option B — Root is always a fixed filename.** Binary: `main.mln`. Library: `lib.mln`. The compiler looks for these names in the source root. Predictable, convention-based.
 - **Option C — Project manifest (e.g. `moonlane.toml`) declares the entry point.** The compiler reads the manifest to find the root file. More infrastructure to define now but necessary for multi-target projects (binary + library in one project).
+
+**Decision:** Accept **Option A** for v0.5.0, with the root path spelled `root::` instead of `crate::`. In script mode, the root module is the file passed directly to the toolchain. `moonlane run src/main.mln` roots `root::` at `src/main.mln`.
+
+This preserves single-file interpreted programs and also supports interpreted multi-file scripts: `mod` declarations are resolved relative to the selected root file and its submodules. A future manifest-based project mode can still select an explicit root file, then reuse the same module-resolution rules.
 
 ---
 
@@ -59,8 +74,8 @@ Two cases need a rule:
 When two `use` statements bring the same identifier into scope, the behaviour is undefined in RFC-0009.
 
 ```moonlane
-use crate::parser::Token;
-use crate::lexer::Token;   // conflict — what happens?
+use root::parser::Token;
+use root::lexer::Token;   // conflict — what happens?
 ```
 
 **Options:**
@@ -68,6 +83,17 @@ use crate::lexer::Token;   // conflict — what happens?
 - **Option A — Compile error.** Any two `use` statements that would bind the same name in the current scope are rejected, regardless of whether the names refer to the same item or different items.
 - **Option B — Compile error only when the name is actually used.** The conflict is reported at the use site, not at the `use` statement. Allows importing conflicting names as long as only one is referenced.
 - **Option C — Last declaration wins.** The later `use` shadows the earlier one silently. Consistent with how local `let` bindings shadow, but surprising at the import level.
+
+**Decision:** Accept **Option A** for explicit imports. If two explicit `use` declarations bind the same local name in the same module, the program is rejected at the second import.
+
+Glob imports (`use path::*;`) use a softer ambiguity rule:
+
+- Explicit imports beat glob imports.
+- Local declarations beat glob imports.
+- Two glob imports may export the same name without an immediate error.
+- A name from conflicting glob imports is an error only if it is referenced ambiguously.
+
+This keeps deliberate imports deterministic while avoiding fragile glob imports that break merely because an upstream module added a new public name.
 
 ---
 
@@ -91,8 +117,8 @@ error: ambiguous module `parser`
 RFC-0009 provides no way to rename an import at its use site. This makes name conflicts unresolvable in the common case where two needed modules export the same name:
 
 ```moonlane
-use crate::v1::Parser;
-use crate::v2::Parser;   // conflict — no way to use both
+use root::v1::Parser;
+use root::v2::Parser;   // conflict — no way to use both
 ```
 
 Without aliasing, the only workaround is to not import one name and use its full path inline — but RFC-0009 also does not define whether qualified paths are valid in expression and type position without a `use` declaration.
@@ -104,12 +130,29 @@ Without aliasing, the only workaround is to not import one name and use its full
 - **Option A — Yes, ship aliasing in v0.5.0.** Necessary for any program that uses two modules exporting the same name. Without it, name conflicts are entirely unresolvable.
 - **Option B — Defer; require full paths for conflict resolution.** Only viable if OQ-5b is resolved in favour of allowing inline qualified paths.
 
-**OQ-5b — Inline qualified paths without `use`.** Should `crate::parser::Ast` be valid in type and expression position without a corresponding `use` declaration?
+**OQ-5b — Inline qualified paths without `use`.** Should `root::parser::Ast` be valid in type and expression position without a corresponding `use` declaration?
 
 - **Option A — Yes.** Any fully-qualified path is valid anywhere a name is expected. `use` is syntactic sugar for bringing a name into the local scope, not the only way to access an item.
 - **Option B — No.** Items are only accessible by their short name after a `use` declaration. Full paths in expression position are not valid syntax.
 
 These two questions interact: if both are "no" and "no", name conflicts are entirely unresolvable. At least one must be "yes."
+
+**Decision:** Accept **Option A** for both sub-questions.
+
+`use path::to::Name as Alias;` is valid in v0.5.0 and binds `Alias` in the current module. Aliasing is valid for single imports and grouped imports:
+
+```moonlane
+use root::v1::Parser as ParserV1;
+use root::v2::{Parser as ParserV2, Token};
+```
+
+Fully-qualified paths are also valid in expression and type position without a preceding `use` declaration:
+
+```moonlane
+let parser: root::parser::Parser = root::parser::Parser::new();
+```
+
+`use` is therefore a local binding convenience, not the only mechanism for accessing a public item.
 
 ---
 
@@ -132,6 +175,10 @@ pub struct Token {
 
 Note: field-level visibility also interacts with struct literal construction. If a field is private, external code cannot construct the struct with a literal — it must use a constructor function. This is a significant ergonomic consequence of Option B.
 
+**Decision:** Accept **Option A** for v0.5.0. Fields of a `pub struct` are public. Fields of a private struct are private because the struct itself is not externally nameable.
+
+Field-level visibility remains desirable, but it is deferred to a follow-up issue for Option B (`pub` per field). That work must define how private fields interact with struct literals, pattern matching, and constructor functions.
+
 ---
 
 ### OQ-7 — `use module` vs. `use module::item` semantics
@@ -151,6 +198,17 @@ let x = sin(1.0);         // (B) math is not usable — must use std::math::sin
 - **Option B — `use` only binds the final name.** `use std::math;` brings the name `math` into scope as a type/value alias but not as a path prefix. To call `sin`, you need `use std::math::sin` or `use std::math::*`.
 
 This question also determines whether `use std::collections::{Map, Set}` is the idiomatic pattern (Option B) or `use std::collections;` followed by `collections::Map` in code (Option A). The two styles are not mutually exclusive but the RFC should pick a primary idiom.
+
+**Decision:** Accept **Option A**. `use path::module;` brings the module into scope as a path handle. After `use std::math;`, `math::sin(1.0)` is valid.
+
+Importing individual items remains valid and is still preferred when only a small number of names are needed:
+
+```moonlane
+use std::collections;
+use std::collections::{Map, Set};
+```
+
+Both declarations are legal if they bind different local names (`collections`, `Map`, and `Set`).
 
 ---
 
@@ -186,7 +244,7 @@ a == b  (a: Int, b: Int)   →   Int::Eq::eq(a, b)
 a < b   (a: Int, b: Int)   →   Int::Ord::compare(a, b) == Ordering::Less
 ```
 
-The aspect definition in `std::core` is the interface contract. The runtime lookup key is `TypeA::Aspect<TypeB>::method`. This creates a new class of compiler-special aspects — like `Display`, `Iterable`, and `From`, the operator aspects must always be in scope because the compiler desugars every operator expression into a call to one of them. They belong in `std::core`.
+The aspect definition in `std::core` is the interface contract. The runtime lookup key is `TypeA::Aspect<TypeB>::method`. This creates a new class of compiler-special aspects — like `Display`, `Iterable`, and `From`, the operator aspects must always be in scope once operator desugaring is implemented because the compiler desugars operator expressions into calls to them. They belong in `std::core`, but implementing operator aspect dispatch remains scoped to RFC-0011 / issue #149.
 
 The planned operator aspects (drawing from RFC-0011 and issue #149):
 
@@ -211,7 +269,7 @@ If `Add::add`, `Eq::eq` etc. live in `std::core`, then `impl Add for Int` must l
 
 The cleaner model: `Int`, `Float`, `Bool`, and `String` are declared in `std::core` with their full set of aspect implementations. They remain primitives in the compiler's internal representation — dedicated `Value` variants, special inference rules, `Bool` required by control flow — but they gain a module path. "Has a module path" and "has special compiler treatment" are orthogonal.
 
-**Proposed decision: `std::core` is auto-imported in every file.**
+**Decision: `std::core` is auto-imported in every file.**
 
 `std::core` contains all types and aspects that the compiler desugars into, plus the primitive types and their implementations. Every Moonlane program behaves as if `use std::core::*;` appears implicitly at the top of every file — the programmer never writes this import. This is the Haskell `Prelude` model.
 
@@ -328,17 +386,41 @@ This is a minor clarification, not a design choice — but it must be stated exp
 
 ---
 
-### OQ-10 — `super::` and relative paths (deferred)
+### OQ-10 — `super::`, `self::`, and relative paths
 
-RFC-0009 explicitly defers `super::` and `self::` to a future version. This is acknowledged as a known ergonomic gap: a submodule that needs to reference a sibling must write `crate::sibling::Name` rather than `super::sibling::Name`.
+RFC-0009 explicitly defers `super::` and `self::` to a future version. This is acknowledged as a known ergonomic gap: a submodule that needs to reference a sibling must write an absolute root path rather than `super::sibling::Name`.
 
-No decision is required now. This is recorded here so the v0.5.0 implementation does not accidentally make relative paths harder to add later. Specifically: the path resolution algorithm should be written to accept `super` and `self` as path roots even if they are currently rejected with "not yet supported", rather than treating them as user-defined module names.
+**Decision:** Include `self::` and `super::` in v0.5.0.
+
+Path roots are:
+
+| Root | Meaning |
+|---|---|
+| `root::` | The selected root module for the current program or package |
+| `std::` | The bundled standard library root |
+| `self::` | The current module |
+| `super::` | The parent module; invalid from the root module |
+| imported module name | A module handle introduced by `use path::module;` |
+| declared child module name | A child module declared by `mod name;` in the current module |
+
+Relative paths obey the same visibility rules as absolute paths. `super::private_child::Name` is only valid when the referenced module and item are visible from the current module.
 
 ---
 
 ## Decision
 
-**Outcome:** *(pending)*  
+**Outcome:** Accepted — v0.5.0  
 **Target:** v0.5.0
 
-*(Decisions to be recorded here after review.)*
+| Question | Decision |
+|---|---|
+| OQ-1 — Module visibility | `mod` is private; `pub mod` makes the submodule path public |
+| OQ-2 — Root path | The root path is spelled `root::`; in script mode it points at the file passed to the toolchain |
+| OQ-3 — Import conflicts | Explicit import conflicts are immediate errors; glob conflicts are errors only on ambiguous use |
+| OQ-4 — Ambiguous `mod` resolution | `name.mln` and `name/mod.mln` existing together is a compile error |
+| OQ-5 — Aliasing and qualified paths | `use … as` is supported; fully-qualified paths are valid without `use` |
+| OQ-6 — Struct field visibility | Fields of a `pub struct` are public in v0.5.0; field-level visibility is tracked separately |
+| OQ-7 — `use module` semantics | `use path::module` brings a module handle into scope |
+| OQ-8 — `std::core` | `std::core` contains compiler-special core types/aspects and is auto-imported in every file |
+| OQ-9 — File ordering | `mod*`, then `use*`, then declarations |
+| OQ-10 — Relative paths | `self::` and `super::` are included in v0.5.0 |
