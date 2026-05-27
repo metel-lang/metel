@@ -4,6 +4,7 @@
 pub mod ast;
 pub mod error;
 pub mod evaluator;
+pub mod module_loader;
 pub mod parser;
 pub mod typed_ast;
 pub mod typechecker;

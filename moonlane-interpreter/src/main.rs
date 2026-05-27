@@ -1,10 +1,11 @@
-use std::{fs, process};
+use std::process;
 
 use clap::Parser;
 
 mod ast;
 mod error;
 mod evaluator;
+mod module_loader;
 mod parser;
 mod typed_ast;
 mod typechecker;
@@ -31,23 +32,15 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let source = match fs::read_to_string(&args.file) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("Error reading '{}': {}", args.file, e);
-            process::exit(1);
-        }
-    };
-
-    if let Err(e) = run(&source, &args.file, args.debug_ast) {
+    if let Err(e) = run(&args.file, args.debug_ast) {
         eprintln!("{}", e);
         process::exit(1);
     }
 }
 
-fn run(source: &str, filename: &str, debug_ast: bool) -> Result<(), MoonlaneError> {
-    // 1. Parse source → untyped AST
-    let ast = parser::parse(source, filename)?;
+fn run(filename: &str, debug_ast: bool) -> Result<(), MoonlaneError> {
+    // 1. Load modules → untyped AST
+    let ast = module_loader::load_program(filename)?;
 
     if debug_ast {
         println!("{:#?}", ast);

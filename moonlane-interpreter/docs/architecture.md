@@ -5,12 +5,12 @@
 ## Pipeline
 
 ```
-.mln source file
+.mln root source file
        │
        ▼
-  ┌─────────┐
-  │  Parser │  pest PEG grammar → concrete syntax tree (CST)
-  └─────────┘
+  ┌───────────────┐
+  │ Module Loader │  selected root file → module graph; invokes parser per file
+  └───────────────┘
        │  ast::Program
        ▼
   ┌──────────────┐
@@ -33,8 +33,9 @@ Each stage is a separate Rust module. No stage is skipped.
 tree-walk-interpreter/
 ├── Cargo.toml
 └── src/
-    ├── main.rs            — CLI entry point: reads a .mln file, runs the pipeline
-    ├── grammar.pest       — pest PEG grammar for the full v0.1 language
+    ├── main.rs            — CLI entry point: selects a root .mln file, runs the pipeline
+    ├── grammar.pest       — pest PEG grammar for the language
+    ├── module_loader.rs   — loads the selected root file and declared child modules
     ├── parser/            — drives pest, builds untyped AST from CST
     ├── ast/               — untyped AST node definitions
     ├── types/             — concrete type representation (Type enum)
@@ -62,7 +63,8 @@ tree-walk-interpreter/
 
 | Data | Type | Produced by | Consumed by |
 |------|------|-------------|-------------|
-| Untyped program | `ast::Program` | parser | typechecker |
+| Module graph | `module_loader::ModuleGraph` | module loader | CLI / tests |
+| Untyped program | `ast::Program` | parser / module loader | typechecker |
 | Typed program | `typed_ast::TypedProgram` | typechecker | evaluator |
 | Errors | `MoonlaneError` | any stage | caller / CLI |
 
@@ -89,6 +91,7 @@ Type error codes: E0001–E0008. Runtime panics (`.yolo()` on `nope`, out-of-bou
 
 | Component | Notes |
 |-----------|-------|
+| Module Loader | `src/module_loader.rs` |
 | Parser | `src/parser/`, `src/grammar.pest` |
 | Type Checker | [typechecker.md](typechecker.md) |
 | Evaluator | [evaluator.md](evaluator.md) |

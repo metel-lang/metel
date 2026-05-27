@@ -10,5 +10,8 @@ mod typechecking_tests;
 #[path = "parsing/parsing_tests.rs"]
 mod parsing_tests;
 
+#[path = "module_loading/module_loading_tests.rs"]
+mod module_loading_tests;
+
 #[path = "evaluator/evaluator_tests.rs"]
 mod evaluator_tests;
