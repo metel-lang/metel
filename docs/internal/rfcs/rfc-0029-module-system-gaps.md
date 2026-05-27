@@ -154,17 +154,75 @@ This question also determines whether `use std::collections::{Map, Set}` is the 
 
 ---
 
-### OQ-8 — `Perhaps` and `Result` — built-in or module-backed
+### OQ-8 — `std::core`: what it contains, how it is imported, and shadowing
 
-RFC-0009 states that `Perhaps`, `Result`, `Bool`, `Int`, `Float`, and `String` "remain globally available in all programs regardless of module structure." Issue #150 proposes moving `Perhaps` and `Result` to a language core module.
+RFC-0009 states that `Perhaps`, `Result`, `Bool`, `Int`, `Float`, and `String` "remain globally available in all programs regardless of module structure." Issue #150 proposes moving `Perhaps` and `Result` to a language core module. These two goals conflict: if the types are module-defined, they are no longer compiler built-ins in the traditional sense.
 
-These two goals conflict. If `Perhaps` and `Result` are defined in a module (`std::core` or similar), they are no longer compiler built-ins — they are module-defined types that happen to be imported automatically.
+**What actually gets special treatment in the interpreter.**
 
-**Options:**
+A survey of the evaluator and typechecker reveals the full set of types and aspects that are hardcoded at the compiler level:
 
-- **Option A — `Perhaps` and `Result` stay as compiler built-ins.** They have no module identity. Issue #150 is descoped or reframed as an implementation-only refactor (the evaluator's internal representation changes, but no module path is exposed to the user).
-- **Option B — `Perhaps` and `Result` move to `std::core`, implicitly imported.** Every Moonlane program behaves as if `use std::core::*;` appears at the top of every file. The types become module-defined but the programmer never writes the import. Consistent with how `Prelude` works in Haskell.
-- **Option C — `Perhaps` and `Result` move to `std::core`, explicit import required.** In multi-module programs, you must write `use std::core::{Perhaps, Result};` (or `use std::core::*;`). Single-file programs continue to have them in scope via the single-file implicit scope rule. Maximally explicit, but inconsistent between single-file and multi-file programs.
+| Name | Kind | Special treatment |
+|---|---|---|
+| `Perhaps<T>` | enum | Dedicated `Value::Perhaps` variant; `nope` literal desugars to `Perhaps::None`; pattern exhaustiveness hardcoded |
+| `Result<T, E>` | enum | Dedicated `Value::Result` variant; `?` operator desugars to `Result::Err` propagation; pattern exhaustiveness hardcoded |
+| `Range` | struct | `..` operator produces `Range`; `for-in` loop has hardcoded `Range` iteration |
+| `RangeInclusive` | struct | `..=` operator produces `RangeInclusive`; `for-in` loop has hardcoded iteration |
+| `Display` | aspect | `print` / `println` builtins dispatch through `Display::to_string`; primitives have hardcoded impls |
+| `Iterable` | aspect | `for-in` loop dispatches through `Iterable::next` for non-`Range` types |
+| `From` | aspect | `?` coercion and numeric conversion dispatch through `From::from`; primitives have hardcoded impls |
+
+The primitive types (`Int`, `Float`, `Bool`, `String`) are compiler built-ins with no special evaluator logic beyond their type. They have `Display` and `From` implementations registered in the typechecker registry but no dedicated runtime variants.
+
+**Proposed decision: `std::core` is auto-imported in every file.**
+
+All seven items above move to `std::core`. Every Moonlane program behaves as if `use std::core::*;` appears implicitly at the top of every file — the programmer never writes this import. This is the Haskell `Prelude` model.
+
+The primitive types (`Int`, `Float`, `Bool`, `String`) stay as compiler built-ins with no module path. They are not in `std::core`. Their `Display` and `From` implementations are declared in `std::core` as aspect impls and are picked up automatically via the auto-import.
+
+```moonlane
+// std/core.mln — always auto-imported
+
+pub enum Perhaps<T> {
+    Some { value: T },
+    None,
+}
+
+pub enum Result<T, E> {
+    Ok    { value: T },
+    Err   { error: E },
+}
+
+pub struct Range          { start: Int, end: Int }
+pub struct RangeInclusive { start: Int, end: Int }
+
+pub aspect Display        { fun to_string(self: @Self) -> String }
+pub aspect Iterable<T>    { fun next(self: Self) -> (Perhaps<T>, Self) }
+pub aspect From<Src>      { fun from(src: Src) -> Self }
+
+// Primitive Display impls
+impl Display for Int    { ... }
+impl Display for Float  { ... }
+impl Display for Bool   { ... }
+impl Display for String { ... }
+
+// Primitive From impls
+impl From<Float> for Int   { ... }
+impl From<Int>   for Float { ... }
+```
+
+**Shadowing rule.** A user-defined name that matches a `std::core` export shadows the auto-import in the declaring module. The shadow is local — it does not affect other modules. This is consistent with how `use` imports are already shadowed by `let` bindings in expression scope.
+
+```moonlane
+// user code
+enum Perhaps<T> { Some(T), Empty }   // shadows std::core::Perhaps in this file only
+
+fun check(x: Perhaps<Int>) -> Bool { ... }   // refers to the local Perhaps
+```
+
+An explicit `use std::core::Perhaps;` after a local definition of `Perhaps` is a name conflict (OQ-3) and is an error.
+
+**Interaction with OQ-3 (name conflicts).** The auto-import from `std::core` is treated as lower priority than any explicit `use` declaration. If a user writes `use crate::mymodule::Perhaps;`, that name takes precedence over the auto-imported `std::core::Perhaps` — no conflict error is raised. The explicit import always wins over the implicit one. A conflict only arises between two explicit `use` statements that bind the same name.
 
 ---
 
