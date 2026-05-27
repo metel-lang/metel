@@ -30,7 +30,68 @@ impl Span {
 
 #[derive(Debug, Clone)]
 pub struct Program {
+    /// Reserved for module loading/resolution in #159/#161.
+    #[allow(dead_code)]
+    pub modules: Vec<ModDecl>,
+    /// Reserved for module loading/resolution in #159/#161.
+    #[allow(dead_code)]
+    pub imports: Vec<UseDecl>,
     pub decls: Vec<Decl>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Visibility {
+    Private,
+    Public,
+}
+
+#[derive(Debug, Clone)]
+pub struct ModDecl {
+    /// Reserved for module loading/resolution in #159/#161.
+    #[allow(dead_code)]
+    pub name:       String,
+    /// Reserved for module loading/resolution in #159/#161.
+    #[allow(dead_code)]
+    pub visibility: Visibility,
+    /// Reserved for module diagnostics in #159/#161.
+    #[allow(dead_code)]
+    pub span:       Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct UseDecl {
+    /// Reserved for module loading/resolution in #159/#161.
+    #[allow(dead_code)]
+    pub visibility: Visibility,
+    /// Reserved for module loading/resolution in #159/#161.
+    #[allow(dead_code)]
+    pub path:       UsePath,
+    /// Reserved for module diagnostics in #159/#161.
+    #[allow(dead_code)]
+    pub span:       Span,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UsePath {
+    pub root: PathRoot,
+    pub tree: UseTree,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PathRoot {
+    Root,
+    Std,
+    Self_,
+    Super,
+    Name(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UseTree {
+    Name { name: String, alias: Option<String> },
+    Group(Vec<UseTree>),
+    Glob,
+    Path { name: String, tree: Box<UseTree> },
 }
 
 

@@ -26,9 +26,22 @@ block_comment = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
 
 // ── Program ───────────────────────────────────────────────────────────────────
 
-program = { SOI ~ decl* ~ EOI }
+program = { SOI ~ mod_decl* ~ use_decl* ~ decl* ~ EOI }
 
 // ── Declarations ──────────────────────────────────────────────────────────────
+
+mod_decl = { pub_kw? ~ "mod" ~ ident ~ ";" }
+
+use_decl = { pub_kw? ~ "use" ~ use_path ~ ";" }
+use_path = { path_root ~ "::" ~ use_tree }
+path_root = { root_kw | std_kw | self_kw | super_kw | ident }
+use_tree = {
+    ident ~ "as" ~ ident
+  | ident ~ "::" ~ use_tree
+  | "{" ~ use_tree ~ ("," ~ use_tree)* ~ ","? ~ "}"
+  | "*"
+  | ident
+}
 
 decl = {
     fun_decl
@@ -166,8 +179,8 @@ closure_expr = { "fun" ~ "(" ~ param_list? ~ ")" ~ ("->" ~ type_expr)? ~ block }
 struct_literal = { type_path ~ "{" ~ field_init ~ ("," ~ field_init)* ~ ","? ~ "}" }
 field_init     = { ident ~ (":" ~ expr)? }
 
-path_expr = { ident ~ ("::" ~ ident)* }
-type_path = { ident ~ ("::" ~ ident)* }
+path_expr = { path_root ~ ("::" ~ ident)* }
+type_path = { path_root ~ ("::" ~ ident)* }
 
 // ── Patterns ──────────────────────────────────────────────────────────────────
 
@@ -199,7 +212,7 @@ unit_type  = { "()" }
 tuple_type = { "(" ~ type_expr ~ ("," ~ type_expr)+ ~ ")" }
 fun_type   = { "fun" ~ "(" ~ type_list? ~ ")" ~ ("->" ~ type_expr)? }
 array_type = { named_type ~ "[]" }
-named_type = { ident ~ ("<" ~ type_args ~ ">")? }
+named_type = { type_path ~ ("<" ~ type_args ~ ">")? }
 type_args  = { type_expr ~ ("," ~ type_expr)* }
 type_list  = { type_expr ~ ("," ~ type_expr)* }
 
@@ -217,6 +230,12 @@ bool_lit  = @{ ("true" | "false") ~ !(ASCII_ALPHANUMERIC | "_") }
 none_lit  = @{ "None" ~ !(ASCII_ALPHANUMERIC | "_") }
 unit_lit  = @{ "()" }
 
+pub_kw   = @{ "pub" ~ !(ASCII_ALPHANUMERIC | "_") }
+root_kw  = @{ "root" ~ !(ASCII_ALPHANUMERIC | "_") }
+std_kw   = @{ "std" ~ !(ASCII_ALPHANUMERIC | "_") }
+self_kw  = @{ "self" ~ !(ASCII_ALPHANUMERIC | "_") }
+super_kw = @{ "super" ~ !(ASCII_ALPHANUMERIC | "_") }
+
 ident = @{
     !keyword ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")*
 }
@@ -224,7 +243,8 @@ ident = @{
 keyword = @{
     ("and" | "as" | "break" | "continue" | "else" | "enum" | "false" |
      "for" | "fun" | "if" | "impl" | "let" | "loop" | "match" |
-     "mut" | "or" | "return" | "struct" | "aspect" | "true" |
-     "use" | "where" | "while")
+     "mod" | "mut" | "or" | "pub" | "return" | "root" | "self" |
+     "std" | "struct" | "super" | "aspect" | "true" | "use" |
+     "where" | "while")
     ~ !(ASCII_ALPHANUMERIC | "_")
 }

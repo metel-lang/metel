@@ -1,0 +1,18 @@
+mod parser;
+pub mod lexer;
+
+use std::math;
+use std::collections::{Map, Set};
+use root::parser::Ast;
+use root::v1::Parser as ParserV1;
+use root::v2::{Parser as ParserV2, Token};
+use root::prelude::*;
+
+struct Program {
+    ast: root::parser::Ast,
+}
+
+fun main() {
+    let _x = math::sin(1.0);
+    let _ast = root::parser::Ast;
+}

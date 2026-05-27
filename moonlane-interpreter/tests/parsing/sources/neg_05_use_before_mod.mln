@@ -1,0 +1,4 @@
+use root::parser::Ast;
+mod parser;
+
+fun main() { }

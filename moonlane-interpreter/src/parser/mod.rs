@@ -42,9 +42,17 @@ fn parse_program(pairs: &mut Pairs<Rule>, filename: &str) -> Result<Program, Moo
     if program_pair.as_rule() != Rule::program {
         return Err(MoonlaneError::internal("parse_program: first rule is not program"));
     }
+    let mut modules = Vec::new();
+    let mut imports = Vec::new();
     let mut decls = Vec::new();
     for pair in program_pair.into_inner() {
         match pair.as_rule() {
+            Rule::mod_decl => {
+                modules.push(parse_mod_decl(pair, filename)?);
+            }
+            Rule::use_decl => {
+                imports.push(parse_use_decl(pair, filename)?);
+            }
             Rule::decl => {
                 decls.push(parse_decl(pair, filename)?);
             }
@@ -52,7 +60,105 @@ fn parse_program(pairs: &mut Pairs<Rule>, filename: &str) -> Result<Program, Moo
             _ => {}
         }
     }
-    Ok(Program { decls })
+    Ok(Program { modules, imports, decls })
+}
+
+fn parse_mod_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<ModDecl, MoonlaneError> {
+    let span = Span::of(&pair, filename);
+    let mut visibility = Visibility::Private;
+    let mut name = None;
+    for p in pair.into_inner() {
+        match p.as_rule() {
+            Rule::pub_kw => visibility = Visibility::Public,
+            Rule::ident => name = Some(p.as_str().to_string()),
+            r => return Err(MoonlaneError::internal(format!("mod_decl: unexpected rule {r:?}"))),
+        }
+    }
+    Ok(ModDecl {
+        name: name.ok_or_else(|| MoonlaneError::internal("mod_decl: expected module name"))?,
+        visibility,
+        span,
+    })
+}
+
+fn parse_use_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<UseDecl, MoonlaneError> {
+    let span = Span::of(&pair, filename);
+    let mut visibility = Visibility::Private;
+    let mut path = None;
+    for p in pair.into_inner() {
+        match p.as_rule() {
+            Rule::pub_kw => visibility = Visibility::Public,
+            Rule::use_path => path = Some(parse_use_path(p)?),
+            r => return Err(MoonlaneError::internal(format!("use_decl: unexpected rule {r:?}"))),
+        }
+    }
+    Ok(UseDecl {
+        visibility,
+        path: path.ok_or_else(|| MoonlaneError::internal("use_decl: expected import path"))?,
+        span,
+    })
+}
+
+fn parse_use_path(pair: pest::iterators::Pair<Rule>) -> Result<UsePath, MoonlaneError> {
+    let mut inner = pair.into_inner();
+    let root_pair = inner.next()
+        .ok_or_else(|| MoonlaneError::internal("use_path: expected path root"))?;
+    let tree_pair = inner.next()
+        .ok_or_else(|| MoonlaneError::internal("use_path: expected use tree"))?;
+    Ok(UsePath {
+        root: parse_path_root(root_pair)?,
+        tree: parse_use_tree(tree_pair)?,
+    })
+}
+
+fn parse_path_root(pair: pest::iterators::Pair<Rule>) -> Result<PathRoot, MoonlaneError> {
+    match pair.as_rule() {
+        Rule::path_root => {
+            let inner = pair.into_inner().next()
+                .ok_or_else(|| MoonlaneError::internal("path_root: expected inner root"))?;
+            parse_path_root(inner)
+        }
+        Rule::root_kw => Ok(PathRoot::Root),
+        Rule::std_kw => Ok(PathRoot::Std),
+        Rule::self_kw => Ok(PathRoot::Self_),
+        Rule::super_kw => Ok(PathRoot::Super),
+        Rule::ident => Ok(PathRoot::Name(pair.as_str().to_string())),
+        r => Err(MoonlaneError::internal(format!("path_root: unexpected rule {r:?}"))),
+    }
+}
+
+fn parse_use_tree(pair: pest::iterators::Pair<Rule>) -> Result<UseTree, MoonlaneError> {
+    if pair.as_str().trim() == "*" {
+        return Ok(UseTree::Glob);
+    }
+    let mut inner = pair.into_inner();
+    let first = inner.next()
+        .ok_or_else(|| MoonlaneError::internal("use_tree: expected import item"))?;
+    match first.as_rule() {
+        Rule::ident => {
+            let name = first.as_str().to_string();
+            match inner.next() {
+                Some(second) if second.as_rule() == Rule::ident => {
+                    Ok(UseTree::Name { name, alias: Some(second.as_str().to_string()) })
+                }
+                Some(second) if second.as_rule() == Rule::use_tree => {
+                    Ok(UseTree::Path { name, tree: Box::new(parse_use_tree(second)?) })
+                }
+                Some(second) => Err(MoonlaneError::internal(format!("use_tree: unexpected rule after name {:?}", second.as_rule()))),
+                None => Ok(UseTree::Name { name, alias: None }),
+            }
+        }
+        Rule::use_tree => {
+            let mut trees = vec![parse_use_tree(first)?];
+            for p in inner {
+                if p.as_rule() == Rule::use_tree {
+                    trees.push(parse_use_tree(p)?);
+                }
+            }
+            Ok(UseTree::Group(trees))
+        }
+        r => Err(MoonlaneError::internal(format!("use_tree: unexpected rule {r:?}"))),
+    }
 }
 
 fn parse_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Decl, MoonlaneError> {
@@ -207,10 +313,12 @@ fn parse_impl_block(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result
             // `impl Aspect<T> for Type { ... }`
             let mut it = type_pairs.into_iter();
             let aspect_pair = it.next().unwrap(); // named_type rule
-            // named_type = { ident ~ ("<" ~ type_args ~ ">")? }
+            // named_type = { type_path ~ ("<" ~ type_args ~ ">")? }
             let mut inner_pairs = aspect_pair.into_inner();
-            let name_ident = inner_pairs.next().unwrap();
-            aspect_name = Some(name_ident.as_str().to_string());
+            let path_pair = inner_pairs
+                .next()
+                .ok_or_else(|| MoonlaneError::internal("impl_block: expected aspect type path"))?;
+            aspect_name = Some(collect_path_components(path_pair)?.join("::"));
             // Collect generic type args if present
             for p in inner_pairs {
                 if p.as_rule() == Rule::type_args {
@@ -484,10 +592,7 @@ fn parse_literal_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resu
 
 fn parse_path_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Expr, MoonlaneError> {
     let span  = Span::of(&pair, filename);
-    let parts: Vec<String> = pair.into_inner()
-        .filter(|p| p.as_rule() == Rule::ident)
-        .map(|p| p.as_str().to_string())
-        .collect();
+    let parts = collect_path_components(pair)?;
     if parts.len() == 1 {
         Ok(Expr::Ident(parts.into_iter().next().unwrap(), span))
     } else {
@@ -618,10 +723,7 @@ fn parse_struct_literal(pair: pest::iterators::Pair<Rule>, filename: &str) -> Re
     let mut inner = pair.into_inner();
     let path_pair = inner.next()
         .ok_or_else(|| MoonlaneError::internal("struct_literal: expected path"))?;
-    let path: Vec<String> = path_pair.into_inner()
-        .filter(|p| p.as_rule() == Rule::ident)
-        .map(|p| p.as_str().to_string())
-        .collect();
+    let path = collect_path_components(path_pair)?;
     let mut fields = vec![];
     for p in inner {
         if p.as_rule() == Rule::field_init {
@@ -638,6 +740,30 @@ fn parse_struct_literal(pair: pest::iterators::Pair<Rule>, filename: &str) -> Re
         }
     }
     Ok(Expr::StructLiteral { path, fields, span })
+}
+
+fn collect_path_components(pair: pest::iterators::Pair<Rule>) -> Result<Vec<String>, MoonlaneError> {
+    let mut parts = Vec::new();
+    for p in pair.into_inner() {
+        match p.as_rule() {
+            Rule::path_root => {
+                parts.push(path_root_to_component(parse_path_root(p)?));
+            }
+            Rule::ident => parts.push(p.as_str().to_string()),
+            r => return Err(MoonlaneError::internal(format!("path: unexpected rule {r:?}"))),
+        }
+    }
+    Ok(parts)
+}
+
+fn path_root_to_component(root: PathRoot) -> String {
+    match root {
+        PathRoot::Root => "root".to_string(),
+        PathRoot::Std => "std".to_string(),
+        PathRoot::Self_ => "self".to_string(),
+        PathRoot::Super => "super".to_string(),
+        PathRoot::Name(name) => name,
+    }
 }
 
 // ── Assignment ────────────────────────────────────────────────────────────────
@@ -1028,9 +1154,9 @@ fn parse_type_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<
         }
         Rule::named_type => {
             let mut inner = pair.into_inner();
-            let name = inner.next()
-                .ok_or_else(|| MoonlaneError::internal("named_type: expected name"))?
-                .as_str().to_string();
+            let path_pair = inner.next()
+                .ok_or_else(|| MoonlaneError::internal("named_type: expected name"))?;
+            let name = collect_path_components(path_pair)?.join("::");
             let mut args = vec![];
             for p in inner {
                 if p.as_rule() == Rule::type_args {

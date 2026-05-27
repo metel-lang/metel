@@ -1,6 +1,7 @@
 //! Integration tests: each .mln test program must run through the parser without errors. These tests are meant to cover the full range of language features, and are not expected to be minimal. They are primarily intended to catch regressions in the parser as new features are added.
 
 use moonlane::parser;
+use moonlane::ast::{PathRoot, UseTree, Visibility};
 
 fn run(filename: &str) {
     let path = format!("tests/parsing/sources/{}", filename);
@@ -42,6 +43,80 @@ fn test_10_comprehensive() { run("10_comprehensive.mln"); }
 
 #[test]
 fn test_11_block_expr_stmts() { run("11_block_expr_stmts.mln"); }
+
+#[test]
+fn test_12_modules() { run("12_modules.mln"); }
+
+#[test]
+fn module_ast_preserves_visibility_roots_aliases_groups_and_globs() {
+    let source = r#"
+mod parser;
+pub mod lexer;
+
+use std::math;
+pub use root::parser::Ast;
+use root::v1::Parser as ParserV1;
+use root::v2::{Parser as ParserV2, Token};
+use root::prelude::*;
+
+fun main() { }
+"#;
+    let program = parser::parse(source, "module_ast.mln")
+        .unwrap_or_else(|e| panic!("{}", e));
+
+    assert_eq!(program.modules.len(), 2);
+    assert_eq!(program.modules[0].name, "parser");
+    assert_eq!(program.modules[0].visibility, Visibility::Private);
+    assert_eq!(program.modules[1].name, "lexer");
+    assert_eq!(program.modules[1].visibility, Visibility::Public);
+
+    assert_eq!(program.imports.len(), 5);
+    assert_eq!(program.imports[0].path.root, PathRoot::Std);
+    assert_eq!(
+        program.imports[0].path.tree,
+        UseTree::Name { name: "math".to_string(), alias: None }
+    );
+
+    assert_eq!(program.imports[1].visibility, Visibility::Public);
+    assert_eq!(program.imports[1].path.root, PathRoot::Root);
+    assert_eq!(
+        program.imports[1].path.tree,
+        UseTree::Path {
+            name: "parser".to_string(),
+            tree: Box::new(UseTree::Name { name: "Ast".to_string(), alias: None }),
+        }
+    );
+
+    assert_eq!(
+        program.imports[2].path.tree,
+        UseTree::Path {
+            name: "v1".to_string(),
+            tree: Box::new(UseTree::Name {
+                name: "Parser".to_string(),
+                alias: Some("ParserV1".to_string()),
+            }),
+        }
+    );
+
+    assert_eq!(
+        program.imports[3].path.tree,
+        UseTree::Path {
+            name: "v2".to_string(),
+            tree: Box::new(UseTree::Group(vec![
+                UseTree::Name {
+                    name: "Parser".to_string(),
+                    alias: Some("ParserV2".to_string()),
+                },
+                UseTree::Name { name: "Token".to_string(), alias: None },
+            ])),
+        }
+    );
+
+    assert_eq!(
+        program.imports[4].path.tree,
+        UseTree::Path { name: "prelude".to_string(), tree: Box::new(UseTree::Glob) }
+    );
+}
 
 // ── Error format tests ────────────────────────────────────────────────────────
 
@@ -119,4 +194,16 @@ fn error_format_line_counting_past_nine() {
         msg.contains("neg_04_error_at_line_10.mln:10:1"),
         "expected 'file:10:1' in message, got: {msg}"
     );
+}
+
+#[test]
+fn rejects_use_before_mod() {
+    let msg = parse_error_message("neg_05_use_before_mod.mln");
+    assert!(msg.contains("P0001"), "expected parse error, got: {msg}");
+}
+
+#[test]
+fn rejects_mod_after_declaration() {
+    let msg = parse_error_message("neg_06_mod_after_decl.mln");
+    assert!(msg.contains("P0001"), "expected parse error, got: {msg}");
 }
