@@ -405,4 +405,7 @@ mod tests {
 
     #[test]
     fn int_display() { check("integration/int_06_display.mln"); }
+
+    #[test]
+    fn int_pub_declarations() { check("integration/int_07_pub_declarations.mln"); }
 }
