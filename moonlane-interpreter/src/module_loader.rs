@@ -81,10 +81,10 @@ impl Loader {
 
         self.stack.push(file_path.clone());
         for import in &program.imports {
-            if let Some((module_name, child_file)) = resolve_import_module(&file_path, &import.path.root, &import.path.tree) {
+            if let Some((mod_segs, child_file)) = resolve_import_module(&file_path, &import.path.root, &import.path.tree) {
                 let child = canonicalize_existing(&child_file)?;
                 let mut child_path = module_path.clone();
-                child_path.push(module_name);
+                child_path.extend(mod_segs);
                 self.load_module(child, child_path)?;
             }
         }
@@ -105,42 +105,66 @@ fn canonicalize_existing(path: &Path) -> Result<PathBuf, MoonlaneError> {
     })
 }
 
-/// Extract the first path segment from an import declaration that corresponds to a
-/// module file alongside the importing file. Returns `(module_name, candidate_path)`
-/// if the import resolves to a local file, or `None` for `std::`, `root::`, and
-/// other roots that don't map to a sibling file.
-fn resolve_import_module(parent_file: &Path, root: &PathRoot, tree: &ImportTree) -> Option<(String, PathBuf)> {
+/// Resolve an import declaration to a module file.
+///
+/// Returns `(module_path_segments, file_path)` if a `.mln` file exists for the
+/// import, or `None` for `root::`, `std::`, `super::`, and imports that don't map
+/// to a sibling file. The module path segments are extended onto the caller's
+/// `module_path` to form the child's canonical module path.
+///
+/// Path mapping: `::` separators map directly to `/` directory separators.
+/// `import parser::ast::Ast` tries `parser/ast.mln` first, then `parser.mln` —
+/// the longest matching prefix wins.
+fn resolve_import_module(
+    parent_file: &Path,
+    root: &PathRoot,
+    tree: &ImportTree,
+) -> Option<(Vec<String>, PathBuf)> {
     let parent_dir = parent_file.parent().unwrap_or_else(|| Path::new("."));
 
-    // Only resolve imports rooted at `self::`, `super::`, or a bare name (child module).
-    // `root::`, `std::` are resolved globally at a later stage.
-    let first_name = match root {
-        PathRoot::Self_ => {
-            // self::name::... — the first segment of the tree is a child
-            tree_first_segment(tree)?
-        }
-        PathRoot::Super => {
-            // super::name::... — resolved relative to parent dir; skip for graph loading
-            return None;
-        }
+    let segs: Vec<String> = match root {
         PathRoot::Root | PathRoot::Std => return None,
-        PathRoot::Name(name) => name.clone(),
+        PathRoot::Super => return None,
+        PathRoot::Self_ => import_tree_segments(tree),
+        PathRoot::Name(name) => {
+            let mut s = vec![name.clone()];
+            s.extend(import_tree_segments(tree));
+            s
+        }
     };
 
-    let candidate = parent_dir.join(format!("{first_name}.mln"));
-    if candidate.exists() {
-        Some((first_name, candidate))
-    } else {
-        None
+    find_module_file(parent_dir, &segs)
+}
+
+/// Collect all identifier segments from an import tree in path order.
+/// Stops at the terminal item(s) — returns their names as the last segment(s).
+/// For `ast::Ast` → ["ast", "Ast"]; for `ast::{A, B}` → ["ast"]; for `*` → [].
+fn import_tree_segments(tree: &ImportTree) -> Vec<String> {
+    match tree {
+        ImportTree::Name { name, .. } => vec![name.clone()],
+        ImportTree::Path { name, tree } => {
+            let mut segs = vec![name.clone()];
+            segs.extend(import_tree_segments(tree));
+            segs
+        }
+        ImportTree::Group(_) | ImportTree::Glob => vec![],
     }
 }
 
-fn tree_first_segment(tree: &ImportTree) -> Option<String> {
-    match tree {
-        ImportTree::Name { name, .. } => Some(name.clone()),
-        ImportTree::Path { name, .. } => Some(name.clone()),
-        ImportTree::Group(_) | ImportTree::Glob => None,
+/// Try path prefixes from longest to shortest, returning the first `.mln` found.
+fn find_module_file(base_dir: &Path, segs: &[String]) -> Option<(Vec<String>, PathBuf)> {
+    for len in (1..=segs.len()).rev() {
+        let prefix = &segs[..len];
+        let mut candidate = base_dir.to_path_buf();
+        for seg in prefix {
+            candidate = candidate.join(seg);
+        }
+        let file = candidate.with_extension("mln");
+        if file.exists() {
+            return Some((prefix.to_vec(), file));
+        }
     }
+    None
 }
 
 fn validate_super_root(program: &Program, module_path: &[String], file_path: &Path) -> Result<(), MoonlaneError> {
