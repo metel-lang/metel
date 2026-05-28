@@ -380,3 +380,76 @@ fn root_qualified_path_in_non_root_module() {
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
+
+// ── v0.6.0 cross-feature combination tests ───────────────────────────────────
+
+#[test]
+fn pub_alias_and_re_export_combined() {
+    // Exercises: T0010 (pub must be annotated), alias resolution,
+    // and re-export propagation all in one program.
+    let dir = fixture_dir("combined_v060");
+    let main = dir.join("main.mln");
+    // main imports via alias AND via re-exported name from facade
+    write(
+        &main,
+        "import facade::compute;\nimport util::answer as get_answer;\nfun main() -> Int { return compute() + get_answer(); }\n",
+    );
+    // facade re-exports `compute` from impl module
+    write(
+        &dir.join("facade.mln"),
+        "import impl_mod::compute;\nexport impl_mod::compute;\n",
+    );
+    write(&dir.join("impl_mod.mln"), "pub fun compute() -> Int { return 10; }\n");
+    write(&dir.join("util.mln"), "pub fun answer() -> Int { return 32; }\n");
+
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn glob_and_explicit_import_from_same_module() {
+    // `import a::*` brings pub_a and pub_b; `import a::pub_a` explicitly — explicit wins, no T0011.
+    let dir = fixture_dir("glob_explicit_same");
+    let main = dir.join("main.mln");
+    write(
+        &main,
+        "import a::*;\nimport a::pub_a;\nfun main() -> Int { return pub_a() + pub_b(); }\n",
+    );
+    write(
+        &dir.join("a.mln"),
+        "pub fun pub_a() -> Int { return 1; }\npub fun pub_b() -> Int { return 2; }\n",
+    );
+
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn t0010_pub_struct_requires_field_type_annotations() {
+    // pub struct fields already require type annotations by grammar; this verifies
+    // a properly annotated pub struct compiles and its fields are accessible cross-module.
+    let dir = fixture_dir("pub_struct_cross");
+    let main = dir.join("main.mln");
+    write(
+        &main,
+        "import point::Point;\nfun main() -> Int { let p = Point { x: 5, y: 3 }; return p.x; }\n",
+    );
+    write(&dir.join("point.mln"), "pub struct Point { x: Int, y: Int }\n");
+
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn group_import_with_alias_subset() {
+    // `import math::{add, mul as multiply}` — group import with per-item alias
+    let dir = fixture_dir("group_alias");
+    let main = dir.join("main.mln");
+    write(
+        &main,
+        "import math::{add, mul as multiply};\nfun main() -> Int { return add(multiply(3, 4), 10); }\n",
+    );
+    write(
+        &dir.join("math.mln"),
+        "pub fun add(a: Int, b: Int) -> Int { return a + b; }\npub fun mul(a: Int, b: Int) -> Int { return a * b; }\n",
+    );
+
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
+}

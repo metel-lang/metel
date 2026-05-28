@@ -253,6 +253,15 @@ fn build_import_schemes(
         if let Some(scheme) = global_exports.get_scheme(&binding.source_module, &binding.source_name) {
             env.insert(local_name.clone(), scheme.clone());
         } else {
+            // No function scheme — check if it is a public struct/enum/aspect (type-only import).
+            let is_pub_type = names.pub_surface
+                .get(&binding.source_module)
+                .map_or(false, |surface| surface.contains(binding.source_name.as_str()));
+            if is_pub_type {
+                // Valid public struct/enum/aspect import — no scheme needed; type registry
+                // handles these via type_context. Skip silently.
+                continue;
+            }
             // Check if the source module is in the graph (not std, which is not file-loaded).
             let src = graph.modules().iter()
                 .find(|m| m.module_path == binding.source_module);
