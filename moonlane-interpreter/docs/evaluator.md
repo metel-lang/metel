@@ -205,6 +205,12 @@ Generic functions and let-polymorphic closures re-run the construction pass at e
 
 This function goes away when RFC-0001 (memory model with mutable references) is implemented. At that point, `next` can take `&mut self` and mutate in place, and `eval_for_in` can call `call_function` directly.
 
+### Declaration name collisions across modules produce undefined runtime behaviour
+
+In v0.6.0, two modules may each declare a top-level name (e.g. `fun tokenize()`) without importing each other. The typechecker approves both in isolation, but `evaluate_graph` flattens all modules into a single environment: the second declaration silently overwrites the first.
+
+`evaluate_graph` emits a best-effort warning when this happens, but does not hard-error — the typechecker approved the program. The correct fix is per-module runtime environments, tracked as a future issue.
+
 ### Closure/scope mutation semantics unspecified
 
 The PoC's `Rc<RefCell<Value>>` environment gives closures reference semantics for captured variables, which is not the intended permanent behaviour (see RFC-0006). Do not write tests that rely on cross-closure mutation sharing unless they explicitly document the dependency.
