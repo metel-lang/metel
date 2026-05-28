@@ -333,3 +333,50 @@ fn self_qualified_call_normalized() {
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
+
+// ── #181: remaining integration coverage ─────────────────────────────────────
+
+#[test]
+fn explicit_import_limits_scope_to_named_item() {
+    // `import helper::answer` should make `answer` callable but not `other`.
+    let dir = fixture_dir("explicit_scope_limit");
+    let main = dir.join("main.mln");
+    write(&main, "import helper::answer;\nfun main() -> Int { return other(); }\n");
+    write(
+        &dir.join("helper.mln"),
+        "pub fun answer() -> Int { return 1; }\npub fun other() -> Int { return 2; }\n",
+    );
+
+    run_graph(&main).expect_err("non-imported name should not be in scope");
+}
+
+#[test]
+fn transitive_item_not_accessible_without_direct_import() {
+    // main imports parser; parser imports lexer.
+    // main should NOT be able to call tokenize() from lexer without importing lexer directly.
+    let dir = fixture_dir("transitive_isolation");
+    let main = dir.join("main.mln");
+    write(&main, "import parser::*;\nfun main() -> Int { return tokenize(); }\n");
+    write(
+        &dir.join("parser.mln"),
+        "import lexer::*;\npub fun parse() -> Int { return tokenize(); }\n",
+    );
+    write(&dir.join("lexer.mln"), "pub fun tokenize() -> Int { return 1; }\n");
+
+    run_graph(&main).expect_err("transitive item should not be accessible without direct import");
+}
+
+#[test]
+fn root_qualified_path_in_non_root_module() {
+    // parser.mln uses root::helper to resolve a sibling module from the root namespace.
+    let dir = fixture_dir("root_path");
+    let main = dir.join("main.mln");
+    write(&main, "import parser::*;\nfun main() -> Int { return parse(); }\n");
+    write(
+        &dir.join("parser.mln"),
+        "import root::helper::*;\npub fun parse() -> Int { return helper_fn(); }\n",
+    );
+    write(&dir.join("helper.mln"), "pub fun helper_fn() -> Int { return 7; }\n");
+
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
+}

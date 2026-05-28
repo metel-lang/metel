@@ -86,10 +86,7 @@ impl Loader {
         for import in &program.imports {
             if let Some((mod_segs, child_file)) = resolve_import_module(&file_path, &root_dir, &import.path.root, &import.path.tree)? {
                 let child = canonicalize_existing(&child_file)?;
-                // Hierarchical paths: parent_path ++ mod_segs. Must stay in sync
-                // with name_resolver::absolute_base(PathRoot::Name). See ADR-0023.
-                let mut child_path = module_path.clone();
-                child_path.extend(mod_segs);
+                let child_path = child_module_path(&module_path, &import.path.root, &mod_segs);
                 self.load_module(child, child_path)?;
             }
         }
@@ -99,6 +96,20 @@ impl Loader {
         self.modules.push(LoadedModule { module_path, file_path, program });
         Ok(())
     }
+}
+
+/// Compute the canonical module path for a child module, matching `name_resolver::absolute_base`.
+/// Must stay in sync with name_resolver::absolute_base. See ADR-0023.
+fn child_module_path(parent: &[String], root: &PathRoot, mod_segs: &[String]) -> Vec<String> {
+    let base: Vec<String> = match root {
+        PathRoot::Root  => vec![],
+        PathRoot::Self_ => parent.to_vec(),
+        PathRoot::Super => parent.get(..parent.len().saturating_sub(1)).unwrap_or(&[]).to_vec(),
+        PathRoot::Name(_) | PathRoot::Std => parent.to_vec(),
+    };
+    let mut path = base;
+    path.extend_from_slice(mod_segs);
+    path
 }
 
 fn canonicalize_existing(path: &Path) -> Result<PathBuf, MoonlaneError> {
