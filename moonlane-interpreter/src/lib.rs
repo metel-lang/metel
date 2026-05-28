@@ -7,6 +7,7 @@ pub mod evaluator;
 pub mod module_loader;
 pub mod name_resolver;
 pub mod parser;
+pub mod path_normalizer;
 pub mod typed_ast;
 pub mod typechecker;
 pub mod typeinference;

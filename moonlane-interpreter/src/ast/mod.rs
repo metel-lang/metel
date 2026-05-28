@@ -305,6 +305,10 @@ pub enum Expr {
     Literal(Literal, Span),
     Ident(String, Span),
     Path(Vec<String>, Span),
+    /// Produced by the path normalizer (#185). A multi-segment `Expr::Path` that
+    /// has been resolved to a single bare name. `resolved` is the name the
+    /// typechecker uses for lookup; `original` is retained for error messages.
+    ResolvedPath { resolved: String, original: Vec<String>, span: Span },
     Tuple(Vec<Expr>, Span),
     Array(Vec<Expr>, Span),
     BinOp(Box<Expr>, BinOp, Box<Expr>, Span),
@@ -329,6 +333,7 @@ impl Expr {
     pub fn span(&self) -> &Span {
         match self {
             Expr::Literal(_, s) | Expr::Ident(_, s) | Expr::Path(_, s)
+            | Expr::ResolvedPath { span: s, .. }
             | Expr::Tuple(_, s) | Expr::Array(_, s) | Expr::BinOp(_, _, _, s)
             | Expr::UnaryOp(_, _, s)
             | Expr::Assign    { span: s, .. } | Expr::Call          { span: s, .. }

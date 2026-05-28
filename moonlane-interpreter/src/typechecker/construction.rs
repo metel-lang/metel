@@ -423,6 +423,14 @@ fn construct_expr(
             ))?;
             Ok(TypedExpr::Ident(name.clone(), ty, span.clone()))
         }
+        Expr::ResolvedPath { resolved, original, span } => {
+            let ty = ctx.lookup(resolved).cloned().ok_or_else(|| MoonlaneError::type_error(
+                TypeErrorCode::T0003,
+                format!("undefined name `{}`", original.join("::")),
+                span,
+            ))?;
+            Ok(TypedExpr::Ident(resolved.clone(), ty, span.clone()))
+        }
         Expr::BinOp(lhs, op, rhs, span) => construct_binop(lhs, op, rhs, span, ctx),
         Expr::UnaryOp(op, operand, span) => construct_unaryop(op, operand, span, ctx),
         Expr::Tuple(elems, span) => {
@@ -1100,6 +1108,13 @@ fn construct_call(
                 _ => vec![None; args.len()],
             }
         }
+        Expr::ResolvedPath { resolved, .. } => {
+            match ctx.lookup(resolved) {
+                Some(Type::Fun(params, _)) if params.len() == args.len() =>
+                    params.iter().map(|p| Some(p.clone())).collect(),
+                _ => vec![None; args.len()],
+            }
+        }
         _ => vec![None; args.len()],
     };
 
@@ -1132,6 +1147,14 @@ fn construct_call(
             let scheme = ctx.scheme_env.get(last.as_str()).unwrap();
             let concrete = instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?;
             let typed = TypedExpr::Path(segments.clone(), concrete.clone(), path_span.clone());
+            (typed, concrete)
+        }
+        Expr::ResolvedPath { resolved, original: _, span: rspan }
+            if ctx.lookup(resolved).is_none() && ctx.scheme_env.contains_key(resolved.as_str()) =>
+        {
+            let scheme = ctx.scheme_env.get(resolved.as_str()).unwrap();
+            let concrete = instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?;
+            let typed = TypedExpr::Ident(resolved.clone(), concrete.clone(), rspan.clone());
             (typed, concrete)
         }
         _ => {

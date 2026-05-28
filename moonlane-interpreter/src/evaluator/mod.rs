@@ -34,7 +34,7 @@ pub(super) fn attach_stack(err: MoonlaneError) -> MoonlaneError {
     err.with_stack(snapshot_stack())
 }
 use crate::ast::{Block, Decl, Expr, Stmt};
-use crate::typed_ast::{FunBody, TypedBlock, TypedDecl, TypedExpr, TypedForInit, TypedProgram, TypedStmt};
+use crate::typed_ast::{FunBody, TypedBlock, TypedDecl, TypedExpr, TypedForInit, TypedModuleGraph, TypedProgram, TypedStmt};
 
 // ── Runtime values ────────────────────────────────────────────────────────────
 
@@ -211,6 +211,43 @@ fn impl_method_key(type_name: &str, method_name: &str, impl_block: &crate::typed
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
+
+/// Evaluate a typed module graph produced by `check_graph`.
+///
+/// Concatenates all module declarations in topological order into a flat program
+/// and evaluates them. Per-module runtime environments are deferred to v0.7.0 (#189).
+pub fn evaluate_graph(graph: TypedModuleGraph) -> Result<(), MoonlaneError> {
+    // Best-effort detection of duplicate top-level names across modules (#192).
+    let mut seen_names: HashMap<String, Vec<String>> = HashMap::new();
+    for module in &graph.modules {
+        for decl in &module.decls {
+            let name = match decl {
+                TypedDecl::Fun(f) => Some(f.name.clone()),
+                TypedDecl::Let(l) => Some(l.name.clone()),
+                TypedDecl::Mut(m) => Some(m.name.clone()),
+                _ => None,
+            };
+            if let Some(n) = name {
+                seen_names.entry(n).or_default().push(module.module_path.join("::"));
+            }
+        }
+    }
+    for (name, modules) in &seen_names {
+        if modules.len() > 1 {
+            eprintln!(
+                "warning: top-level name `{name}` declared in multiple modules ({}); \
+                 behaviour is undefined (#189)",
+                modules.join(", ")
+            );
+        }
+    }
+
+    // Flatten all module decls into a single program in topological order.
+    let flat: TypedProgram = graph.modules.into_iter()
+        .flat_map(|m| m.decls)
+        .collect();
+    evaluate(flat)
+}
 
 pub fn evaluate(program: TypedProgram) -> Result<(), MoonlaneError> {
     CALL_STACK.with(|s| s.borrow_mut().clear());
@@ -741,6 +778,13 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Moonl
             match env.get(name) {
                 Some(val) => Ok(Signal::Value(val)),
                 None => Err(MoonlaneError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span)),
+            }
+        }
+
+        Expr::ResolvedPath { resolved, span, .. } => {
+            match env.get(resolved) {
+                Some(val) => Ok(Signal::Value(val)),
+                None => Err(MoonlaneError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{resolved}`"), span)),
             }
         }
 

@@ -393,6 +393,13 @@ fn infer_expr(
                 span,
             ))
         }
+        Expr::ResolvedPath { resolved, original, span } => {
+            ctx.lookup(resolved).ok_or_else(|| MoonlaneError::type_error(
+                TypeErrorCode::T0003,
+                format!("undefined name `{}`", original.join("::")),
+                span,
+            ))
+        }
         Expr::BinOp(lhs, op, rhs, span) => infer_binop(lhs, op, rhs, span, ctx, fun_generalizations),
         Expr::UnaryOp(op, operand, span) => infer_unaryop(op, operand, span, ctx, fun_generalizations),
         Expr::Tuple(elems, _) => {
