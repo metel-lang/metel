@@ -4,14 +4,6 @@ use crate::error::{TypeErrorCode, MoonlaneError};
 use crate::typeinference::{InferType, Substitution, TypeVar};
 use crate::types::Type;
 
-/// Strip a module-path prefix from a type name written as `mod::path::Type`,
-/// returning just the final type name segment. Single-segment names pass through.
-/// Necessary because the flat merge (ADR-0019) registers types under their bare names;
-/// remove when per-module type resolution is introduced (ADR-0020).
-fn bare_type_name(name: &str) -> &str {
-    name.rsplit("::").next().unwrap_or(name)
-}
-
 /// Like `type_expr_to_infer` but substitutes known generic parameter names with their
 /// corresponding `InferType::Var`s.  Call this when inferring a generic function body
 /// where `generics` maps each parameter name (e.g. `"T"`) to its fresh `TypeVar`.
@@ -21,23 +13,22 @@ pub(super) fn type_expr_to_infer_with_generics(
 ) -> InferType {
     match te {
         TypeExpr::Named(name, args) => {
-            let bare = bare_type_name(name);
             // Zero-arg named type that matches a generic param → type variable.
             if args.is_empty() {
-                if let Some(&tv) = generics.get(bare) {
+                if let Some(&tv) = generics.get(name.as_str()) {
                     return InferType::Var(tv);
                 }
             }
             let arg_tys: Vec<_> = args.iter()
                 .map(|a| type_expr_to_infer_with_generics(a, generics))
                 .collect();
-            match (bare, arg_tys.len()) {
+            match (name.as_str(), arg_tys.len()) {
                 ("Int",    0) => InferType::int(),
                 ("Float",  0) => InferType::float(),
                 ("Bool",   0) => InferType::bool(),
                 ("String", 0) => InferType::str(),
                 ("Never",  0) => InferType::never(),
-                _             => InferType::Named(bare.to_string(), arg_tys),
+                _             => InferType::Named(name.clone(), arg_tys),
             }
         }
         TypeExpr::Unit => InferType::unit(),
@@ -62,15 +53,14 @@ pub(super) fn type_expr_to_infer_with_generics(
 pub(super) fn type_expr_to_infer(te: &TypeExpr) -> InferType {
     match te {
         TypeExpr::Named(name, args) => {
-            let bare = bare_type_name(name);
             let arg_tys: Vec<_> = args.iter().map(type_expr_to_infer).collect();
-            match (bare, arg_tys.len()) {
+            match (name.as_str(), arg_tys.len()) {
                 ("Int",    0) => InferType::int(),
                 ("Float",  0) => InferType::float(),
                 ("Bool",   0) => InferType::bool(),
                 ("String", 0) => InferType::str(),
                 ("Never",  0) => InferType::never(),
-                _             => InferType::Named(bare.to_string(), arg_tys),
+                _             => InferType::Named(name.clone(), arg_tys),
             }
         }
         TypeExpr::Unit         => InferType::unit(),

@@ -814,7 +814,7 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Moonl
             }
         }
 
-        Expr::Path(segments, _) => { // last-segment fallback below: ADR-0019, ADR-0020
+        Expr::Path(segments, _) => {
             if segments.len() == 1 {
                 let name = &segments[0];
                 let span = expr.span();
@@ -826,13 +826,6 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Moonl
                 // Check full qualified name (e.g. "Circle::new" for static methods).
                 let key = segments.join("::");
                 if let Some(val) = env.get(&key) {
-                    return Ok(Signal::Value(val));
-                }
-                // Last-segment fallback: `mod::name` evaluates as bare `name` because the
-                // flat merge (ADR-0019) binds all declarations under their bare names.
-                // Remove when per-module scope is introduced (ADR-0020).
-                let last = segments.last().unwrap();
-                if let Some(val) = env.get(last) {
                     return Ok(Signal::Value(val));
                 }
                 let name    = segments[segments.len() - 2].clone();
@@ -1169,7 +1162,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
             }
         }
 
-        TypedExpr::Path(segments, _, _) => { // last-segment fallback below: ADR-0019, ADR-0020
+        TypedExpr::Path(segments, _, _) => {
             // Unit enum variant: `Colour::Red` → Value::Enum { name: "Colour", variant: "Red", fields: {} }
             // A single-segment path is treated as an ident lookup.
             if segments.len() == 1 {
@@ -1187,13 +1180,6 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
                 // Check full qualified name (e.g. "Circle::new" for static methods).
                 let key = segments.join("::");
                 if let Some(val) = env.get(&key) {
-                    return Ok(Signal::Value(val));
-                }
-                // Last-segment fallback: `mod::name` evaluates as bare `name` because the
-                // flat merge (ADR-0019) binds all declarations under their bare names.
-                // Remove when per-module scope is introduced (ADR-0020).
-                let last = segments.last().unwrap();
-                if let Some(val) = env.get(last) {
                     return Ok(Signal::Value(val));
                 }
                 let name    = segments[segments.len() - 2].clone();

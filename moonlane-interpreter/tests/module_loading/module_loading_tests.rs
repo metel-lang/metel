@@ -29,6 +29,14 @@ fn write(path: &Path, source: &str) {
     fs::write(path, source).unwrap_or_else(|e| panic!("failed to write {}: {e}", path.display()));
 }
 
+fn run_graph(main: &Path) -> Result<(), moonlane::error::MoonlaneError> {
+    let graph = module_loader::load_root(main)?;
+    let names = name_resolver::resolve(&graph)?;
+    let normalized = path_normalizer::normalize(graph, &names)?;
+    let typed = typechecker::check_graph(normalized, &names, typechecker::StdPrelude::empty())?;
+    evaluator::evaluate_graph(typed)
+}
+
 #[test]
 fn single_file_program_loads_without_modules() {
     let dir = fixture_dir("single");
@@ -61,10 +69,7 @@ fn multi_file_program_runs_after_module_loading() {
     write(&main, "import helper::answer;\nfun main() -> Int { return answer(); }\n");
     write(&dir.join("helper.mln"), "pub fun answer() -> Int { return 42; }\n");
 
-    let program = module_loader::load_program(&main).unwrap_or_else(|e| panic!("{e}"));
-    let typed = typechecker::check(program).unwrap_or_else(|e| panic!("{e}"));
-
-    evaluator::evaluate(typed).unwrap_or_else(|e| panic!("{e}"));
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
 
 #[test]
@@ -161,14 +166,11 @@ fn qualified_function_call_via_module_handle() {
 fn qualified_type_in_return_signature_typechecks() {
     let dir = fixture_dir("qual_type");
     let main = dir.join("main.mln");
-    // helper::Token as return type — TypeExpr::Named("helper::Token") strips to "Token".
-    // The struct literal uses the bare name Token (already visible in merged namespace).
-    write(&main, "import helper::*;\nfun wrap(v: Int) -> helper::Token { return Token { value: v }; }\nfun main() -> Int { let t = wrap(7); return t.value; }\n");
+    // Import Token from helper and use the bare name in the return annotation.
+    write(&main, "import helper::*;\nfun wrap(v: Int) -> Token { return Token { value: v }; }\nfun main() -> Int { let t = wrap(7); return t.value; }\n");
     write(&dir.join("helper.mln"), "pub struct Token { value: Int }\n");
 
-    let program = module_loader::load_program(&main).unwrap_or_else(|e| panic!("{e}"));
-    let typed = typechecker::check(program).unwrap_or_else(|e| panic!("{e}"));
-    evaluator::evaluate(typed).unwrap_or_else(|e| panic!("{e}"));
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
 
 #[test]
@@ -208,9 +210,7 @@ fun main() -> Int {
     );
     write(&dir.join("color.mln"), "pub enum Color { Red, Green, Blue }\n");
 
-    let program = module_loader::load_program(&main).unwrap_or_else(|e| panic!("{e}"));
-    let typed = typechecker::check(program).unwrap_or_else(|e| panic!("{e}"));
-    evaluator::evaluate(typed).unwrap_or_else(|e| panic!("{e}"));
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
 
 #[test]
@@ -229,9 +229,7 @@ fun main() -> Int { return add(mul(2, 3), 1); }
         "pub fun add(a: Int, b: Int) -> Int { return a + b; }\npub fun mul(a: Int, b: Int) -> Int { return a * b; }\n",
     );
 
-    let program = module_loader::load_program(&main).unwrap_or_else(|e| panic!("{e}"));
-    let typed = typechecker::check(program).unwrap_or_else(|e| panic!("{e}"));
-    evaluator::evaluate(typed).unwrap_or_else(|e| panic!("{e}"));
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
 
 #[test]
@@ -263,9 +261,7 @@ fn transitive_dependency_loaded_via_facade() {
     let graph = module_loader::load_root(&main).unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(graph.modules.len(), 3);
 
-    let program = module_loader::load_program(&main).unwrap_or_else(|e| panic!("{e}"));
-    let typed = typechecker::check(program).unwrap_or_else(|e| panic!("{e}"));
-    evaluator::evaluate(typed).unwrap_or_else(|e| panic!("{e}"));
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
 
 #[test]
@@ -302,7 +298,5 @@ fun main() -> Int {
     );
     write(&dir.join("point.mln"), "pub struct Point { x: Int, y: Int }\n");
 
-    let program = module_loader::load_program(&main).unwrap_or_else(|e| panic!("{e}"));
-    let typed = typechecker::check(program).unwrap_or_else(|e| panic!("{e}"));
-    evaluator::evaluate(typed).unwrap_or_else(|e| panic!("{e}"));
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
