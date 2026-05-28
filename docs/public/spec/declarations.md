@@ -1,5 +1,7 @@
 # Declarations
 
+`pub` may be prefixed to any top-level `fun`, `struct`, `enum`, or `aspect` declaration to mark it as accessible from other modules. See [Modules — Visibility](modules.md#visibility) for the full rules.
+
 ## Variables
 
 ### Immutable Bindings
