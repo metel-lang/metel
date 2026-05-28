@@ -57,19 +57,19 @@ decl = {
 let_decl    = { "let" ~ ident ~ (":" ~ type_expr)? ~ "=" ~ expr ~ ";" }
 mut_decl    = { "mut" ~ ident ~ (":" ~ type_expr)? ~ "=" ~ expr ~ ";" }
 
-fun_decl    = { "fun" ~ ident ~ generic_params? ~ "(" ~ param_list? ~ ")" ~ ("->" ~ type_expr)? ~ block }
+fun_decl    = { pub_kw? ~ "fun" ~ ident ~ generic_params? ~ "(" ~ param_list? ~ ")" ~ ("->" ~ type_expr)? ~ block }
 
-struct_decl = { "struct" ~ ident ~ generic_params? ~ "{" ~ struct_fields ~ "}" }
+struct_decl = { pub_kw? ~ "struct" ~ ident ~ generic_params? ~ "{" ~ struct_fields ~ "}" }
 struct_fields = { (struct_field ~ ",")* ~ struct_field? }
 struct_field  = { ident ~ ":" ~ type_expr }
 
-enum_decl   = { "enum" ~ ident ~ generic_params? ~ "{" ~ enum_variants ~ "}" }
+enum_decl   = { pub_kw? ~ "enum" ~ ident ~ generic_params? ~ "{" ~ enum_variants ~ "}" }
 enum_variants = { (enum_variant ~ ",")* ~ enum_variant? }
 enum_variant  = { ident ~ ("{" ~ struct_fields ~ "}")? }
 
 impl_block  = { "impl" ~ (named_type ~ "for")? ~ type_expr ~ "{" ~ fun_decl* ~ "}" }
 
-aspect_decl  = { "aspect" ~ ident ~ generic_params? ~ "{" ~ aspect_method* ~ "}" }
+aspect_decl  = { pub_kw? ~ "aspect" ~ ident ~ generic_params? ~ "{" ~ aspect_method* ~ "}" }
 aspect_method = { "fun" ~ ident ~ generic_params? ~ "(" ~ param_list? ~ ")" ~ ("->" ~ type_expr)? ~ (block | ";") }
 
 // ── Parameters ────────────────────────────────────────────────────────────────

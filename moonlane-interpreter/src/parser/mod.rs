@@ -204,9 +204,16 @@ fn parse_opt_type_then_expr(
 fn parse_fun_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<FunDecl, MoonlaneError> {
     let span = Span::of(&pair, filename);
     let mut inner = pair.into_inner();
-    let name = inner.next()
-        .ok_or_else(|| MoonlaneError::internal("fun_decl: expected function name"))?
-        .as_str().to_string();
+    let first = inner.next()
+        .ok_or_else(|| MoonlaneError::internal("fun_decl: expected function name"))?;
+    let (visibility, name) = if first.as_rule() == Rule::pub_kw {
+        let n = inner.next()
+            .ok_or_else(|| MoonlaneError::internal("fun_decl: expected name after pub"))?
+            .as_str().to_string();
+        (Visibility::Public, n)
+    } else {
+        (Visibility::Private, first.as_str().to_string())
+    };
     let mut generics    = vec![];
     let mut params      = vec![];
     let mut return_type = None;
@@ -221,7 +228,7 @@ fn parse_fun_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<F
         }
     }
     Ok(FunDecl {
-        name, generics, params, return_type,
+        visibility, name, generics, params, return_type,
         body: body.ok_or_else(|| MoonlaneError::internal("fun_decl: missing body block"))?,
         span,
     })
@@ -230,9 +237,16 @@ fn parse_fun_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<F
 fn parse_struct_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<StructDecl, MoonlaneError> {
     let span = Span::of(&pair, filename);
     let mut inner = pair.into_inner();
-    let name = inner.next()
-        .ok_or_else(|| MoonlaneError::internal("struct_decl: expected name"))?
-        .as_str().to_string();
+    let first = inner.next()
+        .ok_or_else(|| MoonlaneError::internal("struct_decl: expected name"))?;
+    let (visibility, name) = if first.as_rule() == Rule::pub_kw {
+        let n = inner.next()
+            .ok_or_else(|| MoonlaneError::internal("struct_decl: expected name after pub"))?
+            .as_str().to_string();
+        (Visibility::Public, n)
+    } else {
+        (Visibility::Private, first.as_str().to_string())
+    };
     let mut generics = vec![];
     let mut fields   = vec![];
     for p in inner {
@@ -242,15 +256,22 @@ fn parse_struct_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resul
             _ => {}
         }
     }
-    Ok(StructDecl { name, generics, fields, span })
+    Ok(StructDecl { visibility, name, generics, fields, span })
 }
 
 fn parse_enum_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<EnumDecl, MoonlaneError> {
     let span = Span::of(&pair, filename);
     let mut inner = pair.into_inner();
-    let name = inner.next()
-        .ok_or_else(|| MoonlaneError::internal("enum_decl: expected name"))?
-        .as_str().to_string();
+    let first = inner.next()
+        .ok_or_else(|| MoonlaneError::internal("enum_decl: expected name"))?;
+    let (visibility, name) = if first.as_rule() == Rule::pub_kw {
+        let n = inner.next()
+            .ok_or_else(|| MoonlaneError::internal("enum_decl: expected name after pub"))?
+            .as_str().to_string();
+        (Visibility::Public, n)
+    } else {
+        (Visibility::Private, first.as_str().to_string())
+    };
     let mut generics = vec![];
     let mut variants = vec![];
     for p in inner {
@@ -266,7 +287,7 @@ fn parse_enum_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<
             _ => {}
         }
     }
-    Ok(EnumDecl { name, generics, variants, span })
+    Ok(EnumDecl { visibility, name, generics, variants, span })
 }
 
 fn parse_impl_block(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<ImplBlock, MoonlaneError> {
@@ -1223,9 +1244,16 @@ fn parse_generic_params(pair: pest::iterators::Pair<Rule>, filename: &str) -> Re
 fn parse_aspect_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<AspectDecl, MoonlaneError> {
     let span = Span::of(&pair, filename);
     let mut inner = pair.into_inner();
-    let name = inner.next()
-        .ok_or_else(|| MoonlaneError::internal("aspect_decl: expected name"))?
-        .as_str().to_string();
+    let first = inner.next()
+        .ok_or_else(|| MoonlaneError::internal("aspect_decl: expected name"))?;
+    let (visibility, name) = if first.as_rule() == Rule::pub_kw {
+        let n = inner.next()
+            .ok_or_else(|| MoonlaneError::internal("aspect_decl: expected name after pub"))?
+            .as_str().to_string();
+        (Visibility::Public, n)
+    } else {
+        (Visibility::Private, first.as_str().to_string())
+    };
     let mut generics = vec![];
     let mut methods = vec![];
     for p in inner {
@@ -1242,7 +1270,7 @@ fn parse_aspect_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resul
             _ => {}
         }
     }
-    Ok(AspectDecl { name, generics, methods, span })
+    Ok(AspectDecl { visibility, name, generics, methods, span })
 }
 
 

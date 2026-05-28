@@ -44,7 +44,7 @@ fn multi_file_program_loads_declared_modules() {
     let dir = fixture_dir("multi");
     let main = dir.join("main.mln");
     write(&main, "import parser::Token;\nfun main() { }\n");
-    write(&dir.join("parser.mln"), "struct Token { value: Int }\n");
+    write(&dir.join("parser.mln"), "pub struct Token { value: Int }\n");
 
     let graph = module_loader::load_root(&main).unwrap_or_else(|e| panic!("{e}"));
 
@@ -57,7 +57,7 @@ fn multi_file_program_runs_after_module_loading() {
     let dir = fixture_dir("run_multi");
     let main = dir.join("main.mln");
     write(&main, "import helper::answer;\nfun main() -> Int { return answer(); }\n");
-    write(&dir.join("helper.mln"), "fun answer() -> Int { return 42; }\n");
+    write(&dir.join("helper.mln"), "pub fun answer() -> Int { return 42; }\n");
 
     let program = module_loader::load_program(&main).unwrap_or_else(|e| panic!("{e}"));
     let typed = typechecker::check(program).unwrap_or_else(|e| panic!("{e}"));

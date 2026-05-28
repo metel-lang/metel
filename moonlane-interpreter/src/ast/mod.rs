@@ -120,6 +120,7 @@ pub struct MutDecl {
 
 #[derive(Debug, Clone)]
 pub struct FunDecl {
+    pub visibility:  Visibility,
     pub name:        String,
     pub generics:    Vec<GenericParam>,
     pub params:      Vec<Param>,
@@ -131,19 +132,21 @@ pub struct FunDecl {
 
 #[derive(Debug, Clone)]
 pub struct StructDecl {
-    pub name:     String,
-    pub generics: Vec<GenericParam>,
-    pub fields:   Vec<FieldDef>,
-    pub span:     Span,
+    pub visibility: Visibility,
+    pub name:       String,
+    pub generics:   Vec<GenericParam>,
+    pub fields:     Vec<FieldDef>,
+    pub span:       Span,
 }
 
 
 #[derive(Debug, Clone)]
 pub struct EnumDecl {
-    pub name:     String,
-    pub generics: Vec<GenericParam>,
-    pub variants: Vec<VariantDef>,
-    pub span:     Span,
+    pub visibility: Visibility,
+    pub name:       String,
+    pub generics:   Vec<GenericParam>,
+    pub variants:   Vec<VariantDef>,
+    pub span:       Span,
 }
 
 
@@ -158,10 +161,11 @@ pub struct ImplBlock {
 
 #[derive(Debug, Clone)]
 pub struct AspectDecl {
-    pub name:     String,
-    pub generics: Vec<String>,
-    pub methods:  Vec<AspectMethod>,
-    pub span:     Span,
+    pub visibility: Visibility,
+    pub name:       String,
+    pub generics:   Vec<String>,
+    pub methods:    Vec<AspectMethod>,
+    pub span:       Span,
 }
 
 

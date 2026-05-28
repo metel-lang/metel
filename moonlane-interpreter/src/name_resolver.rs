@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{ImportTree, PathRoot};
+use crate::ast::{Decl, ImportTree, PathRoot, Visibility};
 use crate::error::MoonlaneError;
 use crate::module_loader::{LoadedModule, ModuleGraph};
 
@@ -50,13 +50,34 @@ pub fn resolve(graph: &ModuleGraph) -> Result<ResolvedNames, MoonlaneError> {
         .map(|m| m.module_path.clone())
         .collect();
 
+    // Build a map of publicly visible names per module for visibility checks.
+    let pub_items: HashMap<Vec<String>, HashSet<String>> = graph.modules.iter()
+        .map(|m| {
+            let names = m.program.decls.iter()
+                .filter_map(|d| decl_pub_name(d))
+                .collect();
+            (m.module_path.clone(), names)
+        })
+        .collect();
+
     let mut scopes = HashMap::new();
     for loaded in &graph.modules {
-        let scope = resolve_module(loaded, &known_modules)?;
+        let scope = resolve_module(loaded, &known_modules, &pub_items)?;
         scopes.insert(loaded.module_path.clone(), scope);
     }
 
     Ok(ResolvedNames { scopes })
+}
+
+/// Returns the name of a declaration if it is public.
+fn decl_pub_name(decl: &Decl) -> Option<String> {
+    match decl {
+        Decl::Fun(d)    if d.visibility == Visibility::Public => Some(d.name.clone()),
+        Decl::Struct(d) if d.visibility == Visibility::Public => Some(d.name.clone()),
+        Decl::Enum(d)   if d.visibility == Visibility::Public => Some(d.name.clone()),
+        Decl::Aspect(d) if d.visibility == Visibility::Public => Some(d.name.clone()),
+        _ => None,
+    }
 }
 
 // ── Per-module resolution ─────────────────────────────────────────────────────
@@ -64,6 +85,7 @@ pub fn resolve(graph: &ModuleGraph) -> Result<ResolvedNames, MoonlaneError> {
 fn resolve_module(
     loaded: &LoadedModule,
     known_modules: &HashSet<Vec<String>>,
+    pub_items: &HashMap<Vec<String>, HashSet<String>>,
 ) -> Result<ModuleScope, MoonlaneError> {
     let mut scope = ModuleScope {
         module_path: loaded.module_path.clone(),
@@ -73,7 +95,7 @@ fn resolve_module(
 
     for import in &loaded.program.imports {
         let base = absolute_base(&import.path.root, &loaded.module_path);
-        process_tree(&base, &import.path.tree, known_modules, &mut scope)?;
+        process_tree(&base, &import.path.tree, known_modules, pub_items, &mut scope)?;
     }
 
     Ok(scope)
@@ -101,6 +123,7 @@ fn process_tree(
     base: &[String],
     tree: &ImportTree,
     known_modules: &HashSet<Vec<String>>,
+    pub_items: &HashMap<Vec<String>, HashSet<String>>,
     scope: &mut ModuleScope,
 ) -> Result<(), MoonlaneError> {
     match tree {
@@ -119,6 +142,15 @@ fn process_tree(
             let (source_module, kind) = if known_modules.contains(&module_candidate) {
                 (module_candidate, BindingKind::Module)
             } else {
+                // Item import: verify the item is publicly visible in the source module.
+                if let Some(exports) = pub_items.get(base) {
+                    if !exports.contains(name.as_str()) {
+                        return Err(MoonlaneError::internal(format!(
+                            "visibility error: `{name}` is not public in module `{}`",
+                            base.join("::")
+                        )));
+                    }
+                }
                 (base.to_vec(), BindingKind::Item)
             };
 
@@ -132,12 +164,12 @@ fn process_tree(
         ImportTree::Path { name, tree } => {
             let mut new_base = base.to_vec();
             new_base.push(name.clone());
-            process_tree(&new_base, tree, known_modules, scope)?;
+            process_tree(&new_base, tree, known_modules, pub_items, scope)?;
         }
 
         ImportTree::Group(items) => {
             for item in items {
-                process_tree(base, item, known_modules, scope)?;
+                process_tree(base, item, known_modules, pub_items, scope)?;
             }
         }
     }
@@ -184,7 +216,7 @@ pub enum ScopeLookup<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{ImportDecl, ImportPath, ImportTree, PathRoot, Program, Span};
+    use crate::ast::{Block, Decl, FunDecl, GenericParam, ImportDecl, ImportPath, ImportTree, PathRoot, Program, Span, Visibility};
     use crate::module_loader::{LoadedModule, ModuleGraph};
     use std::path::PathBuf;
 
@@ -198,6 +230,19 @@ mod tests {
 
     fn make_program(imports: Vec<ImportDecl>) -> Program {
         Program { imports, exports: vec![], decls: vec![] }
+    }
+
+    fn make_program_with_pubs(imports: Vec<ImportDecl>, pub_names: &[&str]) -> Program {
+        let decls = pub_names.iter().map(|n| Decl::Fun(FunDecl {
+            visibility: Visibility::Public,
+            name: (*n).into(),
+            generics: vec![],
+            params: vec![],
+            return_type: None,
+            body: Block { stmts: vec![], tail: None, span: span() },
+            span: span(),
+        })).collect();
+        Program { imports, exports: vec![], decls }
     }
 
     fn make_graph(modules: Vec<(Vec<String>, Program)>) -> ModuleGraph {
@@ -219,7 +264,7 @@ mod tests {
                     name: "Token".into(), alias: None,
                 }),
             ])),
-            (vec!["parser".into()], make_program(vec![])),
+            (vec!["parser".into()], make_program_with_pubs(vec![], &["Token"])),
         ]);
 
         let names = resolve(&graph).unwrap();
@@ -239,7 +284,7 @@ mod tests {
                     name: "Token".into(), alias: Some("Tok".into()),
                 }),
             ])),
-            (vec!["parser".into()], make_program(vec![])),
+            (vec!["parser".into()], make_program_with_pubs(vec![], &["Token"])),
         ]);
 
         let names = resolve(&graph).unwrap();
@@ -260,7 +305,7 @@ mod tests {
                     ImportTree::Name { name: "Token".into(), alias: None },
                 ])),
             ])),
-            (vec!["parser".into()], make_program(vec![])),
+            (vec!["parser".into()], make_program_with_pubs(vec![], &["Ast", "Token"])),
         ]);
 
         let names = resolve(&graph).unwrap();
@@ -317,12 +362,30 @@ mod tests {
                     name: "Token".into(), alias: None,
                 }),
             ])),
-            (vec!["parser".into()], make_program(vec![])),
-            (vec!["lexer".into()],  make_program(vec![])),
+            (vec!["parser".into()], make_program_with_pubs(vec![], &["Token"])),
+            (vec!["lexer".into()],  make_program_with_pubs(vec![], &["Token"])),
         ]);
 
         let err = resolve(&graph).expect_err("duplicate import should fail");
         assert!(err.to_string().contains("Token"), "error should mention Token");
+    }
+
+    #[test]
+    fn rejects_private_item_import() {
+        // import parser::Token; where Token is private in parser
+        let graph = make_graph(vec![
+            (vec![], make_program(vec![
+                make_import(PathRoot::Name("parser".into()), ImportTree::Name {
+                    name: "Token".into(), alias: None,
+                }),
+            ])),
+            (vec!["parser".into()], make_program(vec![])), // no pub declarations
+        ]);
+
+        let err = resolve(&graph).expect_err("private import should fail");
+        let msg = err.to_string();
+        assert!(msg.contains("Token"), "error should mention Token");
+        assert!(msg.contains("visibility"), "error should mention visibility");
     }
 
     #[test]
@@ -335,7 +398,7 @@ mod tests {
                     tree: Box::new(ImportTree::Name { name: "Ast".into(), alias: None }),
                 }),
             ])),
-            (vec!["parser".into()], make_program(vec![])),
+            (vec!["parser".into()], make_program_with_pubs(vec![], &["Ast"])),
         ]);
 
         let names = resolve(&graph).unwrap();
@@ -354,7 +417,7 @@ mod tests {
                     tree: Box::new(ImportTree::Name { name: "Thing".into(), alias: None }),
                 }),
             ])),
-            (vec!["parser".into(), "child".into()], make_program(vec![])),
+            (vec!["parser".into(), "child".into()], make_program_with_pubs(vec![], &["Thing"])),
         ]);
 
         let names = resolve(&graph).unwrap();
@@ -372,7 +435,7 @@ mod tests {
                     name: "Token".into(), alias: None,
                 }),
             ])),
-            (vec!["parser".into()], make_program(vec![])),
+            (vec!["parser".into()], make_program_with_pubs(vec![], &["Token"])),
         ]);
 
         let names = resolve(&graph).unwrap();
