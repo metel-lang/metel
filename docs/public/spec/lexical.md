@@ -27,9 +27,16 @@ By convention:
 
 ```
 and       as        aspect    break     continue  else      enum
-false     for       fun       if        impl      let       loop
-match     mod       mut       or        pub       return    root
-self      struct    super     true      use       where     while
+export    false     for       fun       if        impl      import
+let       loop      match     mut       or        pub       return
+root      self      std       struct    super     true      where
+while
+```
+
+The following identifiers are reserved and may not be used as names. They are not currently used as syntax:
+
+```
+mod   use
 ```
 
 ## Literals

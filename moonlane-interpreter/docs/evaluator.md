@@ -219,4 +219,4 @@ The PoC's `Rc<RefCell<Value>>` environment gives closures reference semantics fo
 The evaluator is designed to be thrown away. The correct rewrite path is:
 1. Decide the permanent value representation (likely a tagged pointer or NaN-boxing scheme).
 2. Implement RFC-0006 capture semantics (explicit pointer types for aliasing).
-3. Implement the module system (RFC pending) before the evaluator is shared as a library.
+3. Wire the module system name resolver (RFC-0030, implemented in v0.5.0) into the evaluator for per-module scope isolation before the evaluator is shared as a library.
