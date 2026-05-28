@@ -28,6 +28,9 @@ pub enum TypeErrorCode {
     T0006, // Assignment to immutable binding
     T0007, // Invalid cast
     T0008, // Non-exhaustive match
+    T0009, // Private item access
+    T0010, // Unannotated pub declaration
+    T0011, // Import name conflict
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

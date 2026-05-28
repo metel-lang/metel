@@ -23,7 +23,8 @@ pub struct ModuleGraph {
 
 pub fn load_root(path: impl AsRef<Path>) -> Result<ModuleGraph, MoonlaneError> {
     let root = canonicalize_existing(path.as_ref())?;
-    let mut loader = Loader::default();
+    let root_dir = root.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
+    let mut loader = Loader::new(root_dir);
     loader.load_module(root.clone(), Vec::new())?;
     Ok(ModuleGraph { root, modules: loader.modules })
 }
@@ -46,15 +47,22 @@ pub fn load_program(path: impl AsRef<Path>) -> Result<Program, MoonlaneError> {
     Ok(Program { imports, exports, decls })
 }
 
-#[derive(Default)]
 struct Loader {
     modules: Vec<LoadedModule>,
     visited: HashSet<PathBuf>,
     stack: Vec<PathBuf>,
+    root_dir: PathBuf,
+}
+
+impl Loader {
+    fn new(root_dir: PathBuf) -> Self {
+        Self { modules: Vec::new(), visited: HashSet::new(), stack: Vec::new(), root_dir }
+    }
 }
 
 impl Loader {
     fn load_module(&mut self, file_path: PathBuf, module_path: Vec<String>) -> Result<(), MoonlaneError> {
+        let root_dir = self.root_dir.clone();
         if let Some(cycle_start) = self.stack.iter().position(|p| p == &file_path) {
             let mut chain: Vec<String> = self.stack[cycle_start..]
                 .iter()
@@ -84,7 +92,7 @@ impl Loader {
 
         self.stack.push(file_path.clone());
         for import in &program.imports {
-            if let Some((mod_segs, child_file)) = resolve_import_module(&file_path, &import.path.root, &import.path.tree) {
+            if let Some((mod_segs, child_file)) = resolve_import_module(&file_path, &root_dir, &import.path.root, &import.path.tree)? {
                 let child = canonicalize_existing(&child_file)?;
                 let mut child_path = module_path.clone();
                 child_path.extend(mod_segs);
@@ -110,33 +118,68 @@ fn canonicalize_existing(path: &Path) -> Result<PathBuf, MoonlaneError> {
 
 /// Resolve an import declaration to a module file.
 ///
-/// Returns `(module_path_segments, file_path)` if a `.mln` file exists for the
-/// import, or `None` for `root::`, `std::`, `super::`, and imports that don't map
-/// to a sibling file. The module path segments are extended onto the caller's
-/// `module_path` to form the child's canonical module path.
+/// Returns `Ok(Some((segments, path)))` when a `.mln` file is found.
+/// Returns `Ok(None)` for `std::` imports (handled by `StdPrelude` in the typechecker)
+/// and for glob/group imports that carry no resolvable file segment.
+/// Returns `Err` if the import names a concrete module that cannot be found.
 ///
-/// Path mapping: `::` separators map directly to `/` directory separators.
+/// Path mapping: `::` separators map to `/` directory separators.
 /// `import parser::ast::Ast` tries `parser/ast.mln` first, then `parser.mln` —
 /// the longest matching prefix wins.
 fn resolve_import_module(
     parent_file: &Path,
+    root_dir: &Path,
     root: &PathRoot,
     tree: &ImportTree,
-) -> Option<(Vec<String>, PathBuf)> {
+) -> Result<Option<(Vec<String>, PathBuf)>, MoonlaneError> {
     let parent_dir = parent_file.parent().unwrap_or_else(|| Path::new("."));
 
-    let segs: Vec<String> = match root {
-        PathRoot::Root | PathRoot::Std => return None,
-        PathRoot::Super => return None,
-        PathRoot::Self_ => import_tree_segments(tree),
-        PathRoot::Name(name) => {
-            let mut s = vec![name.clone()];
-            s.extend(import_tree_segments(tree));
-            s
-        }
-    };
+    match root {
+        PathRoot::Std => return Ok(None),
 
-    find_module_file(parent_dir, &segs)
+        PathRoot::Root => {
+            let segs = import_tree_segments(tree);
+            return resolve_in_dir(root_dir, &segs, parent_file);
+        }
+
+        PathRoot::Super => {
+            let super_dir = if parent_dir == root_dir {
+                root_dir.to_path_buf()
+            } else {
+                parent_dir.parent().unwrap_or(parent_dir).to_path_buf()
+            };
+            let segs = import_tree_segments(tree);
+            return resolve_in_dir(&super_dir, &segs, parent_file);
+        }
+
+        PathRoot::Self_ => {
+            let segs = import_tree_segments(tree);
+            return resolve_in_dir(parent_dir, &segs, parent_file);
+        }
+
+        PathRoot::Name(name) => {
+            let mut segs = vec![name.clone()];
+            segs.extend(import_tree_segments(tree));
+            return resolve_in_dir(parent_dir, &segs, parent_file);
+        }
+    }
+}
+
+fn resolve_in_dir(
+    dir: &Path,
+    segs: &[String],
+    source_file: &Path,
+) -> Result<Option<(Vec<String>, PathBuf)>, MoonlaneError> {
+    if segs.is_empty() {
+        return Ok(None);
+    }
+    match find_module_file(dir, segs) {
+        Some(result) => Ok(Some(result)),
+        None => Err(module_error(
+            format!("cannot find module file for `{}`", segs.join("::")),
+            source_file,
+        )),
+    }
 }
 
 /// Collect all identifier segments from an import tree in path order.

@@ -104,8 +104,8 @@ fn accepts_root_self_super_std_and_child_roots_in_non_root_modules() {
         &dir.join("parser.mln"),
         r#"
 import self::child::Thing;
-import root::parser::Token;
-import super::parser::Token;
+import root::child::Thing;
+import super::child::Thing;
 import std::core::Int;
 import child::Thing;
 
@@ -261,9 +261,8 @@ fn transitive_dependency_loaded_via_facade() {
 }
 
 #[test]
-fn import_nonexistent_module_silently_skips_at_load_time() {
-    // A missing .mln file is not a load error — the import is simply unresolved.
-    // Using the unresolved name fails later at typecheck time.
+fn import_nonexistent_module_is_a_load_error() {
+    // After #186: a missing .mln file is a hard load error, not a silent skip.
     let dir = fixture_dir("missing_mod");
     let main = dir.join("main.mln");
     write(
@@ -271,16 +270,10 @@ fn import_nonexistent_module_silently_skips_at_load_time() {
         "import nonexistent::Thing;\nfun main() -> Int { return Thing(); }\n",
     );
 
-    // load_root succeeds: only main.mln is in the graph
-    let graph = module_loader::load_root(&main).unwrap_or_else(|e| panic!("{e}"));
-    assert_eq!(graph.modules.len(), 1, "only root module should be loaded");
-
-    // typechecker rejects the usage of an undefined name
-    let program = module_loader::load_program(&main).unwrap_or_else(|e| panic!("{e}"));
-    let err = typechecker::check(program).expect_err("undefined name should be a type error");
+    let err = module_loader::load_root(&main).expect_err("missing module should fail at load time");
     let msg = err.to_string();
     assert!(
-        msg.contains("Thing") || msg.contains("undefined"),
+        msg.contains("nonexistent") || msg.contains("cannot find module"),
         "message was: {msg}",
     );
 }
