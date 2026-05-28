@@ -9,21 +9,35 @@
        │
        ▼
   ┌───────────────┐
-  │ Module Loader │  selected root file → module graph; invokes parser per file
+  │ Module Loader │  root file → ModuleGraph (topological order); invokes parser per file
   └───────────────┘
-       │  ast::Program
+       │  module_loader::ModuleGraph
+       ▼
+  ┌───────────────┐
+  │ Name Resolver │  per-module import scopes, pub_surface, re-exports
+  └───────────────┘
+       │  name_resolver::ResolvedNames
+       ▼
+  ┌─────────────────┐
+  │ Path Normalizer │  rewrites qualified Expr::Path nodes to Expr::ResolvedPath
+  └─────────────────┘
+       │  path_normalizer::NormalizedModuleGraph
        ▼
   ┌──────────────┐
-  │ Type Checker │  untyped AST → typed AST  (errors reported here)
+  │ Type Checker │  per-module HM inference + construction (errors reported here)
   └──────────────┘
-       │  typed_ast::TypedProgram
+       │  typed_ast::TypedModuleGraph
        ▼
   ┌─────────────┐
-  │  Evaluator  │  typed AST → program output  (tree-walking)
+  │  Evaluator  │  flattens TypedModuleGraph → program output  (tree-walking)
   └─────────────┘
 ```
 
 Each stage is a separate Rust module. No stage is skipped.
+
+> **Note (v0.6.0 in-progress):** The CLI binary (`main.rs`) currently still uses the legacy
+> `load_program → check → evaluate` path (#184). The full pipeline above is exercised by
+> `module_semantics` integration tests and will replace the CLI path when #184 is closed.
 
 ---
 
@@ -37,12 +51,13 @@ tree-walk-interpreter/
     ├── grammar.pest       — pest PEG grammar for the language
     ├── module_loader.rs   — loads the selected root file and its transitive import graph
     ├── name_resolver.rs   — resolves import scopes, visibility, and re-exports per module
+    ├── path_normalizer.rs — rewrites qualified Expr::Path nodes to Expr::ResolvedPath
     ├── parser/            — drives pest, builds untyped AST from CST
     ├── ast/               — untyped AST node definitions
     ├── types/             — concrete type representation (Type enum)
     ├── typeinference/     — HM inference engine: type vars, unification, constraints, schemes
     ├── typechecker/       — two-pass type checker; produces typed AST
-    │   ├── mod.rs         — check() entry point, SchemeEnv alias, FunGeneralization
+    │   ├── mod.rs         — check() / check_graph() entry points, StdPrelude, GlobalExports
     │   ├── registry.rs    — build_registry, register_builtins, concrete env builders
     │   ├── inference.rs   — Pass 1: all infer_* functions
     │   ├── construction.rs— Pass 2: ConstructCtx, construct_* functions, exhaustiveness
@@ -64,9 +79,12 @@ tree-walk-interpreter/
 
 | Data | Type | Produced by | Consumed by |
 |------|------|-------------|-------------|
-| Module graph | `module_loader::ModuleGraph` | module loader | CLI / tests |
-| Untyped program | `ast::Program` | parser / module loader | typechecker |
-| Typed program | `typed_ast::TypedProgram` | typechecker | evaluator |
+| Module graph | `module_loader::ModuleGraph` | module loader | name resolver / path normalizer |
+| Resolved names | `name_resolver::ResolvedNames` | name resolver | path normalizer / typechecker |
+| Normalized graph | `path_normalizer::NormalizedModuleGraph` | path normalizer | typechecker |
+| Typed module graph | `typed_ast::TypedModuleGraph` | typechecker (`check_graph`) | evaluator (`evaluate_graph`) |
+| Untyped program (legacy) | `ast::Program` | module loader (`load_program`) | typechecker (`check`) |
+| Typed program (legacy) | `typed_ast::TypedProgram` | typechecker (`check`) | evaluator (`evaluate`) |
 | Errors | `MoonlaneError` | any stage | caller / CLI |
 
 ---
@@ -92,8 +110,9 @@ Type error codes: E0001–E0008. Runtime panics (`.yolo()` on `nope`, out-of-bou
 
 | Component | Notes |
 |-----------|-------|
-| Module Loader | `src/module_loader.rs` — `load_root` builds the `ModuleGraph`; `load_program` flattens it into a merged `ast::Program` |
-| Name Resolver | `src/name_resolver.rs` — `resolve` produces per-module `ModuleScope` and a `pub_surface` map; not yet wired into the `check` pipeline (v0.5.0) |
+| Module Loader | `src/module_loader.rs` — `load_root` builds the topological `ModuleGraph`; `load_program` (legacy) flattens it for the old single-module pipeline |
+| Name Resolver | `src/name_resolver.rs` — `resolve` produces per-module `ModuleScope`, `pub_surface`, and re-exports; wired into `check_graph` (v0.6.0) |
+| Path Normalizer | `src/path_normalizer.rs` — `normalize` rewrites qualified `Expr::Path` nodes to `Expr::ResolvedPath`; produces `NormalizedModuleGraph` |
 | Parser | `src/parser/`, `src/grammar.pest` |
 | Type Checker | [typechecker.md](typechecker.md) |
 | Evaluator | [evaluator.md](evaluator.md) |

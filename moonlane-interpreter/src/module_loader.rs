@@ -94,6 +94,8 @@ impl Loader {
         for import in &program.imports {
             if let Some((mod_segs, child_file)) = resolve_import_module(&file_path, &root_dir, &import.path.root, &import.path.tree)? {
                 let child = canonicalize_existing(&child_file)?;
+                // Hierarchical paths: parent_path ++ mod_segs. Must stay in sync
+                // with name_resolver::absolute_base(PathRoot::Name). See ADR-0023.
                 let mut child_path = module_path.clone();
                 child_path.extend(mod_segs);
                 self.load_module(child, child_path)?;

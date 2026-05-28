@@ -8,12 +8,15 @@
 ## Pipeline Position
 
 ```
-TypedProgram  ──►  evaluate()  ──►  side effects / RuntimePanic
+TypedProgram      ──►  evaluate()       ──►  side effects / RuntimePanic  (legacy)
+TypedModuleGraph  ──►  evaluate_graph() ──►  side effects / RuntimePanic  (v0.6.0)
 ```
 
-Entry point: `evaluator::evaluate(program: TypedProgram) -> Result<(), MoonlaneError>`
+Entry points:
+- `evaluator::evaluate(program: TypedProgram) -> Result<(), MoonlaneError>` — single-module legacy path
+- `evaluator::evaluate_graph(graph: TypedModuleGraph) -> Result<(), MoonlaneError>` — multi-module path (v0.6.0): flattens the `TypedModuleGraph` into a single `TypedProgram` and delegates to `evaluate`
 
-The evaluator operates on the `TypedProgram` produced by `typechecker::check()`. It does not re-check types — if the evaluator panics on a type mismatch, that is a typechecker bug, not an evaluator limitation.
+The evaluator operates on the typed AST produced by the typechecker. It does not re-check types — if the evaluator panics on a type mismatch, that is a typechecker bug, not an evaluator limitation.
 
 Source: `src/evaluator/` — split into `mod.rs` (core), `builtins.rs`, `call.rs`, `display.rs`, `lvalue.rs`, `pattern.rs`
 

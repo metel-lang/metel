@@ -1,11 +1,13 @@
 # Typechecker Implementation Notes
 
-> Status: v0.3 complete (generics, monomorphization, let-polymorphism).  
-> Extension points for v0.4 (aspects) are called out inline.
+> Status: v0.4 complete (generics, monomorphization, let-polymorphism, aspects).  
+> v0.6.0 in-progress: per-module `check_graph` pipeline (RFC-0031).
 
 ---
 
 ## Pipeline Position
+
+### Single-module (legacy `check`)
 
 ```
 untyped AST  ──►  check()  ──►  TypedProgram
@@ -15,7 +17,31 @@ untyped AST  ──►  check()  ──►  TypedProgram
                     └─ Pass 2:   construct — re-derive concrete types, build TypedAST
 ```
 
-Entry point: `typechecker::check(program: Program) -> Result<TypedProgram, MoonlaneError>`
+### Multi-module (v0.6.0 `check_graph`)
+
+```
+NormalizedModuleGraph + ResolvedNames
+       │
+       ▼  (for each module in topological order)
+  ┌─────────────────────────────────────────────────────┐
+  │ build_import_schemes — pull pub schemes from         │
+  │   GlobalExports for this module's imports            │
+  │                                                      │
+  │ check_impl(program, imported_schemes, type_context)  │
+  │   ├─ Pre-pass: seed imports, register builtins, hoist│
+  │   ├─ Pass 1:   infer (same as single-module)         │
+  │   └─ Pass 2:   construct (scheme_env includes imports)│
+  │                                                      │
+  │ filter_pub_schemes — extract pub names → GlobalExports│
+  └─────────────────────────────────────────────────────┘
+       │
+       ▼
+  TypedModuleGraph (one TypedModule per input module)
+```
+
+Entry points:
+- `typechecker::check(program) -> Result<TypedProgram>` — single-module legacy path
+- `typechecker::check_graph(graph, names, std_prelude) -> Result<TypedModuleGraph>` — multi-module path (v0.6.0)
 
 ---
 
@@ -23,7 +49,7 @@ Entry point: `typechecker::check(program: Program) -> Result<TypedProgram, Moonl
 
 | File | Responsibility |
 |---|---|
-| `mod.rs` | `check()` entry point, `SchemeEnv` alias, `FunGeneralization` struct |
+| `mod.rs` | `check()` / `check_graph()` entry points; `StdPrelude`, `GlobalExports`, `check_impl` |
 | `registry.rs` | `build_registry`, `register_builtins`, `build_concrete_*_env` |
 | `inference.rs` | Pass 1 — all `infer_*` functions |
 | `construction.rs` | Pass 2 — `ConstructCtx`, all `construct_*` functions, exhaustiveness checking |

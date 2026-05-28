@@ -1,7 +1,7 @@
 ---
 number: 0031
 title: Topological Per-Module Typechecking
-status: draft
+status: accepted
 created: 2026-05-28
 milestone: v0.6.0
 tracking_issue: "#172"

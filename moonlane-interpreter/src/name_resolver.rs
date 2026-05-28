@@ -217,6 +217,8 @@ fn absolute_base(root: &PathRoot, current: &[String]) -> Vec<String> {
                 current[..current.len() - 1].to_vec()
             }
         }
+        // Hierarchical: parent_path ++ [n] — must match module_loader's child_path
+        // construction. See ADR-0023.
         PathRoot::Name(n) => {
             let mut path = current.to_vec();
             path.push(n.clone());

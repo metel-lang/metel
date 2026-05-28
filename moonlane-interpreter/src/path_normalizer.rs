@@ -23,7 +23,7 @@ use crate::name_resolver::{ModuleScope, ResolvedNames};
 
 /// Opaque wrapper around `ModuleGraph` that proves the normalization pass has run.
 /// `check_graph` requires this type; calling it with a raw `ModuleGraph` is a
-/// compile-time error.
+/// compile-time error. See ADR-0021.
 pub struct NormalizedModuleGraph(pub(crate) ModuleGraph);
 
 impl NormalizedModuleGraph {

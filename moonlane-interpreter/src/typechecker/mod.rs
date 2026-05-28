@@ -76,6 +76,8 @@ impl GlobalExports {
 /// Typecheck a normalized module graph. Processes modules in topological order
 /// (dependencies before dependents); each module is typechecked against its
 /// declared imports, with results accumulated into `GlobalExports`.
+/// Typecheck a normalized module graph. See ADR-0022 for the GlobalExports accumulator
+/// pattern and the invariant that imported_schemes must reach both inference and construction.
 pub fn check_graph(
     graph: NormalizedModuleGraph,
     names: &ResolvedNames,
@@ -227,6 +229,9 @@ fn check_impl(
 
     // Imported schemes must be visible in the construction pass so calls to imported
     // functions can be constructed. Use or_insert so locally-defined names shadow imports.
+    // INVARIANT: imported_schemes must be seeded into BOTH InferContext (above, via
+    // bind_poly) AND scheme_env (here). Missing either breaks one of the two passes.
+    // See ADR-0022.
     for (name, scheme) in imported_schemes {
         scheme_env.entry(name.clone()).or_insert_with(|| scheme.clone());
     }
