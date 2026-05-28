@@ -744,7 +744,7 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Moonl
             }
         }
 
-        Expr::Path(segments, _) => {
+        Expr::Path(segments, _) => { // last-segment fallback below: ADR-0019, ADR-0020
             if segments.len() == 1 {
                 let name = &segments[0];
                 let span = expr.span();
@@ -758,7 +758,9 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Moonl
                 if let Some(val) = env.get(&key) {
                     return Ok(Signal::Value(val));
                 }
-                // Check last segment alone for module-qualified calls (e.g. helper::answer → answer).
+                // Last-segment fallback: `mod::name` evaluates as bare `name` because the
+                // flat merge (ADR-0019) binds all declarations under their bare names.
+                // Remove when per-module scope is introduced (ADR-0020).
                 let last = segments.last().unwrap();
                 if let Some(val) = env.get(last) {
                     return Ok(Signal::Value(val));
@@ -1097,7 +1099,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
             }
         }
 
-        TypedExpr::Path(segments, _, _) => {
+        TypedExpr::Path(segments, _, _) => { // last-segment fallback below: ADR-0019, ADR-0020
             // Unit enum variant: `Colour::Red` → Value::Enum { name: "Colour", variant: "Red", fields: {} }
             // A single-segment path is treated as an ident lookup.
             if segments.len() == 1 {
@@ -1117,7 +1119,9 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
                 if let Some(val) = env.get(&key) {
                     return Ok(Signal::Value(val));
                 }
-                // Check last segment alone for module-qualified calls (e.g. helper::answer → answer).
+                // Last-segment fallback: `mod::name` evaluates as bare `name` because the
+                // flat merge (ADR-0019) binds all declarations under their bare names.
+                // Remove when per-module scope is introduced (ADR-0020).
                 let last = segments.last().unwrap();
                 if let Some(val) = env.get(last) {
                     return Ok(Signal::Value(val));

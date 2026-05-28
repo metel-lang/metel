@@ -234,6 +234,21 @@ Do **not** create a decision record for:
 
 Accepted decisions are never modified. To reverse one, create a new decision record that supersedes the old one and update its status field.
 
+### Linking decisions to code
+
+When a piece of code would surprise a future contributor — it looks wrong but isn't, it must stay a certain way, or it encodes a subtle invariant — add a one-line comment with the reason and an ADR reference:
+
+```rust
+// Flat merge: all module decls visible globally to the typechecker (ADR-0019).
+// Remove when name_resolver is wired into the check pipeline.
+```
+
+Do **not** add ADR links to routine code. The link must carry information that a reader cannot recover from the code and its surrounding context alone. A bare `// see ADR-0019` with no hint of what the decision was is not useful.
+
+Reserve this for:
+- Code that looks like a bug but is intentional (a workaround, a deliberate shortcut, a known limitation).
+- An invariant the ADR documents as load-bearing — something a future refactor must not break silently.
+
 ---
 
 ## Spec Discipline

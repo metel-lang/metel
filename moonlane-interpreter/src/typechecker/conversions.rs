@@ -6,6 +6,8 @@ use crate::types::Type;
 
 /// Strip a module-path prefix from a type name written as `mod::path::Type`,
 /// returning just the final type name segment. Single-segment names pass through.
+/// Necessary because the flat merge (ADR-0019) registers types under their bare names;
+/// remove when per-module type resolution is introduced (ADR-0020).
 fn bare_type_name(name: &str) -> &str {
     name.rsplit("::").next().unwrap_or(name)
 }

@@ -636,7 +636,9 @@ fn construct_expr(
                     }
                 }
             }
-            // Fallback: look up last segment as a module-qualified item.
+            // Last-segment fallback: `mod::name` resolves as bare `name` because the flat
+            // merge (ADR-0019) registers all declarations under their bare names. Remove
+            // when per-module scope is introduced (ADR-0020).
             let last = segments.last().ok_or_else(|| MoonlaneError::internal("empty path in construct"))?;
             if let Some(ty) = ctx.lookup(last).cloned() {
                 return Ok(TypedExpr::Path(segments.clone(), ty, span.clone()));

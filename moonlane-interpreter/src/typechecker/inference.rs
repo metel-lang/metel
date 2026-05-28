@@ -631,8 +631,9 @@ fn infer_expr(
                     }
                 }
             }
-            // Fallback for module-qualified paths: look up the last segment as a free name.
-            // This handles `helper::answer`, `self::fn_name`, `root::mod::item`, etc.
+            // Last-segment fallback: works because the flat merge (ADR-0019) registers all
+            // declarations under their bare names. Remove when per-module scope is
+            // introduced (ADR-0020).
             if let Some(last) = segments.last() {
                 if let Some(ty) = ctx.lookup(last) {
                     return Ok(ty);

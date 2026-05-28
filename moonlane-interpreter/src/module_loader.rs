@@ -34,6 +34,9 @@ pub fn load_program(path: impl AsRef<Path>) -> Result<Program, MoonlaneError> {
     let mut exports = Vec::new();
     let mut decls = Vec::new();
 
+    // Flat merge: all module decls are combined into one Program so the typechecker
+    // sees every declaration globally. Per-module scope isolation is deferred (ADR-0019).
+    // Remove this merge when name_resolver is wired into the typechecker pipeline.
     for loaded in graph.modules {
         imports.extend(loaded.program.imports);
         exports.extend(loaded.program.exports);
