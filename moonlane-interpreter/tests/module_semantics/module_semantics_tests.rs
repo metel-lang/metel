@@ -112,6 +112,21 @@ fn transitive_dependency_via_graph_pipeline() {
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
 
+// ── Collision detection ───────────────────────────────────────────────────────
+
+#[test]
+fn duplicate_top_level_name_across_modules_runs_with_warning() {
+    // Both modules declare `helper` — evaluate_graph should warn on stderr but not error.
+    let dir = fixture_dir("collision");
+    let main = dir.join("main.mln");
+    write(&main, "import a::*;\nimport b::*;\nfun main() -> Int { return 0; }\n");
+    write(&dir.join("a.mln"), "pub fun helper() -> Int { return 1; }\n");
+    write(&dir.join("b.mln"), "pub fun helper() -> Int { return 2; }\n");
+
+    // The program typechecks and evaluates — collision is a warning, not an error.
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
 // ── Path normalization ────────────────────────────────────────────────────────
 
 #[test]
