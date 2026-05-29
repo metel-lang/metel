@@ -39,6 +39,19 @@ pub(super) fn format_value(val: &Value) -> String {
             let inner = pairs.iter().map(|(k, v)| format!("{}: {}", k, format_value(v))).collect::<Vec<_>>().join(", ");
             format!("{} {{ {} }}", name, inner)
         }
+        // Perhaps and Result use familiar Rust-style display rather than the generic enum format.
+        Value::Enum { name, variant, fields } if name == "Perhaps" => {
+            match (variant.as_str(), fields.get("value")) {
+                ("Some", Some(v)) => format!("Some({})", format_value(v)),
+                _                 => "None".to_string(),
+            }
+        }
+        Value::Enum { name, variant, fields } if name == "Result" => {
+            match variant.as_str() {
+                "Ok"  => format!("Ok({})",  format_value(fields.get("value").unwrap_or(&Value::Unit))),
+                _     => format!("Err({})", format_value(fields.get("error").unwrap_or(&Value::Unit))),
+            }
+        }
         Value::Enum { name, variant, fields } => {
             if fields.is_empty() {
                 format!("{}::{}", name, variant)
@@ -51,10 +64,6 @@ pub(super) fn format_value(val: &Value) -> String {
         }
         Value::Closure(_) => "<closure>".to_string(),
         Value::Builtin(name, _) => format!("<builtin:{}>", name),
-        Value::Perhaps(Some(v)) => format!("Some({})", format_value(v)),
-        Value::Perhaps(None) => "None".to_string(),
-        Value::Result(Ok(v)) => format!("Ok({})", format_value(v)),
-        Value::Result(Err(e)) => format!("Err({})", format_value(e)),
         // RFC-0001 (pointer syntax) placeholder variants — not constructed until that RFC is implemented.
         Value::Pointer(_) | Value::MutPointer(_) => unreachable!("pointer values not constructed until RFC-0001 is implemented"),
     }

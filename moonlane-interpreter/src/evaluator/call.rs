@@ -27,7 +27,11 @@ pub(super) fn call_function(func: Value, args: Vec<Value>, span: &Span) -> Resul
             let sig = result?;
             Ok(match sig {
                 Signal::Return(v) => Signal::Value(v),
-                Signal::PropagateErr(e) => Signal::Value(Value::Result(Err(Box::new(e)))),
+                Signal::PropagateErr(e) => {
+                    let mut fields = std::collections::HashMap::new();
+                    fields.insert("error".to_string(), e);
+                    Signal::Value(Value::Enum { name: "Result".to_string(), variant: "Err".to_string(), fields })
+                }
                 other => other,
             })
         }
@@ -77,7 +81,11 @@ pub(super) fn call_function_mut_self(func: Value, args: Vec<Value>, span: &Span)
             let sig = result?;
             let sig = match sig {
                 Signal::Return(v) => Signal::Value(v),
-                Signal::PropagateErr(e) => Signal::Value(Value::Result(Err(Box::new(e)))),
+                Signal::PropagateErr(e) => {
+                    let mut fields = std::collections::HashMap::new();
+                    fields.insert("error".to_string(), e);
+                    Signal::Value(Value::Enum { name: "Result".to_string(), variant: "Err".to_string(), fields })
+                }
                 other => other,
             };
             Ok((sig, updated_self))

@@ -51,8 +51,6 @@ pub enum Value {
     Enum { name: String, variant: String, fields: HashMap<String, Value> },
     Closure(Rc<ClosureValue>),
     Builtin(String, fn(Vec<Value>, &Span) -> Result<Value, MoonlaneError>),
-    Perhaps(Option<Box<Value>>),
-    Result(Result<Box<Value>, Box<Value>>),
     /// Read-only pointer placeholder — never constructed in v0.2; reserved for RFC-0001.
     Pointer(Rc<RefCell<Value>>),
     /// Writable pointer placeholder — never constructed in v0.2; reserved for RFC-0001.
@@ -601,8 +599,9 @@ fn eval_for_in(
         iter_val = updated_self;
         let result = result_sig.into_value();
         let maybe_item: Option<Value> = match result {
-            Value::Perhaps(None)    => None,
-            Value::Perhaps(Some(v)) => Some(*v),
+            Value::Enum { name, variant, mut fields } if name == "Perhaps" => {
+                if variant == "None" { None } else { Some(fields.remove("value").unwrap_or(Value::Unit)) }
+            }
             _ => return Err(MoonlaneError::internal("Iterable::next: expected Perhaps value")),
         };
         match maybe_item {
@@ -810,7 +809,7 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Moonl
                 Literal::Float(f) => Value::Float(*f),
                 Literal::Bool(b)  => Value::Bool(*b),
                 Literal::Str(s)   => Value::Str(s.clone()),
-                Literal::None     => Value::Perhaps(None),
+                Literal::None     => Value::Enum { name: "Perhaps".into(), variant: "None".into(), fields: HashMap::new() },
                 Literal::Unit     => Value::Unit,
             };
             Ok(Signal::Value(val))
@@ -846,9 +845,6 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Moonl
                 }
                 let name    = segments[segments.len() - 2].clone();
                 let variant = segments[segments.len() - 1].clone();
-                if name == "Perhaps" && variant == "None" {
-                    return Ok(Signal::Value(Value::Perhaps(None)));
-                }
                 Ok(Signal::Value(Value::Enum { name, variant, fields: HashMap::new() }))
             }
         }
@@ -1068,26 +1064,7 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Moonl
                 field_vals.insert(name.clone(), eval_untyped_expr(expr, env)?.into_value());
             }
             if path.len() == 2 {
-                // KNOWN LIMITATION (#205): Perhaps and Result are native Value variants, not
-                // user-defined enum structs. Their constructors are intercepted here rather
-                // than dispatched through the normal struct-literal path. This will be
-                // resolved when the evaluator migrates to struct-style dispatch (#205).
-                match (path[0].as_str(), path[1].as_str()) {
-                    ("Perhaps", "Some") => {
-                        let v = field_vals.remove("value").ok_or_else(|| MoonlaneError::internal("Perhaps::Some: missing `value` field"))?;
-                        Ok(Signal::Value(Value::Perhaps(Some(Box::new(v)))))
-                    }
-                    ("Perhaps", "None") => Ok(Signal::Value(Value::Perhaps(None))),
-                    ("Result", "Ok") => {
-                        let v = field_vals.remove("value").ok_or_else(|| MoonlaneError::internal("Result::Ok: missing `value` field"))?;
-                        Ok(Signal::Value(Value::Result(Ok(Box::new(v)))))
-                    }
-                    ("Result", "Err") => {
-                        let e = field_vals.remove("error").ok_or_else(|| MoonlaneError::internal("Result::Err: missing `error` field"))?;
-                        Ok(Signal::Value(Value::Result(Err(Box::new(e)))))
-                    }
-                    _ => Ok(Signal::Value(Value::Enum { name: path[0].clone(), variant: path[1].clone(), fields: field_vals })),
-                }
+                Ok(Signal::Value(Value::Enum { name: path[0].clone(), variant: path[1].clone(), fields: field_vals }))
             } else {
                 let name = path.last().ok_or_else(|| MoonlaneError::internal("struct literal: empty path"))?.clone();
                 Ok(Signal::Value(Value::Struct { name, fields: field_vals }))
@@ -1147,8 +1124,13 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Moonl
         Expr::PropagateError { expr, span } => {
             let val = eval_untyped_expr(expr, env)?.into_value();
             match val {
-                Value::Result(Ok(v))  => Ok(Signal::Value(*v)),
-                Value::Result(Err(e)) => Ok(Signal::PropagateErr(*e)),
+                Value::Enum { name, variant, mut fields } if name == "Result" => {
+                    if variant == "Ok" {
+                        Ok(Signal::Value(fields.remove("value").unwrap_or(Value::Unit)))
+                    } else {
+                        Ok(Signal::PropagateErr(fields.remove("error").unwrap_or(Value::Unit)))
+                    }
+                }
                 _ => Err(MoonlaneError::panic(RuntimeErrorCode::R0012, "?: expected a Result value", span)),
             }
         }
@@ -1165,7 +1147,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
                 Literal::Float(f) => Value::Float(*f),
                 Literal::Bool(b)  => Value::Bool(*b),
                 Literal::Str(s)   => Value::Str(s.clone()),
-                Literal::None     => Value::Perhaps(None),
+                Literal::None     => Value::Enum { name: "Perhaps".into(), variant: "None".into(), fields: HashMap::new() },
                 Literal::Unit     => Value::Unit,
             };
             Ok(Signal::Value(val))
@@ -1204,14 +1186,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
                 }
                 let name    = segments[segments.len() - 2].clone();
                 let variant = segments[segments.len() - 1].clone();
-                if name == "Perhaps" && variant == "None" {
-                    return Ok(Signal::Value(Value::Perhaps(None)));
-                }
-                Ok(Signal::Value(Value::Enum {
-                    name,
-                    variant,
-                    fields: HashMap::new(),
-                }))
+                Ok(Signal::Value(Value::Enum { name, variant, fields: HashMap::new() }))
             }
         }
 
@@ -1477,30 +1452,11 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
                 field_vals.insert(name.clone(), eval_expr(expr, env)?.into_value());
             }
             if path.len() == 2 {
-                // KNOWN LIMITATION (#205): Perhaps and Result are native Value variants, not
-                // user-defined enum structs. Their constructors are intercepted here rather
-                // than dispatched through the normal struct-literal path. This will be
-                // resolved when the evaluator migrates to struct-style dispatch (#205).
-                match (path[0].as_str(), path[1].as_str()) {
-                    ("Perhaps", "Some") => {
-                        let v = field_vals.remove("value").ok_or_else(|| MoonlaneError::internal("Perhaps::Some: missing `value` field"))?;
-                        Ok(Signal::Value(Value::Perhaps(Some(Box::new(v)))))
-                    }
-                    ("Perhaps", "None") => Ok(Signal::Value(Value::Perhaps(None))),
-                    ("Result", "Ok") => {
-                        let v = field_vals.remove("value").ok_or_else(|| MoonlaneError::internal("Result::Ok: missing `value` field"))?;
-                        Ok(Signal::Value(Value::Result(Ok(Box::new(v)))))
-                    }
-                    ("Result", "Err") => {
-                        let e = field_vals.remove("error").ok_or_else(|| MoonlaneError::internal("Result::Err: missing `error` field"))?;
-                        Ok(Signal::Value(Value::Result(Err(Box::new(e)))))
-                    }
-                    _ => Ok(Signal::Value(Value::Enum {
-                        name:    path[0].clone(),
-                        variant: path[1].clone(),
-                        fields:  field_vals,
-                    })),
-                }
+                Ok(Signal::Value(Value::Enum {
+                    name:    path[0].clone(),
+                    variant: path[1].clone(),
+                    fields:  field_vals,
+                }))
             } else {
                 let name = path.last().ok_or_else(|| {
                     MoonlaneError::internal("struct literal: empty path")
@@ -1584,15 +1540,19 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
         TypedExpr::PropagateError { expr, coercion, span, .. } => {
             let val = eval_expr(expr, env)?.into_value();
             match val {
-                Value::Result(Ok(v))  => Ok(Signal::Value(*v)),
-                Value::Result(Err(e)) => {
-                    // Apply From coercion if needed.
-                    let coerced = if let Some(key) = coercion {
-                        if let Some(from_fn) = env.get(key) {
-                            call::call_function(from_fn, vec![*e], span)?.into_value()
-                        } else { *e }
-                    } else { *e };
-                    Ok(Signal::PropagateErr(coerced))
+                Value::Enum { name, variant, mut fields } if name == "Result" => {
+                    if variant == "Ok" {
+                        Ok(Signal::Value(fields.remove("value").unwrap_or(Value::Unit)))
+                    } else {
+                        let e = fields.remove("error").unwrap_or(Value::Unit);
+                        // Apply From coercion if needed.
+                        let coerced = if let Some(key) = coercion {
+                            if let Some(from_fn) = env.get(key) {
+                                call::call_function(from_fn, vec![e], span)?.into_value()
+                            } else { e }
+                        } else { e };
+                        Ok(Signal::PropagateErr(coerced))
+                    }
                 }
                 _ => Err(MoonlaneError::panic(RuntimeErrorCode::R0012, "?: expected a Result value", span)),
             }
