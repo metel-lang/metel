@@ -2,7 +2,7 @@
 id: adr-0019
 title: "Flat Module Merge for Typechecker in v0.5.0"
 date: '2026-05-28'
-status: active
+status: superseded by ADR-0029
 ---
 
 ## Context

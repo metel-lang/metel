@@ -40,6 +40,8 @@ pub(super) fn format_value(val: &Value) -> String {
             format!("{} {{ {} }}", name, inner)
         }
         // Perhaps and Result use familiar Rust-style display rather than the generic enum format.
+        // These are the only two enum names singled out by display — all others use the generic arm.
+        // See ADR-0028 for why Perhaps/Result are represented as Value::Enum despite special display.
         Value::Enum { name, variant, fields } if name == "Perhaps" => {
             match (variant.as_str(), fields.get("value")) {
                 ("Some", Some(v)) => format!("Some({})", format_value(v)),

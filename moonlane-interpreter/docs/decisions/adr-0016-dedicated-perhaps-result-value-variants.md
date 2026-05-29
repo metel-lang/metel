@@ -1,6 +1,6 @@
 # ADR-0016: Dedicated Value::Perhaps and Value::Result Variants
 
-**Status:** Accepted  
+**Status:** Superseded by ADR-0028  
 **Sprint:** 7 (v0.4.1)  
 **Issue:** #142
 

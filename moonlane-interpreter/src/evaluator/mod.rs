@@ -48,6 +48,7 @@ pub enum Value {
     Tuple(Vec<Value>),
     Array(Rc<RefCell<Vec<Value>>>),
     Struct { name: String, fields: HashMap<String, Value> },
+    // Perhaps<T> and Result<T,E> use Value::Enum like all other enums. See ADR-0028.
     Enum { name: String, variant: String, fields: HashMap<String, Value> },
     Closure(Rc<ClosureValue>),
     Builtin(String, fn(Vec<Value>, &Span) -> Result<Value, MoonlaneError>),
@@ -228,6 +229,7 @@ impl<'a> ImplMethodKey<'a> {
 /// Each module is initialised in its own `Environment` seeded with builtins,
 /// then cross-linked via the `imported_names` table populated by `check_graph`.
 /// Modules are processed in topological order (dependencies before dependents).
+/// See ADR-0029 for the isolation design and ADR-0019 for the superseded flat-merge approach.
 pub fn evaluate_graph(graph: TypedModuleGraph) -> Result<(), MoonlaneError> {
     CALL_STACK.with(|s| s.borrow_mut().clear());
 

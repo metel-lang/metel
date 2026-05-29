@@ -4,6 +4,17 @@ title: "Moonlane Language Changelog"
 
 # Changelog
 
+## v0.6.2
+
+Evaluator normalization. Shipped by Sprint 13 (`sprint/13`).
+
+**Internal improvements:**
+- `Value::Perhaps` and `Value::Result` dedicated variants removed; all `Perhaps` and `Result` values now use the general `Value::Enum { name, variant, fields }` representation, eliminating special-case dispatch throughout the evaluator (ADR-0028, #205)
+- `evaluate_graph` now initialises each module in its own isolated `Environment` seeded with builtins and cross-linked via the `imported_names` table populated by `check_graph`; replaces the flat-merge strategy from v0.5.0 (ADR-0029, #210)
+
+**Compatibility:**
+- No language-visible changes. All existing programs produce identical output.
+
 ## v0.6.1
 
 Type system cleanup and `std::core` virtual module. Shipped by Sprint 12 (`sprint/12`).

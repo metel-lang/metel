@@ -198,6 +198,8 @@ pub fn check_graph(
             }
         }
 
+        // Populate imported_names: local_name → (source_module, canonical_name).
+        // Used by evaluate_graph to seed each module's isolated Environment. See ADR-0029.
         let (import_aliases, imported_names) = names.scopes.get(&loaded.module_path)
             .map(|scope| {
                 let aliases = scope.explicit.iter()
