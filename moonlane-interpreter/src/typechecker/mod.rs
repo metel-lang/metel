@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::ast::{Decl, Program, Visibility};
 use crate::error::MoonlaneError;
 use crate::module_loader::LoadedModule;
-use crate::name_resolver::ResolvedNames;
+use crate::name_resolver::{GlobTier, ResolvedNames};
 use crate::path_normalizer::NormalizedModuleGraph;
 use crate::error::TypeErrorCode;
 use crate::typed_ast::{TypedDecl, TypedModule, TypedModuleGraph, TypedProgram};
@@ -222,13 +222,19 @@ fn build_import_schemes(
     let Some(scope) = names.scopes.get(&loaded.module_path) else { return Ok(env) };
 
     // Glob imports (lower priority — added first so explicit can override).
-    // Track which module each glob name came from to detect glob/glob conflicts (T0011).
-    let mut glob_source: HashMap<String, &[String]> = HashMap::new();
-    for glob_module in &scope.globs {
-        if let Some(all_schemes) = global_exports.all_pub_schemes(glob_module) {
-            for (name, scheme) in all_schemes {
-                if let Some(prior_source) = glob_source.get(name.as_str()) {
-                    // Two different glob imports export the same name → T0011.
+    // Process Std globs before User globs so User silently wins cross-tier conflicts.
+    // T0011 fires only when two globs of the **same** tier export the same name.
+    let mut glob_source: HashMap<String, (Vec<String>, GlobTier)> = HashMap::new();
+    let ordered_globs = scope.globs.iter()
+        .filter(|(t, _)| *t == GlobTier::Std)
+        .chain(scope.globs.iter().filter(|(t, _)| *t == GlobTier::User));
+    for (tier, glob_module) in ordered_globs {
+        let Some(all_schemes) = global_exports.all_pub_schemes(glob_module) else { continue };
+        for (name, scheme) in all_schemes {
+            let conflict = glob_source.get(name.as_str()).map(|(s, t)| (s.clone(), t.clone()));
+            match conflict {
+                Some((prior_source, ref prior_tier)) if prior_tier == tier => {
+                    // Same-tier conflict → T0011.
                     return Err(MoonlaneError::type_error(
                         TypeErrorCode::T0011,
                         format!(
@@ -242,8 +248,14 @@ fn build_import_schemes(
                         &crate::ast::Span::new(0, 0, loaded.file_path.display().to_string()),
                     ));
                 }
-                glob_source.insert(name.clone(), glob_module.as_slice());
-                env.entry(name.clone()).or_insert_with(|| scheme.clone());
+                Some((_, GlobTier::User)) => {
+                    // Prior User glob claimed this name; current Std glob cannot override.
+                }
+                _ => {
+                    // Either no prior claim, or current User tier overrides a prior Std.
+                    glob_source.insert(name.clone(), (glob_module.clone(), tier.clone()));
+                    env.insert(name.clone(), scheme.clone());
+                }
             }
         }
     }

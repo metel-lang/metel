@@ -6,6 +6,17 @@ use crate::module_loader::{LoadedModule, ModuleGraph};
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
+/// Priority tier for glob imports.
+/// Higher tiers win over lower tiers without a conflict error.
+/// T0011 fires only when two globs of the **same** tier export the same name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GlobTier {
+    /// Auto-inserted by the runtime (e.g. `std::core`). Lowest priority.
+    Std,
+    /// Explicit `import module::*` in user source. Wins over `Std` silently.
+    User,
+}
+
 /// A single resolved import binding within a module's scope.
 #[derive(Debug, Clone)]
 pub struct ImportBinding {
@@ -31,10 +42,10 @@ pub struct ModuleScope {
     /// Explicit bindings: local_name → ImportBinding.
     /// Two explicit bindings with the same local_name are a compile error.
     pub explicit: HashMap<String, ImportBinding>,
-    /// Glob-imported module paths (`import path::*`).
+    /// Glob-imported module paths (`import path::*`), tagged with their priority tier.
     /// Names from these modules are in scope at lower priority than explicit imports.
-    /// Ambiguity between two glob-sourced names is deferred to use-site.
-    pub globs: Vec<Vec<String>>,
+    /// T0011 fires only for same-tier conflicts; `User` silently wins over `Std`.
+    pub globs: Vec<(GlobTier, Vec<String>)>,
     /// Re-exported names: local_name → source binding.
     /// These names are part of this module's public API surface for callers.
     pub re_exports: HashMap<String, ImportBinding>,
@@ -242,7 +253,7 @@ fn process_tree(
 ) -> Result<(), MoonlaneError> {
     match tree {
         ImportTree::Glob => {
-            scope.globs.push(base.to_vec());
+            scope.globs.push((GlobTier::User, base.to_vec()));
         }
 
         ImportTree::Name { name, alias } => {
@@ -325,8 +336,8 @@ impl ModuleScope {
 
 pub enum ScopeLookup<'a> {
     Explicit(&'a ImportBinding),
-    /// The name was not explicitly imported; these glob sources may provide it.
-    MaybeGlob(&'a Vec<Vec<String>>),
+    /// The name was not explicitly imported; these tiered glob sources may provide it.
+    MaybeGlob(&'a Vec<(GlobTier, Vec<String>)>),
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -445,7 +456,7 @@ mod tests {
         let names = resolve(&graph).unwrap();
         let root_scope = &names.scopes[&vec![]];
         assert!(root_scope.explicit.is_empty(), "glob should not add explicit bindings");
-        assert_eq!(root_scope.globs, vec![vec!["parser".to_string()]]);
+        assert_eq!(root_scope.globs, vec![(GlobTier::User, vec!["parser".to_string()])]);
     }
 
     #[test]

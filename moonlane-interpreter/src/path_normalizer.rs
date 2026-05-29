@@ -282,7 +282,7 @@ fn try_resolve_path(
         }
         // 2. Glob import from this module — local name == source name
         let source_module: Vec<String> = segments[..segments.len() - 1].to_vec();
-        if s.globs.iter().any(|g| g == &source_module || g.first() == Some(first)) {
+        if s.globs.iter().any(|(_, g)| g == &source_module || g.first() == Some(first)) {
             return Some(declared_name.clone());
         }
     }
