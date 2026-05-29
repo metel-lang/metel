@@ -552,3 +552,107 @@ fn group_import_with_alias_subset() {
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
+
+// ── Sprint 12: std::core auto-import + module interaction ────────────────────
+
+#[test]
+fn std_core_builtins_available_in_each_module_without_import() {
+    // Every module in a multi-module graph must see std::core builtins (print,
+    // assert, array_push, array_len) without any explicit import statement.
+    let dir = fixture_dir("int_std_auto_import");
+    let main = dir.join("main.mln");
+    write(
+        &dir.join("helper.mln"),
+        "pub fun sum(arr: Int[]) -> Int {\
+         \n    assert(array_len(arr) > 0);\
+         \n    mut total = 0;\
+         \n    mut i = 0;\
+         \n    while (i < array_len(arr)) { total += arr[i]; i += 1; }\
+         \n    return total;\
+         \n}\n",
+    );
+    write(
+        &main,
+        "import helper::sum;\
+         \nfun main() {\
+         \n    let arr = [1, 2, 3, 4, 5];\
+         \n    let result = sum(arr);\
+         \n    assert(result == 15);\
+         \n    print(result);\
+         \n}\n",
+    );
+    run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn user_glob_overrides_std_core_same_name_in_multi_module() {
+    // A User-tier glob export of a function with the same name as a std::core
+    // builtin wins silently over the Std-tier auto-import (no T0011).
+    let dir = fixture_dir("int_user_glob_overrides_std");
+    let main = dir.join("main.mln");
+    write(
+        &dir.join("mylib.mln"),
+        "pub fun double(x: Int) -> Int { return x * 2; }\n",
+    );
+    write(
+        &main,
+        "import mylib::*;\
+         \nfun main() {\
+         \n    let result = double(21);\
+         \n    assert(result == 42);\
+         \n}\n",
+    );
+    run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn multi_module_perhaps_and_result_without_explicit_std_import() {
+    // Perhaps and Result are available in every module via std::core auto-import.
+    // No explicit `import std::core::Perhaps` should be needed.
+    let dir = fixture_dir("int_module_perhaps");
+    let main = dir.join("main.mln");
+    write(
+        &dir.join("finder.mln"),
+        "pub fun find_first_positive(arr: Int[]) -> Perhaps<Int> {\
+         \n    mut i = 0;\
+         \n    while (i < array_len(arr)) {\
+         \n        if (arr[i] > 0) { return Perhaps::Some { value: arr[i] }; }\
+         \n        i += 1;\
+         \n    }\
+         \n    None\
+         \n}\n",
+    );
+    write(
+        &main,
+        "import finder::find_first_positive;\
+         \nfun main() {\
+         \n    let arr = [-1, -2, 7, 3];\
+         \n    let r = find_first_positive(arr);\
+         \n    match r {\
+         \n        Perhaps::Some { value } => assert(value == 7),\
+         \n        None => assert(false),\
+         \n    };\
+         \n}\n",
+    );
+    run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn explicit_std_core_import_and_auto_glob_coexist() {
+    // A module may `import std::core::Perhaps` explicitly while other std::core
+    // names (like assert) are still available via the auto-glob.
+    let dir = fixture_dir("int_explicit_and_auto");
+    let main = dir.join("main.mln");
+    write(
+        &main,
+        "import std::core::Perhaps;\
+         \nfun main() {\
+         \n    let p = Perhaps::Some { value: 42 };\
+         \n    match p {\
+         \n        Perhaps::Some { value } => assert(value == 42),\
+         \n        None => assert(false),\
+         \n    };\
+         \n}\n",
+    );
+    run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
+}

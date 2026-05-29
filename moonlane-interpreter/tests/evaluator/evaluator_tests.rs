@@ -408,4 +408,7 @@ mod tests {
 
     #[test]
     fn int_pub_declarations() { check("integration/int_07_pub_declarations.mln"); }
+
+    #[test]
+    fn int_std_core_paths() { check("integration/int_08_std_core_paths.mln"); }
 }
