@@ -1,14 +1,12 @@
 use std::collections::HashMap;
 
 use crate::ast::{Decl, Program, Span, TypeExpr, AspectDecl};
-use crate::error::MoonlaneError;
 use crate::typeinference::{
-    EnumInfo, InferContext, InferType, TypeRegistry, TypeScheme, TypeVar, TypeVarGenerator,
-    VariantInfo,
+    EnumInfo, FieldEntry, InferContext, InferType, TypeDefinitionRegistry, TypeScheme, TypeVar,
+    TypeVarGenerator, VariantInfo,
 };
-use crate::types::Type;
 
-use super::conversions::{infer_type_to_type, type_expr_to_infer, type_expr_to_infer_with_generics};
+use super::conversions::{type_expr_to_infer, type_expr_to_infer_with_generics};
 
 fn dbg_scheme(t: TypeVar) -> TypeScheme {
     TypeScheme {
@@ -50,7 +48,7 @@ fn print_scheme(t: TypeVar) -> TypeScheme {
     }
 }
 
-fn register_builtin_aspect_impls(registry: &mut TypeRegistry) {
+fn register_builtin_aspect_impls(registry: &mut TypeDefinitionRegistry) {
     use crate::types::Type;
     // Iterable impls for built-in sequence types
     registry.register_aspect_impl("Range".into(),          "Iterable".into(), vec![Type::Int]);
@@ -65,19 +63,22 @@ fn register_builtin_aspect_impls(registry: &mut TypeRegistry) {
     registry.register_aspect_impl("String".into(), "Display".into(), vec![]);
 }
 
-/// Build the `TypeRegistry` from the program's declarations and built-in types.
+/// Build the `TypeDefinitionRegistry` from the program's declarations and built-in types.
 /// Allocates TypeVars from `gen`; the caller must pass the same `gen` to
 /// `InferContext::new` so that all TypeVar IDs are globally unique.
-pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> TypeRegistry {
-    let mut registry = TypeRegistry::new();
+pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> TypeDefinitionRegistry {
+    let mut registry = TypeDefinitionRegistry::new();
     register_builtin_aspect_impls(&mut registry);
+
+    // Built-in generic enums use a synthetic span (no source file).
+    let builtin_span = Span::new(0, 0, "<builtin>");
 
     // Register built-in generic enums.
     let t = gen.fresh();
     registry.register_enum("Perhaps".into(), EnumInfo {
         type_params: vec![t],
         variants: vec![
-            VariantInfo { name: "Some".into(), fields: vec![("value".into(), InferType::Var(t))] },
+            VariantInfo { name: "Some".into(), fields: vec![("value".into(), InferType::Var(t), builtin_span.clone())] },
             VariantInfo { name: "None".into(), fields: vec![] },
         ],
     });
@@ -86,8 +87,8 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
     registry.register_enum("Result".into(), EnumInfo {
         type_params: vec![t, e],
         variants: vec![
-            VariantInfo { name: "Ok".into(),  fields: vec![("value".into(), InferType::Var(t))] },
-            VariantInfo { name: "Err".into(), fields: vec![("error".into(), InferType::Var(e))] },
+            VariantInfo { name: "Ok".into(),  fields: vec![("value".into(), InferType::Var(t), builtin_span.clone())] },
+            VariantInfo { name: "Err".into(), fields: vec![("error".into(), InferType::Var(e), builtin_span.clone())] },
         ],
     });
 
@@ -95,8 +96,8 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
     for decl in &program.decls {
         match decl {
             Decl::Struct(sd) if sd.generics.is_empty() => {
-                let fields = sd.fields.iter()
-                    .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann)))
+                let fields: Vec<FieldEntry> = sd.fields.iter()
+                    .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann), f.span.clone()))
                     .collect();
                 registry.register_struct_fields(sd.name.clone(), fields);
             }
@@ -108,8 +109,8 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
                     gen_map.insert(gp.name.clone(), tv);
                     type_params.push(tv);
                 }
-                let fields = sd.fields.iter()
-                    .map(|f| (f.name.clone(), type_expr_to_infer_with_generics(&f.type_ann, &gen_map)))
+                let fields: Vec<FieldEntry> = sd.fields.iter()
+                    .map(|f| (f.name.clone(), type_expr_to_infer_with_generics(&f.type_ann, &gen_map), f.span.clone()))
                     .collect();
                 registry.register_struct_fields(sd.name.clone(), fields);
                 registry.register_struct_type_params(sd.name.clone(), type_params);
@@ -125,7 +126,7 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
                 let variants = ed.variants.iter().map(|v| VariantInfo {
                     name: v.name.clone(),
                     fields: v.fields.iter()
-                        .map(|f| (f.name.clone(), type_expr_to_infer_with_generics(&f.type_ann, &gen_map)))
+                        .map(|f| (f.name.clone(), type_expr_to_infer_with_generics(&f.type_ann, &gen_map), f.span.clone()))
                         .collect(),
                 }).collect();
                 registry.register_enum(ed.name.clone(), EnumInfo {
@@ -164,7 +165,7 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
     registry
 }
 
-fn register_aspect_decl(ad: &AspectDecl, registry: &mut TypeRegistry) {
+fn register_aspect_decl(ad: &AspectDecl, registry: &mut TypeDefinitionRegistry) {
     let method_names = ad.methods.iter().map(|m| m.name.clone()).collect();
     registry.register_aspect(ad.name.clone(), method_names);
 }
@@ -173,7 +174,7 @@ fn register_impl_methods<'a>(
     methods: impl Iterator<Item = &'a crate::ast::FunDecl>,
     target_name: &str,
     gen: &mut TypeVarGenerator,
-    registry: &mut TypeRegistry,
+    registry: &mut TypeDefinitionRegistry,
 ) {
     for method in methods {
         let mut param_types = vec![];
@@ -286,34 +287,3 @@ pub(super) fn register_builtin_schemes(
     scheme_env.insert("assert_msg".into(),    mono(vec![bool_ty, str_ty], unit_ty));
 }
 
-pub(super) fn build_concrete_struct_env(
-    struct_env: &HashMap<String, Vec<(String, InferType)>>,
-    struct_type_params: &HashMap<String, Vec<TypeVar>>,
-    subst: &crate::typeinference::Substitution,
-) -> Result<HashMap<String, Vec<(String, Type)>>, MoonlaneError> {
-    let dummy = Span::new(0, 0, "");
-    struct_env.iter()
-        .filter(|(name, _)| !struct_type_params.contains_key(name.as_str()))
-        .map(|(name, fields)| {
-            let concrete = fields.iter()
-                .map(|(fname, fty)| Ok((fname.clone(), infer_type_to_type(&subst.apply(fty), &dummy)?)))
-                .collect::<Result<Vec<_>, _>>()?;
-            Ok((name.clone(), concrete))
-        })
-        .collect()
-}
-
-pub(super) fn build_concrete_method_env(
-    method_env: &HashMap<String, HashMap<String, InferType>>,
-    subst: &crate::typeinference::Substitution,
-) -> Result<HashMap<String, HashMap<String, Type>>, MoonlaneError> {
-    let dummy = Span::new(0, 0, "");
-    method_env.iter()
-        .map(|(type_name, methods)| {
-            let concrete = methods.iter()
-                .map(|(mname, mty)| Ok((mname.clone(), infer_type_to_type(&subst.apply(mty), &dummy)?)))
-                .collect::<Result<HashMap<_, _>, _>>()?;
-            Ok((type_name.clone(), concrete))
-        })
-        .collect()
-}

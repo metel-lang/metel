@@ -247,7 +247,7 @@ fn infer_block(
         match decl {
             Decl::Struct(sd) => {
                 let fields = sd.fields.iter()
-                    .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann)))
+                    .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann), f.span.clone()))
                     .collect();
                 ctx.register_struct_fields(sd.name.clone(), fields);
             }
@@ -255,7 +255,7 @@ fn infer_block(
                 let variants = ed.variants.iter().map(|v| VariantInfo {
                     name: v.name.clone(),
                     fields: v.fields.iter()
-                        .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann)))
+                        .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann), f.span.clone()))
                         .collect(),
                 }).collect();
                 ctx.register_enum(ed.name.clone(), EnumInfo { type_params: vec![], variants });
@@ -509,8 +509,8 @@ fn infer_expr(
                 ))?
                 .clone();
             let raw_ty = fields.iter()
-                .find(|(n, _)| n == field)
-                .map(|(_, ty)| ty.clone())
+                .find(|(n, _, _)| n == field)
+                .map(|(_, ty, _)| ty.clone())
                 .ok_or_else(|| MoonlaneError::type_error(
                     TypeErrorCode::T0003,
                     format!("no field `{field}` on `{struct_name}`"),
@@ -890,8 +890,8 @@ fn infer_enum_variant_literal(
     }
     for (fname, expr) in fields {
         let raw_ty = variant.fields.iter()
-            .find(|(n, _)| n == fname)
-            .map(|(_, ty)| ty)
+            .find(|(n, _, _)| n == fname)
+            .map(|(_, ty, _)| ty)
             .ok_or_else(|| MoonlaneError::type_error(
                 TypeErrorCode::T0003,
                 format!("no field `{fname}` on `{enum_name}::{variant_name}`"),
@@ -941,8 +941,8 @@ fn infer_struct_literal(
     };
     for (name, expr) in fields {
         let raw_ty = expected_fields.iter()
-            .find(|(n, _)| n == name)
-            .map(|(_, ty)| ty)
+            .find(|(n, _, _)| n == name)
+            .map(|(_, ty, _)| ty)
             .ok_or_else(|| MoonlaneError::type_error(
                 TypeErrorCode::T0003,
                 format!("no field `{name}` on `{struct_name}`"),
@@ -952,7 +952,7 @@ fn infer_struct_literal(
         let expr_ty = infer_expr(expr, ctx, fun_generalizations)?;
         ctx.add_constraint(expr_ty, decl_ty, span.clone());
     }
-    for (decl_name, _) in &expected_fields {
+    for (decl_name, _, _) in &expected_fields {
         if !fields.iter().any(|(n, _)| n == decl_name) {
             return Err(MoonlaneError::type_error(
                 TypeErrorCode::T0003,
@@ -991,8 +991,8 @@ fn infer_field_assign_type(
         ))?
         .clone();
     let raw_ty = fields.iter()
-        .find(|(n, _)| n == field)
-        .map(|(_, ty)| ty.clone())
+        .find(|(n, _, _)| n == field)
+        .map(|(_, ty, _)| ty.clone())
         .ok_or_else(|| MoonlaneError::type_error(
             TypeErrorCode::T0003,
             format!("no field `{field}` on `{struct_name}`"),
@@ -1046,8 +1046,8 @@ fn infer_enum_variant_pattern(
     );
     for field_name in fields {
         let raw_ty = variant.fields.iter()
-            .find(|(n, _)| n == field_name)
-            .map(|(_, ty)| ty)
+            .find(|(n, _, _)| n == field_name)
+            .map(|(_, ty, _)| ty)
             .ok_or_else(|| MoonlaneError::type_error(
                 TypeErrorCode::T0003,
                 format!("no field `{field_name}` on `{enum_name}::{variant_name}`"),

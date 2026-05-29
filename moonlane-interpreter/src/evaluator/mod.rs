@@ -192,22 +192,35 @@ impl Environment {
 
 // Compute the environment key for an impl method.
 //
-// `impl From<T> for U` is special: multiple From impls for the same target type
-// U can coexist (one per source type T). The key encodes the full impl identity
-// as "U::From<T>::from" so each coexists without collision.
-//
-// All other aspects use the simple "TypeName::method_name" form because at most
-// one impl of a given aspect per type is allowed (no disambiguation needed).
-fn impl_method_key(type_name: &str, method_name: &str, impl_block: &crate::typed_ast::TypedImplBlock) -> String {
-    if impl_block.aspect_name.as_deref() == Some("From")
-        && method_name == "from"
-        && !impl_block.aspect_type_args.is_empty()
-    {
-        if let crate::ast::TypeExpr::Named(src, _) = &impl_block.aspect_type_args[0] {
-            return format!("{type_name}::From<{src}>::from");
+/// Structured key for impl method dispatch.
+///
+/// Replaces the old flat string concatenation (`"TypeName::method_name"`) with a
+/// typed representation. `From` impls require a three-part key because multiple
+/// `From` impls can coexist for the same target type (one per source type).
+enum ImplMethodKey<'a> {
+    Regular  { type_name: &'a str, method_name: &'a str },
+    FromImpl { target: &'a str, source: &'a str },
+}
+
+impl<'a> ImplMethodKey<'a> {
+    fn from_block(type_name: &'a str, method_name: &'a str, impl_block: &'a crate::typed_ast::TypedImplBlock) -> Self {
+        if impl_block.aspect_name.as_deref() == Some("From")
+            && method_name == "from"
+            && !impl_block.aspect_type_args.is_empty()
+        {
+            if let crate::ast::TypeExpr::Named(src, _) = &impl_block.aspect_type_args[0] {
+                return ImplMethodKey::FromImpl { target: type_name, source: src.as_str() };
+            }
+        }
+        ImplMethodKey::Regular { type_name, method_name }
+    }
+
+    fn to_env_key(&self) -> String {
+        match self {
+            ImplMethodKey::Regular  { type_name, method_name } => format!("{type_name}::{method_name}"),
+            ImplMethodKey::FromImpl { target, source }         => format!("{target}::From<{source}>::from"),
         }
     }
-    format!("{type_name}::{method_name}")
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -277,7 +290,7 @@ fn evaluate_inner(program: TypedProgram, aliases: &[(String, String)]) -> Result
             TypedDecl::Impl(impl_block) => {
                 if let crate::ast::TypeExpr::Named(type_name, _) = &impl_block.target_type {
                     for method in &impl_block.methods {
-                        let key = impl_method_key(type_name, &method.name, impl_block);
+                        let key = ImplMethodKey::from_block(type_name, &method.name, impl_block).to_env_key();
                         env.define(&key, Value::Unit);
                     }
                 }
@@ -312,7 +325,7 @@ fn evaluate_inner(program: TypedProgram, aliases: &[(String, String)]) -> Result
                             FunBody::Typed(b) => ClosureBody::Typed(b.clone()),
                             FunBody::Generic(b) => ClosureBody::Untyped(b.clone()),
                         };
-                        let key = impl_method_key(type_name, &method.name, impl_block);
+                        let key = ImplMethodKey::from_block(type_name, &method.name, impl_block).to_env_key();
                         let captured = env.clone();
                         env.set(&key, Value::Closure(Rc::new(ClosureValue {
                             name:     Some(method.name.clone()),

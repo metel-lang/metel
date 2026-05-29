@@ -446,18 +446,10 @@ fn check_impl(
         scheme_env.entry(name.clone()).or_insert_with(|| scheme.clone());
     }
 
-    // Build concrete environments for Pass 2 using the full registry (includes imported types).
-    let concrete_struct_env = registry::build_concrete_struct_env(ctx.registry().raw_struct_env(), ctx.registry().raw_struct_type_params(), &subst)?;
-    let concrete_method_env = registry::build_concrete_method_env(ctx.registry().raw_method_env(), &subst)?;
-    let enum_env = ctx.registry().raw_enum_env();
-    let raw_struct_env = ctx.registry().raw_struct_env();
-    let raw_struct_type_params = ctx.registry().raw_struct_type_params();
-
     // Pass 2: construct typed AST for the current module only.
+    // The registry owns all type definitions; ConstructCtx derives concrete envs from it.
     let typed_decls = construction::construct_program(
-        program, &subst, &scheme_env,
-        concrete_struct_env, raw_struct_env, raw_struct_type_params,
-        concrete_method_env, enum_env, gen,
+        program, &subst, &scheme_env, ctx.registry(), gen,
     )?;
 
     // Return the user-defined scheme_env (before builtin_schemes were added to it,

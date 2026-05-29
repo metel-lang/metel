@@ -9,18 +9,52 @@ use crate::types::Type;
 use super::SchemeEnv;
 use super::conversions::{infer_type_to_type, resolved_to_type, type_expr_to_infer, type_to_infer};
 
+/// Build the concrete (fully-resolved `Type`) struct field map from inference results.
+/// Generic structs are excluded — they are resolved per-use-site during construction.
+pub(super) fn build_concrete_struct_env(
+    registry: &TypeDefinitionRegistry,
+    subst:    &Substitution,
+) -> Result<HashMap<String, Vec<(String, Type, Span)>>, MoonlaneError> {
+    registry.raw_struct_env().iter()
+        .filter(|(name, _)| !registry.raw_struct_type_params().contains_key(name.as_str()))
+        .map(|(name, fields)| {
+            let concrete = fields.iter()
+                .map(|(fname, fty, fspan)| {
+                    Ok((fname.clone(), infer_type_to_type(&subst.apply(fty), fspan)?, fspan.clone()))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok((name.clone(), concrete))
+        })
+        .collect()
+}
+
+/// Build the concrete method type map from inference results.
+pub(super) fn build_concrete_method_env(
+    registry: &TypeDefinitionRegistry,
+    subst:    &Substitution,
+) -> Result<HashMap<String, HashMap<String, Type>>, MoonlaneError> {
+    let dummy = Span::new(0, 0, "");
+    registry.raw_method_env().iter()
+        .map(|(type_name, methods)| {
+            let concrete = methods.iter()
+                .map(|(mname, mty)| Ok((mname.clone(), infer_type_to_type(&subst.apply(mty), &dummy)?)))
+                .collect::<Result<HashMap<_, _>, _>>()?;
+            Ok((type_name.clone(), concrete))
+        })
+        .collect()
+}
+
 /// Scope-aware context for Pass 2. Mirrors InferContext's scope management but
 /// holds concrete `Type` values; no constraint emission.
 struct ConstructCtx<'a> {
     subst:        &'a Substitution,
     scheme_env:   &'a SchemeEnv,
     env:          Vec<HashMap<String, Type>>,
-    struct_scopes: Vec<HashMap<String, Vec<(String, Type)>>>,
-    /// Raw (InferType) fields and type params for generic structs, for field-type resolution.
-    generic_struct_raw: &'a HashMap<String, Vec<(String, InferType)>>,
-    generic_struct_type_params: &'a HashMap<String, Vec<TypeVar>>,
+    /// Stack of concrete struct field maps (name → fields with spans), innermost last.
+    struct_scopes: Vec<HashMap<String, Vec<(String, Type, Span)>>>,
+    /// Unified registry — source of truth for type definitions across all passes.
+    registry:     &'a TypeDefinitionRegistry,
     method_env:   HashMap<String, HashMap<String, Type>>,
-    enum_env:     &'a HashMap<String, EnumInfo>,
     /// Shared generator continued from Pass 1; keeps TypeVar identities globally unique.
     gen:          TypeVarGenerator,
     /// Return type of the innermost enclosing function (None = unit / unknown).
@@ -33,20 +67,17 @@ impl<'a> ConstructCtx<'a> {
     fn new(
         subst:      &'a Substitution,
         scheme_env: &'a SchemeEnv,
-        struct_env: HashMap<String, Vec<(String, Type)>>,
-        generic_struct_raw: &'a HashMap<String, Vec<(String, InferType)>>,
-        generic_struct_type_params: &'a HashMap<String, Vec<TypeVar>>,
-        method_env: HashMap<String, HashMap<String, Type>>,
-        enum_env:   &'a HashMap<String, EnumInfo>,
+        registry:   &'a TypeDefinitionRegistry,
         gen:        TypeVarGenerator,
-    ) -> Self {
+    ) -> Result<Self, MoonlaneError> {
+        let concrete_struct_env = build_concrete_struct_env(registry, subst)?;
+        let method_env = build_concrete_method_env(registry, subst)?;
         let mut ctx = Self {
             subst, scheme_env,
             env: vec![HashMap::new()],
-            struct_scopes: vec![struct_env],  // global scope pre-pushed
-            generic_struct_raw,
-            generic_struct_type_params,
-            method_env, enum_env, gen,
+            struct_scopes: vec![concrete_struct_env],  // global scope pre-pushed
+            registry,
+            method_env, gen,
             current_return_ty: None,
             current_break_ty:  None,
         };
@@ -61,7 +92,7 @@ impl<'a> ConstructCtx<'a> {
                 }
             }
         }
-        ctx
+        Ok(ctx)
     }
 
     fn push_scope(&mut self) { self.env.push(HashMap::new()); }
@@ -70,11 +101,11 @@ impl<'a> ConstructCtx<'a> {
     fn push_struct_scope(&mut self) { self.struct_scopes.push(HashMap::new()); }
     fn pop_struct_scope(&mut self)  { self.struct_scopes.pop(); }
 
-    fn register_local_struct(&mut self, name: String, fields: Vec<(String, Type)>) {
+    fn register_local_struct(&mut self, name: String, fields: Vec<(String, Type, Span)>) {
         self.struct_scopes.last_mut().unwrap().insert(name, fields);
     }
 
-    fn get_struct_fields(&self, name: &str) -> Option<&Vec<(String, Type)>> {
+    fn get_struct_fields(&self, name: &str) -> Option<&Vec<(String, Type, Span)>> {
         self.struct_scopes.iter().rev().find_map(|s| s.get(name))
     }
 
@@ -107,14 +138,10 @@ pub(super) fn construct_program(
     program:    &Program,
     subst:      &Substitution,
     scheme_env: &SchemeEnv,
-    struct_env: HashMap<String, Vec<(String, Type)>>,
-    generic_struct_raw: &HashMap<String, Vec<(String, InferType)>>,
-    generic_struct_type_params: &HashMap<String, Vec<TypeVar>>,
-    method_env: HashMap<String, HashMap<String, Type>>,
-    enum_env:   &HashMap<String, EnumInfo>,
+    registry:   &TypeDefinitionRegistry,
     gen:        TypeVarGenerator,
 ) -> Result<TypedProgram, MoonlaneError> {
-    let mut ctx = ConstructCtx::new(subst, scheme_env, struct_env, generic_struct_raw, generic_struct_type_params, method_env, enum_env, gen);
+    let mut ctx = ConstructCtx::new(subst, scheme_env, registry, gen)?;
 
     let mut out = vec![];
     for decl in &program.decls {
@@ -294,11 +321,10 @@ fn construct_block(
     // for any expression in the block regardless of declaration order.
     for decl in &block.stmts {
         if let Decl::Struct(sd) = decl {
-            let dummy = &sd.span;
             let fields = sd.fields.iter()
                 .map(|f| {
-                    let ty = resolved_to_type(&type_expr_to_infer(&f.type_ann), ctx.subst, dummy)?;
-                    Ok((f.name.clone(), ty))
+                    let ty = resolved_to_type(&type_expr_to_infer(&f.type_ann), ctx.subst, &f.span)?;
+                    Ok((f.name.clone(), ty, f.span.clone()))
                 })
                 .collect::<Result<_, MoonlaneError>>()?;
             ctx.register_local_struct(sd.name.clone(), fields);
@@ -514,13 +540,13 @@ fn construct_expr(
                     format!("field access on non-struct type {t}")
                 )),
             };
-            let field_ty = if let Some(type_params) = ctx.generic_struct_type_params.get(&struct_name) {
+            let field_ty = if let Some(type_params) = ctx.registry.raw_struct_type_params().get(&struct_name) {
                 // Generic struct: look up raw InferType field, build remap, apply, convert.
-                let raw_fields = ctx.generic_struct_raw.get(&struct_name)
+                let raw_fields = ctx.registry.raw_struct_env().get(&struct_name)
                     .ok_or_else(|| MoonlaneError::internal(format!("missing raw fields for `{struct_name}`")))?;
                 let raw_ty = raw_fields.iter()
-                    .find(|(n, _)| n == field)
-                    .map(|(_, ty)| ty.clone())
+                    .find(|(n, _, _)| n == field)
+                    .map(|(_, ty, _)| ty.clone())
                     .ok_or_else(|| MoonlaneError::internal(format!("no field `{field}` on `{struct_name}`")))?;
                 let mut remap = Substitution::new();
                 for (&tp, arg) in type_params.iter().zip(type_args.iter()) {
@@ -529,8 +555,8 @@ fn construct_expr(
                 infer_type_to_type(&remap.apply(&raw_ty), span)?
             } else {
                 ctx.get_struct_fields(&struct_name)
-                    .and_then(|fs| fs.iter().find(|(n, _)| n == field))
-                    .map(|(_, ty)| ty.clone())
+                    .and_then(|fs| fs.iter().find(|(n, _, _)| n == field))
+                    .map(|(_, ty, _)| ty.clone())
                     .ok_or_else(|| MoonlaneError::internal(
                         format!("no field `{field}` on `{struct_name}`")
                     ))?
@@ -584,9 +610,9 @@ fn construct_expr(
                 construct_enum_literal_ty(&path[0], &path[1], &typed_fields, expected_ty, span, ctx)?
             } else {
                 let type_name = path.last().unwrap();
-                if let Some(type_params) = ctx.generic_struct_type_params.get(type_name) {
+                if let Some(type_params) = ctx.registry.raw_struct_type_params().get(type_name) {
                     // Generic struct: infer type args from the typed field values.
-                    let raw_fields = ctx.generic_struct_raw.get(type_name.as_str())
+                    let raw_fields = ctx.registry.raw_struct_env().get(type_name.as_str())
                         .ok_or_else(|| MoonlaneError::internal(format!("missing raw fields for `{type_name}`")))?;
                     let mut remap: HashMap<TypeVar, InferType> = HashMap::new();
                     for &tp in type_params {
@@ -594,7 +620,7 @@ fn construct_expr(
                     }
                     // Match each field value type to its raw InferType param; resolve via subst.
                     for (fname, fexpr) in &typed_fields {
-                        if let Some((_, InferType::Var(v))) = raw_fields.iter().find(|(n, _)| n == fname) {
+                        if let Some((_, InferType::Var(v), _)) = raw_fields.iter().find(|(n, _, _)| n == fname) {
                             if type_params.contains(v) {
                                 remap.insert(*v, type_to_infer(fexpr.ty()));
                             }
@@ -630,13 +656,13 @@ fn construct_expr(
                     return Ok(TypedExpr::Path(segments.clone(), ty, span.clone()));
                 }
                 // Also check enum variants via enum_env.
-                if let Some(info) = ctx.enum_env.get(type_name.as_str()) {
+                if let Some(info) = ctx.registry.enum_info(type_name.as_str()) {
                     if let Some(variant) = info.variants.iter().find(|v| &v.name == member_name) {
                         let ty = if variant.fields.is_empty() {
                             Type::Named(type_name.clone(), vec![])
                         } else {
                             let field_types: Vec<Type> = variant.fields.iter()
-                                .map(|(_, t)| infer_type_to_type(t, span))
+                                .map(|(_, t, _)| infer_type_to_type(t, span))
                                 .collect::<Result<_, _>>()?;
                             Type::Fun(field_types, Box::new(Type::Named(type_name.clone(), vec![])))
                         };
@@ -810,7 +836,7 @@ fn construct_match(m: &MatchExpr, expected_ty: Option<&Type>, ctx: &mut Construc
         });
         ctx.pop_scope();
     }
-    check_match_exhaustiveness(&typed_arms, &scrutinee_ty, ctx.enum_env, &m.span)?;
+    check_match_exhaustiveness(&typed_arms, &scrutinee_ty, ctx.registry.raw_enum_env(), &m.span)?;
     let expr_type = typed_arms.first()
         .map(|a| a.body.tail.as_ref().map(|e| e.ty().clone()).unwrap_or(Type::Unit))
         .unwrap_or(Type::Unit);
@@ -946,7 +972,7 @@ fn construct_enum_literal_ty(
 ) -> Result<Type, MoonlaneError> {
     // Resolve concrete type arguments using the same instantiate-then-unify
     // pattern as instantiate_scheme_for_call.
-    let enum_info = ctx.enum_env.get(enum_name)
+    let enum_info = ctx.registry.enum_info(enum_name)
         .ok_or_else(|| MoonlaneError::type_error(
             TypeErrorCode::T0003,
             format!("unknown enum `{enum_name}`"),
@@ -975,8 +1001,8 @@ fn construct_enum_literal_ty(
     // to solve for the fresh variables.
     let mut local_subst = Substitution::new();
     for (field_name, typed_expr) in typed_fields {
-        if let Some((_, field_decl_ty)) = variant.fields.iter()
-            .find(|(n, _)| n == field_name)
+        if let Some((_, field_decl_ty, _)) = variant.fields.iter()
+            .find(|(n, _, _)| n == field_name)
         {
             let instantiated = init_subst.apply(field_decl_ty);
             let actual = type_to_infer(typed_expr.ty());
@@ -1037,7 +1063,7 @@ fn bind_enum_variant_fields(
     scrutinee_ty: &Type,
     ctx: &mut ConstructCtx,
 ) -> Result<(), MoonlaneError> {
-    let enum_info = ctx.enum_env.get(enum_name)
+    let enum_info = ctx.registry.enum_info(enum_name)
         .ok_or_else(|| MoonlaneError::internal(format!("unknown enum `{enum_name}`")))?
         .clone();
     let variant = enum_info.variants.iter()
@@ -1049,15 +1075,14 @@ fn bind_enum_variant_fields(
     for (&tp, arg_ty) in enum_info.type_params.iter().zip(type_args.iter()) {
         remap.bind(tp, InferType::Concrete(arg_ty.clone()));
     }
-    let dummy = Span::new(0, 0, "");
     for field_name in fields {
-        let template_ty = variant.fields.iter()
-            .find(|(n, _)| n == field_name)
-            .map(|(_, ty)| ty.clone())
+        let (template_ty, field_span) = variant.fields.iter()
+            .find(|(n, _, _)| n == field_name)
+            .map(|(_, ty, span)| (ty.clone(), span.clone()))
             .ok_or_else(|| MoonlaneError::internal(
                 format!("no field `{field_name}` on variant `{variant_name}`")
             ))?;
-        let concrete = infer_type_to_type(&remap.apply(&template_ty), &dummy)?;
+        let concrete = infer_type_to_type(&remap.apply(&template_ty), &field_span)?;
         ctx.bind(field_name, concrete);
     }
     Ok(())

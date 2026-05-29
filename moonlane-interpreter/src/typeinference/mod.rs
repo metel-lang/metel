@@ -411,10 +411,13 @@ pub fn instantiate(scheme: &TypeScheme, gen: &mut TypeVarGenerator) -> InferType
 
 // ── Enum environment ─────────────────────────────────────────────────────────
 
+/// A single field entry in a struct or enum variant, carrying its declaration span.
+pub type FieldEntry = (String, InferType, Span);
+
 #[derive(Debug, Clone)]
 pub struct VariantInfo {
     pub name:   String,
-    pub fields: Vec<(String, InferType)>,
+    pub fields: Vec<FieldEntry>,
 }
 
 #[derive(Debug, Clone)]
@@ -423,12 +426,19 @@ pub struct EnumInfo {
     pub variants:    Vec<VariantInfo>,
 }
 
-// ── Type Registry ─────────────────────────────────────────────────────────────
+// ── Type Definition Registry ──────────────────────────────────────────────────
 
-/// Immutable store of type definitions built during the pre-pass.
+/// Unified store of all named type definitions across all pipeline phases.
 /// Created by `build_registry` and injected into `InferContext` before inference begins.
-pub struct TypeRegistry {
-    struct_env:         HashMap<String, Vec<(String, InferType)>>,
+///
+/// Owns the canonical description of every struct, enum, aspect, and impl in the
+/// program. Both the inference pass (Pass 1) and the construction pass (Pass 2)
+/// derive their type information from this registry instead of maintaining parallel
+/// copies. Fields and variant payloads carry their declaration `Span` so that
+/// downstream errors can point back to the source location.
+pub struct TypeDefinitionRegistry {
+    /// struct name → fields with declaration spans.
+    struct_env:         HashMap<String, Vec<FieldEntry>>,
     /// Ordered type-parameter TypeVars per generic struct (absent for non-generic structs).
     struct_type_params: HashMap<String, Vec<TypeVar>>,
     /// Tracks which struct names were registered in each lexical scope so they
@@ -444,7 +454,7 @@ pub struct TypeRegistry {
     impl_aspect_env: HashMap<(String, String), Vec<Vec<Type>>>,
 }
 
-impl TypeRegistry {
+impl TypeDefinitionRegistry {
     pub fn new() -> Self {
         Self {
             struct_env:         HashMap::new(),
@@ -457,7 +467,7 @@ impl TypeRegistry {
         }
     }
 
-    pub fn register_struct_fields(&mut self, name: String, fields: Vec<(String, InferType)>) {
+    pub fn register_struct_fields(&mut self, name: String, fields: Vec<FieldEntry>) {
         self.struct_env.insert(name.clone(), fields);
         if let Some(scope) = self.struct_scope_stack.last_mut() {
             scope.push(name);
@@ -488,7 +498,7 @@ impl TypeRegistry {
         self.enum_env.insert(name, info);
     }
 
-    pub fn struct_fields(&self, name: &str) -> Option<&Vec<(String, InferType)>> {
+    pub fn struct_fields(&self, name: &str) -> Option<&Vec<FieldEntry>> {
         self.struct_env.get(name)
     }
 
@@ -519,7 +529,7 @@ impl TypeRegistry {
             .push(type_args);
     }
 
-    /// Checks `(target, "From")` for a impl with first type-arg matching `source`.
+    /// Checks `(target, "From")` for an impl with first type-arg matching `source`.
     pub fn has_from_impl(&self, target: &str, source: &Type) -> bool {
         self.impl_aspect_env
             .get(&(target.to_string(), "From".to_string()))
@@ -535,7 +545,7 @@ impl TypeRegistry {
             .and_then(|args| args.first())
     }
 
-    pub(crate) fn raw_struct_env(&self) -> &HashMap<String, Vec<(String, InferType)>> {
+    pub(crate) fn raw_struct_env(&self) -> &HashMap<String, Vec<FieldEntry>> {
         &self.struct_env
     }
 
@@ -543,16 +553,16 @@ impl TypeRegistry {
         &self.struct_type_params
     }
 
-    pub(crate) fn raw_method_env(&self) -> &HashMap<String, HashMap<String, InferType>> {
-        &self.method_env
-    }
-
     pub(crate) fn raw_enum_env(&self) -> &HashMap<String, EnumInfo> {
         &self.enum_env
     }
+
+    pub(crate) fn raw_method_env(&self) -> &HashMap<String, HashMap<String, InferType>> {
+        &self.method_env
+    }
 }
 
-impl Default for TypeRegistry {
+impl Default for TypeDefinitionRegistry {
     fn default() -> Self { Self::new() }
 }
 
@@ -573,7 +583,7 @@ pub struct InferContext {
     constraints: Vec<Constraint>,
     current_return_type: Option<InferType>,
     current_break_type:  Option<InferType>,
-    registry: TypeRegistry,
+    registry: TypeDefinitionRegistry,
     /// Type-param name → TypeVar for the currently-being-inferred generic function.
     /// Empty when inferring a non-generic function or at top level.
     current_type_params: HashMap<String, TypeVar>,
@@ -583,7 +593,7 @@ impl InferContext {
     /// Create a new inference context with a pre-built registry and a generator
     /// that has already been advanced past all TypeVars allocated during registry
     /// construction, ensuring global TypeVar uniqueness.
-    pub fn new(registry: TypeRegistry, gen: TypeVarGenerator) -> Self {
+    pub fn new(registry: TypeDefinitionRegistry, gen: TypeVarGenerator) -> Self {
         Self {
             var_gen: gen,
             mono_env: vec![HashMap::new()],  // root scope pre-pushed
@@ -596,7 +606,7 @@ impl InferContext {
         }
     }
 
-    pub fn register_struct_fields(&mut self, name: String, fields: Vec<(String, InferType)>) {
+    pub fn register_struct_fields(&mut self, name: String, fields: Vec<crate::typeinference::FieldEntry>) {
         self.registry.register_struct_fields(name, fields);
     }
 
@@ -611,7 +621,7 @@ impl InferContext {
         self.registry.register_method(type_name, method_name, fun_ty);
     }
 
-    pub fn get_struct_fields(&self, name: &str) -> Option<&Vec<(String, InferType)>> {
+    pub fn get_struct_fields(&self, name: &str) -> Option<&Vec<crate::typeinference::FieldEntry>> {
         self.registry.struct_fields(name)
     }
 
@@ -639,11 +649,11 @@ impl InferContext {
         self.registry.iterable_elem_type(target)
     }
 
-    pub fn registry(&self) -> &TypeRegistry {
+    pub fn registry(&self) -> &TypeDefinitionRegistry {
         &self.registry
     }
 
-    pub fn registry_mut(&mut self) -> &mut TypeRegistry {
+    pub fn registry_mut(&mut self) -> &mut TypeDefinitionRegistry {
         &mut self.registry
     }
 
@@ -784,6 +794,6 @@ impl InferContext {
 
 impl Default for InferContext {
     fn default() -> Self {
-        Self::new(TypeRegistry::new(), TypeVarGenerator::new())
+        Self::new(TypeDefinitionRegistry::new(), TypeVarGenerator::new())
     }
 }
