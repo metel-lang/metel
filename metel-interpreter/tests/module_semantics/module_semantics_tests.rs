@@ -1061,3 +1061,44 @@ fun main() {
 
     run_graph_std(&dir.join("main.mtl")).unwrap_or_else(|e| panic!("{e}"));
 }
+
+// ── METEL-3: cross-module struct field type resolution ────────────────────────
+
+/// Module B imports a struct from module A whose field type is defined in C.
+/// B never imports C directly. The type registry accumulator must carry C's type
+/// definitions into B's registry so the field type resolves. See METEL-3.
+#[test]
+fn cross_module_struct_field_type_from_indirect_dependency() {
+    let dir = fixture_dir("indirect_dep");
+
+    // Module C: defines Coords
+    write(
+        &dir.join("coords.mtl"),
+        "pub struct Coords { x: Int, y: Int }\n",
+    );
+
+    // Module A: defines Shape whose field type comes from C
+    write(
+        &dir.join("shape.mtl"),
+        r#"import coords::Coords;
+pub struct Shape { origin: Coords, size: Int }
+pub fun make_shape(x: Int, y: Int, s: Int) -> Shape {
+    return Shape { origin: Coords { x: x, y: y }, size: s };
+}
+"#,
+    );
+
+    // Module B: imports Shape from A (not Coords from C) and uses it
+    write(
+        &dir.join("main.mtl"),
+        r#"import shape::Shape;
+import shape::make_shape;
+fun main() -> Int {
+    let s = make_shape(1, 2, 10);
+    return s.size;
+}
+"#,
+    );
+
+    run_graph(&dir.join("main.mtl")).unwrap_or_else(|e| panic!("{e}"));
+}
