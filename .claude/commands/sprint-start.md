@@ -1,21 +1,21 @@
 # /sprint-start
 
-Open a new sprint: create the sprint branch, the kickoff issue, assign issues to the sprint, and mark them in-progress.
+Open a new sprint: create the sprint branch, create the Plane cycle, assign work items, and mark them in-progress.
 
-**Arguments:** `$ARGUMENTS` — sprint number and goal, e.g. `3 "Implement expression evaluation"`
+**Arguments:** `$ARGUMENTS` — sprint number and goal, e.g. `16 "Implement expression evaluation"`
 
 ## Steps
 
 1. **Parse arguments.** Extract the sprint number (integer) and the sprint goal (quoted string).
 
-2. **Determine the active milestone.** Read `CLAUDE.md` for the current development focus milestone (e.g. `v0.3`). This milestone must be applied to the kickoff issue and all planned issues. If the milestone is ambiguous, ask the user before continuing.
+2. **Determine the active milestone.** Read `CLAUDE.md` for the current development focus milestone (e.g. `v0.6.5`). All planned work items must carry this milestone. If the milestone is ambiguous, ask the user before continuing.
 
-3. **Show the current backlog** for the active epic so the user can decide what goes into the sprint:
-```bash
-gh issue list --repo metel-lang/metel --label "status:backlog" --json number,title,labels,milestone
+3. **Show the current backlog** in Plane so the user can decide what goes into the sprint:
+```
+mcp__plane__list_work_items  →  filter by backlog state
 ```
 
-4. **Ask the user** which issue numbers to include in this sprint before proceeding.
+4. **Ask the user** which work item identifiers to include in this sprint before proceeding.
 
 5. **Create and push the sprint branch:**
 ```bash
@@ -25,48 +25,24 @@ git push -u origin sprint/<N>
 ```
 All sprint work must be committed to `sprint/<N>`. Nothing goes directly to `main` during the sprint.
 
-6. **Create the sprint kickoff issue** with the active milestone:
-```bash
-gh issue create \
-  --repo metel-lang/metel \
-  --title "Sprint <N> Kickoff: <goal>" \
-  --label "sprint:kickoff" \
-  --milestone "<milestone>" \
-  --body "## Sprint Goal
-<goal>
-
-## Branch
-\`sprint/<N>\`
-
-## Milestone
-<milestone>
-
-## Planned Issues
-$(for each selected issue: - [ ] #N)
-
-## Definition of Done
-- All planned issues closed
-- All tests pass on sprint/<N>
-- PR opened against main with sprint review linked"
+6. **Create the Plane cycle** for this sprint:
+```
+mcp__plane__create_cycle  →  name "Sprint <N>: <goal>", set start/end dates if known
 ```
 
-7. **Ensure all planned issues carry the correct milestone:**
-```bash
-gh issue edit <N> --repo metel-lang/metel \
-  --milestone "<milestone>" \
-  --remove-label "status:backlog" \
-  --add-label "status:in-progress"
+7. **Add work items to the cycle** and move them to In Progress state:
 ```
-Run this for every planned issue. Issues must not enter a sprint without a milestone.
+mcp__plane__add_work_items_to_cycle  →  add all planned items
+mcp__plane__update_work_item  →  set state to In Progress for each
+```
 
-8. **Update the project board** Status field to **"Todo"** for each planned issue via GraphQL. Do NOT set "In Progress" — that status is reserved for tasks actively being worked on. Sprint kickoff only moves issues from Backlog → Todo.
-
-9. **Report** the kickoff issue URL, the sprint branch name, the milestone, and the list of issues now in the sprint.
+8. **Report** the sprint branch name, milestone, cycle URL, and list of work items now in the sprint.
 
 ## Notes
 - Sprint numbers are sequential integers (Sprint 1, Sprint 2, …).
 - The sprint goal should be one sentence.
-- Only issues with `status:backlog` should be moved into a sprint.
+- Only work items in the backlog state should be moved into a sprint.
 - Check CLAUDE.md for the active epic and milestone before proceeding.
-- All issues created or touched during the sprint must carry the active milestone — kickoff, review, planned issues, and any new issues opened mid-sprint.
+- All work items created or touched during the sprint must carry the active milestone.
 - Remind the user: all commits must go on `sprint/<N>`, not on `main`.
+- Commit messages must follow: `type(METEL-<N>): description`
