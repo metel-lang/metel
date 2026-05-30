@@ -590,11 +590,16 @@ pub struct InferContext {
 }
 
 impl InferContext {
-    /// Create a new inference context with a pre-built registry and a generator
+    /// Create a new inference context with a pre-built registry, a generator
     /// that has already been advanced past all TypeVars allocated during registry
-    /// construction, ensuring global TypeVar uniqueness.
-    pub fn new(registry: TypeDefinitionRegistry, gen: TypeVarGenerator) -> Self {
-        Self {
+    /// construction (ensuring global TypeVar uniqueness), and the set of imported
+    /// schemes to seed into the poly_env. See ADR-0022.
+    pub fn new(
+        registry: TypeDefinitionRegistry,
+        gen: TypeVarGenerator,
+        imported_schemes: &HashMap<String, TypeScheme>,
+    ) -> Self {
+        let mut ctx = Self {
             var_gen: gen,
             mono_env: vec![HashMap::new()],  // root scope pre-pushed
             poly_env: vec![HashMap::new()],  // root scope pre-pushed
@@ -603,7 +608,11 @@ impl InferContext {
             current_break_type:  None,
             registry,
             current_type_params: HashMap::new(),
+        };
+        for (name, scheme) in imported_schemes {
+            ctx.bind_poly(name, scheme.clone());
         }
+        ctx
     }
 
     pub fn register_struct_fields(&mut self, name: String, fields: Vec<crate::typeinference::FieldEntry>) {
@@ -794,6 +803,6 @@ impl InferContext {
 
 impl Default for InferContext {
     fn default() -> Self {
-        Self::new(TypeDefinitionRegistry::new(), TypeVarGenerator::new())
+        Self::new(TypeDefinitionRegistry::new(), TypeVarGenerator::new(), &HashMap::new())
     }
 }

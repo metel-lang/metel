@@ -454,12 +454,7 @@ fn check_impl(
 
     let mut gen = TypeVarGenerator::new();
     let reg = registry::build_registry(&registry_program, &mut gen);
-    let mut ctx = InferContext::new(reg, gen);
-
-    // Seed imported name bindings before registering builtins.
-    for (name, scheme) in imported_schemes {
-        ctx.bind_poly(name, scheme.clone());
-    }
+    let mut ctx = InferContext::new(reg, gen, imported_schemes);
 
     // Pre-pass: register built-in value bindings and hoist function names.
     registry::register_builtins(&mut ctx, std_prelude);
