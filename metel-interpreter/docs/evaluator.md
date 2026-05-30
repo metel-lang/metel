@@ -193,6 +193,8 @@ Anonymous closures appear as `<closure>`. The call stack is cleared at the start
 
 ## Known Limitations
 
+> **Per-module isolation** (flat environment, declaration collisions across modules) was fixed in v0.6.0 by `evaluate_graph`. Each module runs in its own isolated `Environment`; names from other modules are seeded explicitly from their evaluated environments.
+
 ### Generic function dispatch — re-constructs on each call
 
 Generic functions and let-polymorphic closures re-run the construction pass at every call site. This is correct but not optimal: for hot generic functions, monomorphization at a higher level (pre-compiling all instantiation sites) would be faster. Acceptable for the tree-walk interpreter.
@@ -228,4 +230,5 @@ The PoC's `Rc<RefCell<Value>>` environment gives closures reference semantics fo
 The evaluator is designed to be thrown away. The correct rewrite path is:
 1. Decide the permanent value representation (likely a tagged pointer or NaN-boxing scheme).
 2. Implement RFC-0006 capture semantics (explicit pointer types for aliasing).
-3. Wire the module system name resolver (RFC-0030, implemented in v0.5.0) into the evaluator for per-module scope isolation before the evaluator is shared as a library.
+
+Per-module scope isolation is **already implemented** (v0.6.0). `evaluate_graph` runs each `TypedModule` in its own isolated `Environment`, seeding imported names from already-evaluated dependency environments. See the Pipeline Position section above.
