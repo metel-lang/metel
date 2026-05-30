@@ -768,3 +768,296 @@ fn diamond_dependency_shared_base_accessible_in_both_importers() {
     );
     run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
 }
+
+// ── Full-feature multi-module integration ─────────────────────────────────────
+
+#[test]
+fn complex_multi_module_task_system() {
+    // Four modules exercising: pub enums/structs (T0010), generic cross-module
+    // utilities (filter/map/fold/find_first), Result/Perhaps error handling,
+    // closures, pattern matching, recursive functions, all loop forms, tuples,
+    // type casts, let-polymorphism, closure capture, and chained operations.
+    let dir = fixture_dir("task_system");
+
+    // ── types.mtl ─────────────────────────────────────────────────────────────
+    write(
+        &dir.join("types.mtl"),
+        r#"
+pub enum Priority { High, Medium, Low }
+pub enum Status { Open, InProgress, Done }
+pub struct Task { title: String, priority: Priority, status: Status, effort: Int }
+pub struct ValidationError { message: String }
+"#,
+    );
+
+    // ── utils.mtl ─────────────────────────────────────────────────────────────
+    write(
+        &dir.join("utils.mtl"),
+        r#"
+pub fun filter_array<T>(arr: T[], pred: fun(T) -> Bool) -> T[] {
+    mut out: T[] = [];
+    for (let x in arr) {
+        if (pred(x)) { array_push(out, x); }
+    }
+    out
+}
+
+pub fun map_array<T, U>(arr: T[], f: fun(T) -> U) -> U[] {
+    mut out: U[] = [];
+    for (let x in arr) { array_push(out, f(x)); }
+    out
+}
+
+pub fun fold_left<T, A>(arr: T[], init: A, f: fun(A, T) -> A) -> A {
+    mut acc = init;
+    for (let x in arr) {
+        acc = f(acc, x);
+    }
+    acc
+}
+
+pub fun find_first<T>(arr: T[], pred: fun(T) -> Bool) -> Perhaps<T> {
+    for (let x in arr) {
+        if (pred(x)) { return Perhaps::Some { value: x }; }
+    }
+    None
+}
+
+pub fun sum_ints(arr: Int[]) -> Int {
+    mut total = 0;
+    for (let x in arr) { total += x; }
+    total
+}
+"#,
+    );
+
+    // ── tasks.mtl ─────────────────────────────────────────────────────────────
+    write(
+        &dir.join("tasks.mtl"),
+        r#"
+import types::*;
+import utils::*;
+
+pub fun validate_task(title: String, priority: Priority, status: Status, effort: Int) -> Result<Task, ValidationError> {
+    if (string_len(title) == 0) {
+        return Result::Err { error: ValidationError { message: "title cannot be empty" } };
+    }
+    if (effort < 0) {
+        return Result::Err { error: ValidationError { message: "effort cannot be negative" } };
+    }
+    Result::Ok { value: Task { title: title, priority: priority, status: status, effort: effort } }
+}
+
+pub fun total_effort(tasks: Task[]) -> Int {
+    fold_left(tasks, 0, fun(acc: Int, t: Task) -> Int { acc + t.effort })
+}
+
+pub fun open_task_count(tasks: Task[]) -> Int {
+    mut count = 0;
+    for (let t in tasks) {
+        match t.status {
+            Status::Open       => { count += 1; },
+            Status::InProgress => { count += 1; },
+            Status::Done       => (),
+        };
+    }
+    count
+}
+
+pub fun is_high_priority(t: Task) -> Bool {
+    match t.priority {
+        Priority::High   => true,
+        Priority::Medium => false,
+        Priority::Low    => false,
+    }
+}
+
+pub fun is_done(t: Task) -> Bool {
+    match t.status {
+        Status::Done       => true,
+        Status::Open       => false,
+        Status::InProgress => false,
+    }
+}
+
+pub fun task_titles(tasks: Task[]) -> String[] {
+    map_array(tasks, fun(t: Task) -> String { t.title })
+}
+
+pub fun find_by_title(tasks: Task[], title: String) -> Perhaps<Task> {
+    find_first(tasks, fun(t: Task) -> Bool { t.title == title })
+}
+
+pub fun compute_completion_pct(tasks: Task[]) -> Int {
+    let n = array_len(tasks);
+    if (n == 0) { return 0; }
+    mut done = 0;
+    for (let t in tasks) {
+        if (is_done(t)) { done += 1; }
+    }
+    (done * 100) / n
+}
+"#,
+    );
+
+    // ── main.mtl ──────────────────────────────────────────────────────────────
+    write(
+        &dir.join("main.mtl"),
+        r#"
+import types::*;
+import utils::*;
+import tasks::*;
+
+fun fib(n: Int) -> Int {
+    if (n <= 1) { n }
+    else { fib(n - 1) + fib(n - 2) }
+}
+
+fun unwrap_task(r: Result<Task, ValidationError>) -> Task {
+    match r {
+        Result::Ok  { value } => value,
+        Result::Err { error } => Task { title: "error", priority: Priority::Low, status: Status::Done, effort: 0 },
+    }
+}
+
+fun make_tasks() -> Task[] {
+    let t1 = unwrap_task(validate_task("Design API",  Priority::High,   Status::Open,       5));
+    let t2 = unwrap_task(validate_task("Write tests", Priority::Medium, Status::InProgress, 3));
+    let t3 = unwrap_task(validate_task("Deploy",      Priority::High,   Status::Done,       2));
+    let t4 = unwrap_task(validate_task("Write docs",  Priority::Low,    Status::Open,       4));
+    let t5 = unwrap_task(validate_task("Fix bug",     Priority::High,   Status::InProgress, 1));
+    [t1, t2, t3, t4, t5]
+}
+
+fun main() {
+    // 1. Recursive Fibonacci
+    assert(fib(0) == 0);
+    assert(fib(1) == 1);
+    assert(fib(5) == 5);
+    assert(fib(7) == 13);
+
+    // 2. Validation errors from tasks module
+    let bad_empty = validate_task("", Priority::High, Status::Open, 5);
+    match bad_empty {
+        Result::Err { error } => assert(string_len(error.message) > 0),
+        Result::Ok  { value } => assert(false),
+    };
+    let bad_effort = validate_task("T", Priority::Low, Status::Open, -1);
+    match bad_effort {
+        Result::Err { error } => assert(error.message == "effort cannot be negative"),
+        Result::Ok  { value } => assert(false),
+    };
+
+    // 3. Build task list (efforts: 5, 3, 2, 4, 1 = 15 total)
+    let tasks = make_tasks();
+    assert(array_len(tasks) == 5);
+
+    // 4. total_effort via cross-module fold_left: 5+3+2+4+1 = 15
+    assert(total_effort(tasks) == 15);
+
+    // 5. open_task_count: Open(t1,t4) + InProgress(t2,t5) = 4
+    assert(open_task_count(tasks) == 4);
+
+    // 6. Generic filter_array with cross-module predicates
+    let high = filter_array(tasks, fun(t: Task) -> Bool { is_high_priority(t) });
+    assert(array_len(high) == 3);
+
+    let done_list = filter_array(tasks, fun(t: Task) -> Bool { is_done(t) });
+    assert(array_len(done_list) == 1);
+
+    // 7. map_array: extract efforts, sum via sum_ints
+    let efforts = map_array(tasks, fun(t: Task) -> Int { t.effort });
+    assert(sum_ints(efforts) == 15);
+    assert(efforts[0] == 5);
+    assert(efforts[4] == 1);
+
+    // 8. task_titles (cross-module map_array inside tasks module)
+    let titles = task_titles(tasks);
+    assert(array_len(titles) == 5);
+    assert(titles[0] == "Design API");
+    assert(titles[2] == "Deploy");
+
+    // 9. find_by_title: found
+    let found = find_by_title(tasks, "Write tests");
+    match found {
+        Perhaps::Some { value } => assert(value.effort == 3),
+        None                    => assert(false),
+    };
+
+    // 10. find_by_title: not found
+    let not_found = find_by_title(tasks, "nonexistent");
+    match not_found {
+        Perhaps::Some { value } => assert(false),
+        None                    => (),
+    };
+
+    // 11. compute_completion_pct: 1 done / 5 total = 20%
+    assert(compute_completion_pct(tasks) == 20);
+    let empty_tasks: Task[] = [];
+    assert(compute_completion_pct(empty_tasks) == 0);
+
+    // 12. fold_left directly: product of [1,2,3,4] = 24
+    let small: Int[] = [1, 2, 3, 4];
+    let product = fold_left(small, 1, fun(acc: Int, x: Int) -> Int { acc * x });
+    assert(product == 24);
+
+    // 13. find_first: locate the Done task (Deploy, effort=2)
+    let first_done = find_first(tasks, fun(t: Task) -> Bool { is_done(t) });
+    match first_done {
+        Perhaps::Some { value } => assert(value.title == "Deploy"),
+        None                    => assert(false),
+    };
+
+    // 14. Closure capturing outer variable (min_effort threshold)
+    let min_effort = 3;
+    let heavy = filter_array(tasks, fun(t: Task) -> Bool { t.effort >= min_effort });
+    assert(array_len(heavy) == 3);
+
+    // 15. C-style for: manual effort accumulation
+    mut manual_sum = 0;
+    for (mut i = 0; i < array_len(tasks); i += 1) {
+        manual_sum += tasks[i].effort;
+    }
+    assert(manual_sum == 15);
+
+    // 16. while loop: count high-priority non-done tasks
+    // t1(High,Open) and t5(High,InProgress) qualify; t3(High,Done) does not
+    mut hp_active = 0;
+    mut idx = 0;
+    while (idx < array_len(tasks)) {
+        let t = tasks[idx];
+        if (is_high_priority(t) && !is_done(t)) { hp_active += 1; }
+        idx += 1;
+    }
+    assert(hp_active == 2);
+
+    // 17. Range for-in: sum 0+1+2+3+4 = 10
+    mut range_sum = 0;
+    for (let i in 0..5) { range_sum += i; }
+    assert(range_sum == 10);
+
+    // 18. Type cast: total effort Int -> Float
+    let effort_f = total_effort(tasks) as Float;
+    assert(effort_f == 15.0);
+
+    // 19. Tuple: pack (task_count, total_effort)
+    let report: (Int, Int) = (array_len(tasks), total_effort(tasks));
+    assert(report.0 == 5);
+    assert(report.1 == 15);
+
+    // 20. Chained map + filter across modules
+    // doubled efforts: [10,6,4,8,2]; filter > 5: [10,6,8] = 3 items
+    let doubled = map_array(efforts, fun(x: Int) -> Int { x * 2 });
+    let big = filter_array(doubled, fun(x: Int) -> Bool { x > 5 });
+    assert(array_len(big) == 3);
+
+    // 21. Let-polymorphism: identity closure used at two different types
+    let id = fun(x) { x };
+    assert(id(tasks[0]).effort == 5);
+    assert(id(42) == 42);
+}
+"#,
+    );
+
+    run_graph_std(&dir.join("main.mtl")).unwrap_or_else(|e| panic!("{e}"));
+}
