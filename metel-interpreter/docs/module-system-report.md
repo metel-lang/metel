@@ -430,9 +430,13 @@ Sprint 13 removed `Value::Perhaps` and `Value::Result` from the evaluator (they 
 
 The desugaring to a match expression (planned in #214) will eliminate all of this, but the From coercion case needs careful handling — see §8.5.
 
-### 7.4 Field-level visibility (#158)
+### 7.4 Field-level visibility and field-level mutability (#158)
 
-All struct fields are implicitly public. There is no syntax or enforcement for private fields. The spec section for modules documents item-level visibility (`pub fun`, `pub struct`) but field-level visibility is undesigned — no RFC exists for it.
+All struct fields are implicitly public. There is no syntax or enforcement for private fields. The spec section for modules documents item-level visibility (`pub fun`, `pub struct`) but field-level visibility and field-level mutability are not yet implemented.
+
+**RFC-0032** (Field-Level Visibility, `docs/internal/rfcs/rfc-0032-field-level-visibility.md`) proposes making fields module-private by default and requiring explicit `pub` on each field to expose it. This is a breaking change for existing `pub struct` definitions. Deferred to a sprint following v0.6.3.
+
+**RFC-0033** (Field-Level Mutability, `docs/internal/rfcs/rfc-0033-field-level-mutability.md`) proposes a `let` annotation on fields to mark them permanently immutable after construction, independent of the binding's mutability. Non-breaking and additive. Intended to ship in the same version as RFC-0032 since the two compose at the field annotation level (`pub let field: Type`). Deferred to the same sprint.
 
 ### 7.5 Primitives have no `std::core` paths (#150, partial)
 
@@ -538,7 +542,8 @@ This assumes `StdPrelude::schemes()` (used by the typechecker) and `register_bui
 | Cross-module mutual recursion | #189 | Needs global 1a-before-1b pass ordering |
 | `?` desugaring to match pre-pass | #214 | — |
 | `Type::Perhaps`/`Type::Result` as `Named` | #150 | Needs #214 first |
-| Field-level visibility | #158 | Undesigned; no RFC |
+| Field-level visibility | #158, RFC-0032 | Deferred post-v0.6.3; breaking change |
+| Field-level mutability | RFC-0033 | Deferred with RFC-0032; non-breaking |
 | `std::core` paths for primitives | #150 (partial) | Requires type system changes |
 | Single-file pipeline audit for pre-pass | #216 Gap 3 | Before #214 implementation |
 
