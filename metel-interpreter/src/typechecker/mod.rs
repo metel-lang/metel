@@ -176,27 +176,22 @@ pub fn check_graph(
     );
 
     let mut typed_modules: Vec<TypedModule> = Vec::new();
-    // Accumulated type-level decls (struct/enum/impl/aspect) from already-checked modules.
-    // These are passed to build_registry so that imported types are known during typechecking.
-    let mut type_context: Vec<Decl> = Vec::new();
+    // Accumulated resolved type definitions from already-checked modules.
+    // Passed to check_impl so cross-module struct/enum field references are visible.
+    // See METEL-3.
+    let mut type_registry = TypeDefinitionRegistry::new();
 
     for loaded in graph.modules() {
         check_pub_annotations(loaded, names)?;
         let imported_schemes = build_import_schemes(loaded, names, &global_exports, &graph)?;
-        let (typed_decls, scheme_env) =
-            check_impl(&loaded.program, &imported_schemes, &type_context, &std_prelude)?;
+        let (typed_decls, scheme_env, next_registry) =
+            check_impl(&loaded.program, &imported_schemes, &type_registry, &std_prelude)?;
+        type_registry = next_registry;
 
         // Export pub names from this module's scheme_env, plus re-exported names
         // pulled from their source modules in GlobalExports (#178).
         let pub_schemes = filter_pub_schemes(&scheme_env, loaded, names, &global_exports);
         global_exports.insert(loaded.module_path.clone(), ModuleExports { pub_schemes });
-
-        // Accumulate this module's type decls for subsequent modules.
-        for decl in &loaded.program.decls {
-            if matches!(decl, Decl::Struct(_) | Decl::Enum(_) | Decl::Impl(_) | Decl::Aspect(_)) {
-                type_context.push(decl.clone());
-            }
-        }
 
         // Populate imported_names: local_name → (source_module, canonical_name).
         // Used by evaluate_graph to seed each module's isolated Environment. See ADR-0029.
@@ -419,7 +414,7 @@ fn filter_pub_schemes(
 /// Run the type checker over an untyped AST, producing a fully typed AST.
 pub fn check(mut program: Program) -> Result<TypedProgram, MetelError> {
     desugar_propagate_error(&mut program.decls);
-    let (decls, _) = check_impl(&program, &HashMap::new(), &[], &StdPrelude::default())?;
+    let (decls, _, _) = check_impl(&program, &HashMap::new(), &TypeDefinitionRegistry::new(), &StdPrelude::default())?;
     Ok(decls)
 }
 
@@ -427,33 +422,22 @@ pub fn check(mut program: Program) -> Result<TypedProgram, MetelError> {
 ///
 /// - `imported_schemes`: type schemes from imported modules, seeded into the
 ///   inference context so imported names are visible.
-/// - `type_context`: struct/enum/impl/aspect declarations from already-checked
-///   modules, included in the type registry so imported types are known.
+/// - `base_registry`: resolved type definitions accumulated from already-checked
+///   dependency modules. Merged into the freshly-built registry so that cross-module
+///   type references in struct fields and method signatures are visible. See METEL-3.
 ///
-/// Returns `(typed_decls, scheme_env)` where `scheme_env` maps user-defined
-/// function names to their inferred schemes (used by `filter_pub_schemes`).
+/// Returns `(typed_decls, scheme_env, registry)` where `registry` carries this
+/// module's type definitions merged with the base, for the next module to use.
 fn check_impl(
     program: &Program,
     imported_schemes: &SchemeEnv,
-    type_context: &[Decl],
+    base_registry: &TypeDefinitionRegistry,
     std_prelude: &StdPrelude,
-) -> Result<(Vec<TypedDecl>, SchemeEnv), MetelError> {
-    // Build a registry program that includes type decls from imported modules
-    // so the registry knows about all available struct/enum types.
-    let registry_program = if type_context.is_empty() {
-        program.clone()
-    } else {
-        let mut combined = Program {
-            imports: Vec::new(),
-            exports: Vec::new(),
-            decls: type_context.to_vec(),
-        };
-        combined.decls.extend_from_slice(&program.decls);
-        combined
-    };
-
+) -> Result<(Vec<TypedDecl>, SchemeEnv, TypeDefinitionRegistry), MetelError> {
     let mut gen = TypeVarGenerator::new();
-    let reg = registry::build_registry(&registry_program, &mut gen);
+    let mut reg = registry::build_registry(program, &mut gen);
+    // Merge dependency type definitions so cross-module struct/enum refs resolve.
+    reg.merge_from(base_registry);
     let mut ctx = InferContext::new(reg, gen, imported_schemes);
 
     // Pre-pass: register built-in value bindings and hoist function names.
@@ -466,7 +450,7 @@ fn check_impl(
     let subst = ctx.solve()?;
 
     // Build SchemeEnv from user functions, then add all built-in schemes.
-    let mut gen = ctx.split_gen();
+    let gen = ctx.split_gen();
     let mut scheme_env: SchemeEnv = HashMap::new();
     for fg in fun_generalizations {
         let resolved = subst.apply(&fg.fun_ty);
@@ -496,7 +480,8 @@ fn check_impl(
         .filter(|(name, _)| !std_prelude.contains(name))
         .collect();
 
-    Ok((typed_decls, user_scheme_env))
+    let final_registry = ctx.into_registry();
+    Ok((typed_decls, user_scheme_env, final_registry))
 }
 
 #[cfg(test)]

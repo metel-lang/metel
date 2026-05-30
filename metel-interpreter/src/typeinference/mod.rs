@@ -560,6 +560,30 @@ impl TypeDefinitionRegistry {
     pub(crate) fn raw_method_env(&self) -> &HashMap<String, HashMap<String, InferType>> {
         &self.method_env
     }
+
+    /// Copy all entries from `other` into `self`, without overwriting existing entries.
+    /// Used by `check_impl` to seed a module's registry with type definitions from
+    /// already-checked dependency modules. See METEL-3.
+    pub fn merge_from(&mut self, other: &TypeDefinitionRegistry) {
+        for (k, v) in &other.struct_env {
+            self.struct_env.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+        for (k, v) in &other.struct_type_params {
+            self.struct_type_params.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+        for (k, v) in &other.method_env {
+            self.method_env.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+        for (k, v) in &other.enum_env {
+            self.enum_env.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+        for (k, v) in &other.aspect_env {
+            self.aspect_env.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+        for (k, v) in &other.impl_aspect_env {
+            self.impl_aspect_env.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+    }
 }
 
 impl Default for TypeDefinitionRegistry {
@@ -664,6 +688,12 @@ impl InferContext {
 
     pub fn registry_mut(&mut self) -> &mut TypeDefinitionRegistry {
         &mut self.registry
+    }
+
+    /// Consume the context and return its registry. Used by `check_graph` to extract
+    /// accumulated type definitions after a module is checked. See METEL-3.
+    pub fn into_registry(self) -> TypeDefinitionRegistry {
+        self.registry
     }
 
     pub fn fresh_type_var_raw(&mut self) -> TypeVar {

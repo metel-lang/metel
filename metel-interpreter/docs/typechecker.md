@@ -26,7 +26,7 @@ NormalizedModuleGraph + ResolvedNames
   │ build_import_schemes — pull pub schemes from         │
   │   GlobalExports for this module's imports            │
   │                                                      │
-  │ check_impl(program, imported_schemes, type_context)  │
+  │ check_impl(program, imported_schemes, base_registry) │
   │   ├─ Pre-pass: seed imports, register builtins, hoist│
   │   ├─ Pass 1:   infer (same as single-module)         │
   │   └─ Pass 2:   construct (scheme_env includes imports)│
