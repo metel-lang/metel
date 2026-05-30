@@ -122,11 +122,18 @@ impl Loader {
     }
 }
 
-/// Compute the canonical module path for a child module. Delegates to
-/// [`crate::module_paths::resolve_path_root`] for the base, then appends
-/// the module segments. See ADR-0023.
+/// Compute the canonical module path for a child module.
+///
+/// For most root variants, delegates to `resolve_path_root` then appends `mod_segs`.
+/// For `Name(n)`, however, `resolve_import_module` already puts `n` as `mod_segs[0]`,
+/// so the base is just `parent` — using `resolve_path_root` here would double-include `n`.
+/// See ADR-0023.
 fn child_module_path(parent: &[String], root: &PathRoot, mod_segs: &[String]) -> Vec<String> {
-    let mut path = resolve_path_root(root, parent);
+    let base = match root {
+        PathRoot::Name(_) => parent.to_vec(),
+        _ => resolve_path_root(root, parent),
+    };
+    let mut path = base;
     path.extend_from_slice(mod_segs);
     path
 }
