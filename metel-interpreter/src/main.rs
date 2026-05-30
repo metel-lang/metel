@@ -6,6 +6,7 @@ mod ast;
 mod error;
 mod evaluator;
 mod module_loader;
+mod module_paths;
 mod name_resolver;
 mod parser;
 mod path_normalizer;

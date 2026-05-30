@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use crate::ast::{ImportTree, PathRoot, Program};
 use crate::error::{MetelError, ParseErrorCode};
+use crate::module_paths::resolve_path_root;
 use crate::parser;
 
 #[derive(Debug, Clone)]
@@ -121,16 +122,11 @@ impl Loader {
     }
 }
 
-/// Compute the canonical module path for a child module, matching `name_resolver::absolute_base`.
-/// Must stay in sync with name_resolver::absolute_base. See ADR-0023.
+/// Compute the canonical module path for a child module. Delegates to
+/// [`crate::module_paths::resolve_path_root`] for the base, then appends
+/// the module segments. See ADR-0023.
 fn child_module_path(parent: &[String], root: &PathRoot, mod_segs: &[String]) -> Vec<String> {
-    let base: Vec<String> = match root {
-        PathRoot::Root  => vec![],
-        PathRoot::Self_ => parent.to_vec(),
-        PathRoot::Super => parent.get(..parent.len().saturating_sub(1)).unwrap_or(&[]).to_vec(),
-        PathRoot::Name(_) | PathRoot::Std => parent.to_vec(),
-    };
-    let mut path = base;
+    let mut path = resolve_path_root(root, parent);
     path.extend_from_slice(mod_segs);
     path
 }

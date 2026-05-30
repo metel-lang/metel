@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::ast::{Decl, ImportTree, PathRoot, Span, Visibility};
 use crate::error::{MetelError, TypeErrorCode};
 use crate::module_loader::{LoadedModule, ModuleGraph};
+use crate::module_paths::resolve_path_root;
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -256,27 +257,10 @@ fn process_export_tree(
 }
 
 /// Compute the absolute path prefix corresponding to a path root,
-/// given the importing module's own path.
+/// given the importing module's own path. Delegates to the canonical
+/// implementation in [`crate::module_paths::resolve_path_root`]. See ADR-0023.
 fn absolute_base(root: &PathRoot, current: &[String]) -> Vec<String> {
-    match root {
-        PathRoot::Root  => vec![],
-        PathRoot::Std   => vec!["std".to_string()],
-        PathRoot::Self_ => current.to_vec(),
-        PathRoot::Super => {
-            if current.is_empty() {
-                vec![] // validated as error elsewhere; tolerate gracefully
-            } else {
-                current[..current.len() - 1].to_vec()
-            }
-        }
-        // Hierarchical: parent_path ++ [n] — must match module_loader's child_path
-        // construction. See ADR-0023.
-        PathRoot::Name(n) => {
-            let mut path = current.to_vec();
-            path.push(n.clone());
-            path
-        }
-    }
+    resolve_path_root(root, current)
 }
 
 fn process_tree(

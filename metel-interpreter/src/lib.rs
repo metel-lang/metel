@@ -5,6 +5,7 @@ pub mod ast;
 pub mod error;
 pub mod evaluator;
 pub mod module_loader;
+pub mod module_paths;
 pub mod name_resolver;
 pub mod parser;
 pub mod path_normalizer;
