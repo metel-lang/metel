@@ -248,9 +248,9 @@ pub fn check_graph(
 /// Build the set of imported name→scheme bindings for a module, drawn from
 /// GlobalExports. Explicit imports take precedence over glob imports.
 ///
-/// For explicit imports: if the name is absent from GlobalExports, scans the
-/// source module's `program.decls` in the graph to distinguish T0009 (private
-/// item — declared but not pub) from T0003 (name does not exist). See #191.
+/// For explicit imports: if the name is absent from GlobalExports, checks
+/// `names.declared_names` to distinguish T0009 (private item — declared but
+/// not pub) from T0003 (name does not exist). See #191.
 fn build_import_schemes(
     loaded: &LoadedModule,
     names: &ResolvedNames,
@@ -314,11 +314,14 @@ fn build_import_schemes(
                 continue;
             }
             // Check if the source module is in the graph (not std, which is not file-loaded).
-            let src = graph.modules().iter()
-                .find(|m| m.module_path == binding.source_module);
-            if let Some(src_module) = src {
+            let src_in_graph = graph.modules().iter()
+                .any(|m| m.module_path == binding.source_module);
+            if src_in_graph {
                 let span = find_import_span(loaded, &binding.source_module, &binding.source_name);
-                if decl_exists(&src_module.program, &binding.source_name) {
+                let name_exists = names.declared_names
+                    .get(&binding.source_module)
+                    .map_or(false, |s| s.contains(binding.source_name.as_str()));
+                if name_exists {
                     return Err(MetelError::type_error(
                         TypeErrorCode::T0009,
                         format!(
@@ -379,19 +382,6 @@ fn find_import_span(
     crate::ast::Span::new(0, 0, loaded.file_path.display().to_string())
 }
 
-/// Returns true if `name` is declared as a top-level item in `program`,
-/// regardless of visibility. Used to distinguish T0009 (private) from T0003 (absent).
-fn decl_exists(program: &Program, name: &str) -> bool {
-    program.decls.iter().any(|d| match d {
-        Decl::Fun(f) => f.name == name,
-        Decl::Struct(s) => s.name == name,
-        Decl::Enum(e) => e.name == name,
-        Decl::Aspect(a) => a.name == name,
-        Decl::Let(l) => l.name == name,
-        Decl::Mut(m) => m.name == name,
-        Decl::Impl(_) | Decl::Stmt(_) => false,
-    })
-}
 
 /// Build the public scheme export for a module: pub-declared names from its
 /// own scheme_env, plus any re-exported names pulled from `global_exports`.

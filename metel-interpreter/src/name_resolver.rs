@@ -59,6 +59,9 @@ pub struct ResolvedNames {
     /// Combined public surface per module: local declarations + re-exports.
     /// Used by callers to check import visibility.
     pub pub_surface: HashMap<Vec<String>, HashSet<String>>,
+    /// All top-level declared names per module, regardless of visibility.
+    /// Used by the typechecker to distinguish T0009 (private) from T0003 (absent).
+    pub declared_names: HashMap<Vec<String>, HashSet<String>>,
 }
 
 // ── Path alias dereferencing ──────────────────────────────────────────────────
@@ -85,11 +88,20 @@ pub fn resolve(graph: &ModuleGraph) -> Result<ResolvedNames, MetelError> {
         .map(|m| m.module_path.clone())
         .collect();
 
-    // First pass: collect locally-declared public names per module.
+    // First pass: collect locally-declared names per module (public and all).
     let mut pub_surface: HashMap<Vec<String>, HashSet<String>> = graph.modules.iter()
         .map(|m| {
             let names = m.program.decls.iter()
                 .filter_map(|d| decl_pub_name(d))
+                .collect();
+            (m.module_path.clone(), names)
+        })
+        .collect();
+
+    let declared_names: HashMap<Vec<String>, HashSet<String>> = graph.modules.iter()
+        .map(|m| {
+            let names = m.program.decls.iter()
+                .filter_map(|d| decl_any_name(d))
                 .collect();
             (m.module_path.clone(), names)
         })
@@ -120,7 +132,7 @@ pub fn resolve(graph: &ModuleGraph) -> Result<ResolvedNames, MetelError> {
     ].iter().map(|s| s.to_string()).collect();
     pub_surface.insert(vec!["std".to_string(), "core".to_string()], std_core_surface);
 
-    Ok(ResolvedNames { scopes, pub_surface })
+    Ok(ResolvedNames { scopes, pub_surface, declared_names })
 }
 
 /// Returns the name of a declaration if it is public.
@@ -131,6 +143,19 @@ fn decl_pub_name(decl: &Decl) -> Option<String> {
         Decl::Enum(d)   if d.visibility == Visibility::Public => Some(d.name.clone()),
         Decl::Aspect(d) if d.visibility == Visibility::Public => Some(d.name.clone()),
         _ => None,
+    }
+}
+
+/// Returns the name of a declaration regardless of visibility.
+fn decl_any_name(decl: &Decl) -> Option<String> {
+    match decl {
+        Decl::Fun(d)    => Some(d.name.clone()),
+        Decl::Struct(d) => Some(d.name.clone()),
+        Decl::Enum(d)   => Some(d.name.clone()),
+        Decl::Aspect(d) => Some(d.name.clone()),
+        Decl::Let(d)    => Some(d.name.clone()),
+        Decl::Mut(d)    => Some(d.name.clone()),
+        Decl::Impl(_) | Decl::Stmt(_) => None,
     }
 }
 
