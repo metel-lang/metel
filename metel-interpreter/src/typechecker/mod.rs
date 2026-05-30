@@ -513,3 +513,35 @@ fn check_impl(
 
     Ok((typed_decls, user_scheme_env))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Assert that StdPrelude::schemes() and evaluator::builtins::free_function_names()
+    /// contain exactly the same keys. A divergence means a builtin either passes
+    /// typechecking but fails at runtime ("undefined name") or vice versa.
+    /// See METEL-5 / ADR-0027.
+    #[test]
+    fn stdprelude_and_evaluator_builtins_parity() {
+        let prelude = StdPrelude::default();
+        let prelude_names: std::collections::HashSet<&str> = prelude
+            .schemes()
+            .keys()
+            .map(|s| s.as_str())
+            .collect();
+        let evaluator_names = crate::evaluator::builtins::free_function_names();
+
+        let only_in_prelude: Vec<&&str> = prelude_names.difference(&evaluator_names).collect();
+        let only_in_evaluator: Vec<&&str> = evaluator_names.difference(&prelude_names).collect();
+
+        assert!(
+            only_in_prelude.is_empty() && only_in_evaluator.is_empty(),
+            "StdPrelude and evaluator builtin free-function sets diverged.\n\
+             Only in StdPrelude (typechecks but fails at runtime): {:?}\n\
+             Only in evaluator (available at runtime but rejected by typechecker): {:?}",
+            only_in_prelude,
+            only_in_evaluator,
+        );
+    }
+}

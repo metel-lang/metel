@@ -3,6 +3,15 @@ use crate::error::{MetelError, RuntimeErrorCode};
 use super::{Environment, Value};
 use super::display::{format_float, format_value, value_to_display_string};
 
+/// The free-function builtin names registered by this module.
+/// Must stay in sync with `StdPrelude::schemes()`. See METEL-5 / ADR-0027.
+pub(crate) fn free_function_names() -> std::collections::HashSet<&'static str> {
+    [
+        "print", "println", "string_len", "string_concat",
+        "array_push", "array_len", "clock", "assert", "assert_msg", "dbg",
+    ].into_iter().collect()
+}
+
 pub(super) fn register_builtins(env: &mut Environment) {
     // print/println dispatch through Display (to_string) for any type.
     env.define("print", Value::Builtin("print".to_string(), |args, span| {

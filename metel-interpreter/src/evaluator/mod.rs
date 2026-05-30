@@ -1,7 +1,7 @@
 // PoC evaluator — this implementation will almost certainly be rewritten.
 // Implement the simplest correct thing; do not over-engineer.
 
-mod builtins;
+pub(crate) mod builtins;
 mod call;
 mod display;
 mod lvalue;
