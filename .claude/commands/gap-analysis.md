@@ -16,6 +16,31 @@ Call `mcp__plane__list_cycle_work_items` (or `mcp__plane__list_work_items` with 
 
 Also read `CLAUDE.md` for the active milestone and any active epics, and read the corresponding spec sections in `docs/public/spec/` that are likely to be touched by the sprint theme.
 
+### 1a. RFC spec_status pre-check (hard gate)
+
+Before analysing any individual work item, scan `docs/internal/rfcs/` for every RFC that:
+- Is referenced in any sprint item description (look for `rfc-NNNN` mentions), **or**
+- Has `status: accepted`
+
+For each such RFC, read its frontmatter and check `spec_status` and `status`. Report two classes of blocker at the top of the Step 4 output under `### RFC blockers` before all other findings:
+
+**Class 1 — Spec not updated (`spec_status: pending`):**
+The RFC is accepted but its decisions are not yet in the spec. Implementation is blocked.
+
+**Class 2 — Stale accepted RFC (should be `incorporated`):**
+The RFC has `status: accepted` but its `**Target:** vX.Y.0` (in `## Decision`) is ≤ the sprint's milestone version. It should have been marked `incorporated` when that version shipped. This is a tracking debt that must be resolved before the sprint closes.
+
+```
+### RFC blockers (must be resolved before sprint can proceed)
+
+**rfc-NNNN — <title>**
+- Class: [Spec not updated | Stale — should be incorporated]
+- Finding: <one sentence>
+- Required action: <what to do>
+```
+
+Do not proceed with item-level gap analysis until the user confirms how blockers will be resolved.
+
 ---
 
 ## Step 2 — Analyse each work item

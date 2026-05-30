@@ -303,12 +303,31 @@ RFCs are design proposals for language changes. The full lifecycle is defined in
 
 ### When to read an RFC
 
-Before implementing any feature that has an associated RFC, read it. If the RFC `status` is `accepted`, implementation may proceed against its `## Proposal`. If `status` is `under-review` or `draft`, **stop** — the design is not settled; ask before implementing.
+Before implementing any feature that has an associated RFC, read it. Check both `status` and `spec_status` in the frontmatter:
+
+| `status` | `spec_status` | What to do |
+|---|---|---|
+| `draft` or `under-review` | — | **STOP** — design not settled; ask before implementing |
+| `accepted` | `pending` | **STOP** — update the spec first (see below), then implement |
+| `accepted` | `done` | Implementation may proceed |
+| `incorporated` | `done` | Already shipped; read for context only |
+
+### When an RFC is accepted
+
+Immediately after setting `status: accepted`:
+
+1. Update the relevant spec or docs to reflect the RFC's decisions:
+   - Language-visible RFCs → update `docs/public/spec/` section(s) governing the feature.
+   - Implementation RFCs → update `metel-interpreter/docs/typechecker.md` or `architecture.md`.
+2. Set `spec_status: done` in the RFC frontmatter.
+3. Commit both changes together: `docs(rfc-NNNN): update spec to reflect accepted decisions`.
+
+Do not create or start any implementation work item until `spec_status: done`. A sprint that includes implementation of an RFC whose `spec_status` is `pending` is a misconfigured sprint.
 
 ### During implementation of an accepted RFC
 
-- Treat the RFC's `## Proposal` section as specification — the same discipline applies as with `docs/public/spec.md`.
-- Any deviation from the proposal requires updating the RFC and writing a decision record explaining why.
+- Treat the relevant spec section (updated per the above) as the source of truth — not the RFC body.
+- Any deviation from the spec requires updating the spec first and writing a decision record.
 
 ### After the target version ships
 

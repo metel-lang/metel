@@ -70,7 +70,7 @@ RFCs are the mechanism for proposing language changes. An RFC must be accepted a
 |---|---|
 | `draft` | Being written; not yet ready for review |
 | `under-review` | Ready for evaluation; set manually by the author |
-| `accepted` | Design decided; `target: vX.Y.0` assigned; implementation may begin |
+| `accepted` | Design decided; `target: vX.Y.0` assigned; **spec must be updated before implementation begins** |
 | `rejected` | Will not be implemented; reason recorded in `## Decision` |
 | `deferred` | Not rejected, but not scheduled for any version |
 | `incorporated` | Implemented and shipped in the target version |
@@ -83,20 +83,29 @@ id: rfc-NNNN
 title: "..."
 date: 'YYYY-MM-DD'
 status: draft          # one of the states above
+spec_status: pending   # pending | done — tracks whether the relevant spec/docs reflect the RFC decisions
 ---
 ```
 
-The target version is **not** stored in the RFC frontmatter. It lives in exactly one place: the GitHub issue milestone. The `## Decision` section records it in prose (`**Target:** vX.Y.0`) as a human-readable audit trail, but the milestone is the authoritative field.
+`spec_status` is required for all `accepted` RFCs. It is independent of `status`:
+- `pending` — RFC is accepted but the relevant spec or architecture docs have not yet been updated to reflect its decisions. **Implementation is blocked until this is `done`.**
+- `done` — The spec (for language-visible RFCs: `docs/public/spec/`) or internal architecture docs (for implementation RFCs: `metel-interpreter/docs/`) have been updated. Implementation may proceed.
+
+The target version is **not** stored in the RFC frontmatter. It lives in exactly one place: the project milestone. The `## Decision` section records it in prose (`**Target:** vX.Y.0`) as a human-readable audit trail, but the milestone is the authoritative field.
 
 ### Acceptance process
 
 1. Author sets `status: under-review` when the RFC is ready for evaluation.
-2. Discussion happens in the linked GitHub issue.
+2. Discussion happens in the linked issue.
 3. The project owner records the outcome in a `## Decision` section at the bottom of the RFC file.
-4. **If accepted**: set `status: accepted`, assign the RFC's GitHub issue to the target version milestone, and record `**Target:** vX.Y.0` in the `## Decision` section.
+4. **If accepted**:
+   - Set `status: accepted` and `spec_status: pending`.
+   - Assign the RFC's issue to the target version milestone.
+   - Record `**Target:** vX.Y.0` in `## Decision`.
+   - **Immediately** update the relevant spec or docs to reflect the RFC's decisions and set `spec_status: done`. This may be a single commit. Implementation items must not be created or started until `spec_status: done`.
 5. **If rejected or deferred**: set status accordingly; record the reason in `## Decision`.
 
-Once the RFC's target version ships (git tag applied), set `status: incorporated`.
+Once the RFC's target version ships (git tag applied), set `status: incorporated`. This is a required step of the release process — every accepted RFC whose target version matches the tag must be updated before the tag is pushed. The sprint-end quality gate (Gate 4) enforces this with a full RFC staleness sweep.
 
 ### Decision section format
 

@@ -73,6 +73,19 @@ For every language-visible change in the sprint, verify the spec reflects it:
 3. Check each RFC implemented this sprint — its frontmatter `status` must be `incorporated`.
 4. Check `docs/public/changelog.md` — the current version milestone must have an entry listing the sprint's shipped features.
 
+**RFC staleness sweep (full scan — not just this sprint):**
+
+Read every file in `docs/internal/rfcs/`. For each RFC with `status: accepted`:
+- Find its target version in the `## Decision` section (`**Target:** vX.Y.0`).
+- Compare the target version against the sprint's milestone version.
+- If the target version is less than or equal to the current sprint's milestone (i.e. it should have shipped already), this RFC is stale — it was implemented but never marked `incorporated`.
+
+Report all stale RFCs as a Gate 4 failure. For each stale RFC, set `status: incorporated` in its frontmatter before the sprint can close.
+
+```bash
+grep -l "status: accepted" docs/internal/rfcs/*.md
+```
+
 Report any spec/code divergence found.
 
 ### Gate 5: Spec completeness
@@ -228,7 +241,9 @@ N tests written, M failures found, K fixed.
 
 Then instruct the user:
 
-> **`main` is up to date. Create the release tag:**
+> **`main` is up to date. Before tagging:**
+> 1. Mark all accepted RFCs whose target version matches this sprint's milestone as `incorporated` in their frontmatter — any missed by Gate 4 must be caught now.
+> 2. Create the release tag:
 > ```bash
 > git tag -a v<X.Y.Z> -m "v<X.Y.Z>: <sprint theme>" && git push origin v<X.Y.Z>
 > ```
@@ -236,6 +251,7 @@ Then instruct the user:
 
 **The tag must be created on `main` after the rebase — never on the sprint branch.**
 The tag name must match the version in `docs/public/changelog.md`.
+Once the tag is pushed, any RFC with `status: accepted` and a target version ≤ the tagged version is automatically stale — the Gate 4 sweep will catch this on the next sprint.
 
 ---
 
