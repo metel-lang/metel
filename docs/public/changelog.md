@@ -4,6 +4,20 @@ title: "Metel Language Changelog"
 
 # Changelog
 
+## v0.6.4
+
+Module system technical debt. Shipped by Sprint 15 (`sprint/15`).
+
+**Internal improvements:**
+- `TypeDefinitionRegistry` is now used as the cross-module type accumulator in `check_graph`, replacing the `Vec<Decl>` approach that cloned raw AST nodes; cross-module struct field type references now resolve correctly even when the field type comes from an indirect dependency (ADR-0032, METEL-3)
+- `InferContext::new` accepts `imported_schemes` directly, enforcing the dual-registration invariant (inference + construction passes both see imported names) at the type level (ADR-0022, METEL-6)
+- `declared_names` map added to `ResolvedNames` during name resolution, replacing an O(n) AST scan in `build_import_schemes` for T0009/T0003 distinction (METEL-4)
+- `resolve_path_root` extracted to `src/module_paths.rs` as a single shared implementation for both `module_loader` and `name_resolver`; fixed a regression where the `Name` path root incorrectly doubled the module name segment (ADR-0023, METEL-7)
+- `StdPrelude::schemes()` / evaluator builtin parity assertion added as a compile-time-checked test (ADR-0027, METEL-5)
+
+**Compatibility:**
+- No language-visible changes.
+
 ## v0.6.3
 
 Module system — feature complete. Shipped by Sprint 14 (`sprint/14`).

@@ -178,7 +178,7 @@ pub fn check_graph(
     let mut typed_modules: Vec<TypedModule> = Vec::new();
     // Accumulated resolved type definitions from already-checked modules.
     // Passed to check_impl so cross-module struct/enum field references are visible.
-    // See METEL-3.
+    // See ADR-0032.
     let mut type_registry = TypeDefinitionRegistry::new();
 
     for loaded in graph.modules() {
@@ -424,7 +424,7 @@ pub fn check(mut program: Program) -> Result<TypedProgram, MetelError> {
 ///   inference context so imported names are visible.
 /// - `base_registry`: resolved type definitions accumulated from already-checked
 ///   dependency modules. Merged into the freshly-built registry so that cross-module
-///   type references in struct fields and method signatures are visible. See METEL-3.
+///   type references in struct fields and method signatures are visible. See ADR-0032.
 ///
 /// Returns `(typed_decls, scheme_env, registry)` where `registry` carries this
 /// module's type definitions merged with the base, for the next module to use.

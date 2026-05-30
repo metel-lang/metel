@@ -563,7 +563,7 @@ impl TypeDefinitionRegistry {
 
     /// Copy all entries from `other` into `self`, without overwriting existing entries.
     /// Used by `check_impl` to seed a module's registry with type definitions from
-    /// already-checked dependency modules. See METEL-3.
+    /// already-checked dependency modules. See ADR-0032.
     pub fn merge_from(&mut self, other: &TypeDefinitionRegistry) {
         for (k, v) in &other.struct_env {
             self.struct_env.entry(k.clone()).or_insert_with(|| v.clone());
@@ -691,7 +691,7 @@ impl InferContext {
     }
 
     /// Consume the context and return its registry. Used by `check_graph` to extract
-    /// accumulated type definitions after a module is checked. See METEL-3.
+    /// accumulated type definitions after a module is checked. See ADR-0032.
     pub fn into_registry(self) -> TypeDefinitionRegistry {
         self.registry
     }
