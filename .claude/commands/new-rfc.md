@@ -109,14 +109,16 @@ Create a new RFC and register it in Plane. RFC content lives in Plane pages; the
 
 ## Lifecycle
 
-| Stage | RFC Status | Action |
+| RFC Status | Plane state | Action |
 |---|---|---|
-| **Draft** | `draft` | Content in Plane page. |
-| **Accepted** | `accepted` | Assign to a Plane milestone. Update Decision section in the page. |
-| **Incorporated** | `incorporated` | Spec updated. Commit the RFC file to `docs/internal/rfcs/rfc-NNNN-<slug>.md`. Set Doc Path property. |
-| **Implemented** | `implemented` | Feature working in the interpreter. |
-| **Superseded** | `superseded` | Add a note to the page pointing to the superseding RFC. Create the new RFC as a separate work item + page. |
-| **Deferred** | `deferred` | No action planned yet. |
+| `draft` | Backlog | Content in Plane page. |
+| `accepted` | Todo | Assign to a Plane milestone. Update Decision section in the page. |
+| `incorporated` | Done | Spec updated. Commit the RFC file to `docs/internal/rfcs/rfc-NNNN-<slug>.md`. Set Doc Path property. |
+| `implemented` | Done | Feature working in the interpreter. |
+| `superseded` | Cancelled | Add a note to the page pointing to the superseding RFC. Create the new RFC as a separate work item + page. |
+| `deferred` | Cancelled | No action planned yet. |
+
+When transitioning an RFC's status, always update **both** the RFC Status custom property and the Plane work item state to keep them in sync. Plane does not support per-type state machines — the RFC Status property is the authoritative lifecycle field; the state is a coarse queue signal for board visibility.
 
 ## Incorporated RFC file template
 
