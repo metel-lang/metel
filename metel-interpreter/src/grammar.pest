@@ -245,8 +245,8 @@ ident = @{
 keyword = @{
     ("and" | "as" | "break" | "continue" | "else" | "enum" | "export" |
      "false" | "for" | "fun" | "if" | "impl" | "import" | "let" | "loop" |
-     "match" | "mod" | "mut" | "or" | "pub" | "return" | "root" | "self" |
-     "std" | "struct" | "super" | "aspect" | "true" | "use" |
+     "match" | "mut" | "or" | "pub" | "return" | "root" | "self" |
+     "std" | "struct" | "super" | "aspect" | "true" |
      "where" | "while")
     ~ !(ASCII_ALPHANUMERIC | "_")
 }
