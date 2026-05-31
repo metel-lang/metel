@@ -122,7 +122,15 @@ All other keywords remain as-is: `fun`, `let`, `mut`, `struct`, `enum`, `type`, 
 
 ## Decision
 
-**Outcome:** *(pending)*
+**Outcome:** Accepted  
 **Target:** v0.2
 
-*(Decision rationale goes here when the RFC is evaluated.)*
+All three accepted changes shipped in v0.2–v0.4.2:
+
+| Change | Shipped |
+|---|---|
+| `nope` / `Perhaps::Nope` → `None` / `Perhaps::None` | v0.4.2 |
+| `aspect` keyword confirmed (not renamed further) | v0.2 |
+| `harness` reserved keyword | v0.2 (superseded by RFC-0030 which adopted `import` instead) |
+
+The `.yolo()` rename remains deferred — no stdlib migration has occurred and the RFC-0015 decision on unwrap syntax is still pending.

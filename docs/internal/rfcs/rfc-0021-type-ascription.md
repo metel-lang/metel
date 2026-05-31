@@ -156,7 +156,7 @@ No new grammar rule is strictly required — `cast_expr` can be renamed `asc_exp
 
 ## Decision
 
-**Outcome:** *(pending)*
+**Outcome:** Accepted  
 **Target:** v0.2
 
-*(Decision rationale goes here when the RFC is evaluated.)*
+Shipped in v0.2.0. `:` is the type ascription operator in expression position; `as` is preserved as the explicit runtime conversion operator. The two operators are cleanly distinct: `:` is a compile-time inference hint with no runtime cost; `as` is a deliberate runtime conversion. `1 : Float` is a type error; `1 as Float` is a conversion. Chained ascription is not supported (`?` grammar form — at most one `:` per expression).

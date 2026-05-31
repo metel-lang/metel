@@ -1,11 +1,14 @@
 ---
-number: 0031
-title: Topological Per-Module Typechecking
+id: rfc-0031
+title: "Topological Per-Module Typechecking"
+date: '2026-05-28'
 status: incorporated
-spec_status: done
-created: 2026-05-28
-milestone: v0.6.0
-tracking_issue: "#172"
+---
+
+## Summary
+
+Replace the flat-merge typechecker (ADR-0019) with a topological multi-pass typechecker that processes each module against its own declared scope. This is an internal architecture RFC — no language-visible syntax changes.
+
 ---
 
 # RFC-0031: Topological Per-Module Typechecking
@@ -290,3 +293,12 @@ note: use an explicit import to disambiguate: `import parser::Token`
 13. **T0009 vs T0003 detection:** `ModuleExports` stores only `pub` items. When a name is absent from `pub_schemes`, the typechecker looks it up in the source module's `program.decls` (available in the `NormalizedModuleGraph`) to distinguish T0009 ("private") from T0003 ("absent"). No redundant `all_declared_names` field is needed; the lookup is O(declarations) on error paths only (#191).
 
 12. **Qualified path error messages:** The normalizer produces `Expr::ResolvedPath { resolved, original }`. The typechecker uses `resolved` for lookup and `original.join("::")` for error messages — explicit in the type, survives inferred-type errors where no source span exists (#185).
+
+---
+
+## Decision
+
+**Outcome:** Accepted  
+**Target:** v0.6.0
+
+Option A (multi-pass with shared scheme registry) implemented and shipped in v0.6.0. `check_graph` returns a `TypedModuleGraph`; the flat `load_program` / `check(Program)` path and all ADR-0019/ADR-0020 compatibility shims were removed in the same sprint. All 13 resolved questions above reflect the final implementation choices.
