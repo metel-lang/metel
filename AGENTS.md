@@ -23,6 +23,19 @@ Metel is a statically-typed, expression-oriented language. This repository conta
 | GitHub Issues | **Tasks** — unit of work; use `gh issue list` for CLI access |
 | GitHub Milestones | **Version milestones** (`v0.2`, `v0.3`, …) and **Epic milestones** (implementation groupings) |
 
+## Wiki Release Workflow
+
+The public wiki lives in `metel-website` and consumes `metel-docs` as a submodule. Treat it as the user-facing documentation surface for public releases.
+
+When a task or release affects public documentation:
+
+1. Update `metel-docs` first.
+2. Point `metel-website` at the updated docs commit.
+3. If a new public docs release is being published, generate the versioned docs snapshot in `metel-website`.
+4. Publish the wiki only after the matching docs version is ready.
+
+For now, wiki publication remains manual. Do not assume automatic CI deployment is available unless the release workflow explicitly says so.
+
 ---
 
 ## Sprint Workflow
@@ -358,4 +371,3 @@ Set RFC Status → `implemented` in Plane. State remains Done.
 - Do not start implementation if the task description has unresolved questions.
 - Do not mark a task done with unchecked acceptance criteria.
 - Do not make significant architectural decisions alone — ask first.
-

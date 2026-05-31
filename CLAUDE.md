@@ -4,15 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Metel is a statically typed, expression-oriented language with a Rust-inspired syntax. It runs in two first-class execution modes: a production-quality interpreter and a native compiler. Both are permanent, supported targets — the interpreter is not a stepping stone to be discarded when the compiler exists.
+Metel is a statically typed, expression-oriented language with a Rust-inspired syntax. This repository currently contains the production interpreter and the language implementation work around it.
 
-**This dual-mode commitment is the project's core identity and competitive position.** Design decisions must be consistent with it. See `docs/internal/vision.md` for the full rationale.
+**The interpreter is the shipped runtime.** The compiler is not implemented yet, so repo guidance must reflect the interpreter as the current product surface. See `docs/internal/vision.md` for the broader project direction.
 
 Key implications for agents working in this repo:
-- Do not treat the tree-walk interpreter as throwaway scaffolding. It is a product.
-- Do not design features that only make sense for a compiler unless explicitly designated compiler-only.
-- Every language feature must answer: *what does this give the programmer in interpreter mode, and in compiler mode?*
-- The spec is the contract both backends must satisfy. Ambiguity in the spec is a spec bug.
+- Do not treat the tree-walk interpreter as throwaway scaffolding. It is the product users run today.
+- Do not describe compiler-only workflows as if they already exist in this repository.
+- The spec is the contract the interpreter must satisfy. Ambiguity in the spec is a spec bug.
 
 ## Common Development Commands
 
@@ -116,6 +115,16 @@ gh issue edit <number> --add-label "status:in-progress"        # mark in-progres
 **Labels:** `evaluator`, `generics`, `aspects`, `integration`, `tooling`, `dx`, `migration`, `docs`, `typechecker`, `type-inference`, `architecture`, `priority:low/medium/high`, `status:backlog`, `status:in-progress`, `archived`
 
 **Milestones:** Version milestones (`v0.4.0`, `v0.5.0`, …). See [`docs/internal/versioning.md`](docs/internal/versioning.md) for the full model.
+
+### Wiki Release Workflow
+
+The user-facing wiki lives in `metel-website` and consumes `metel-docs` as a submodule. Public release work should always include the wiki publication step.
+
+- Update `metel-docs` first.
+- Update the `metel-website` submodule pointer to that docs commit.
+- If a release is going public, create the matching versioned docs snapshot in `metel-website`.
+- Publish the wiki from the website repo only when the matching docs version is ready.
+- Until automated deployment is reintroduced, wiki publication stays manual.
 
 ### Docs and Decisions
 
