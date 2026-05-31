@@ -119,6 +119,9 @@ pub(super) fn eval_binop(op: &BinOp, lv: Value, rv: Value, span: &Span) -> Resul
         (BinOp::Div, Value::Float(a), Value::Float(b)) => Value::Float(a / b),
         (BinOp::Rem, Value::Float(a), Value::Float(b)) => Value::Float(a % b),
 
+        // String concatenation
+        (BinOp::Add, Value::Str(a), Value::Str(b)) => Value::Str(a + &b),
+
         // Int comparison
         (BinOp::Eq, Value::Int(a), Value::Int(b)) => Value::Bool(a == b),
         (BinOp::Ne, Value::Int(a), Value::Int(b)) => Value::Bool(a != b),
