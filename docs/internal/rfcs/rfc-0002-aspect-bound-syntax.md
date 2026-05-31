@@ -2,7 +2,8 @@
 id: rfc-0002
 title: "Aspect Bound Syntax"
 date: '2026-05-19'
-status: accepted
+status: superseded
+superseded_by: rfc-0035
 spec_status: pending
 ---
 
