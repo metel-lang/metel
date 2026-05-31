@@ -100,27 +100,34 @@ fn infer_decl(
                 TypeExpr::Named(name, _) => name.rsplit("::").next().unwrap_or(name).to_string(),
                 _ => return Err(MetelError::internal("generic impl blocks not yet supported")),
             };
-            // Verify the impl provides every method the aspect declares.
+            let mut inherited_defaults = vec![];
             if let Some(aspect_name) = &ib.aspect_name {
-                if let Some(required) = ctx.aspect_methods(aspect_name).cloned() {
+                if let Some(methods) = ctx.aspect_method_defs(aspect_name).cloned() {
                     let provided: std::collections::HashSet<&str> =
                         ib.methods.iter().map(|m| m.name.as_str()).collect();
-                    for req in &required {
-                        if !provided.contains(req.as_str()) {
+                    for method in methods {
+                        if provided.contains(method.name.as_str()) {
+                            continue;
+                        }
+                        if method.default_body.is_none() {
                             return Err(MetelError::type_error(
                                 TypeErrorCode::T0003,
                                 format!(
                                     "`{}` does not implement `{}::{}` required by aspect `{}`",
-                                    target_name, target_name, req, aspect_name
+                                    target_name, target_name, method.name, aspect_name
                                 ),
                                 &ib.span,
                             ));
                         }
+                        inherited_defaults.push(method);
                     }
                 }
             }
             for method in &ib.methods {
                 infer_impl_method(method, &target_name, ctx, fun_generalizations)?;
+            }
+            for method in &inherited_defaults {
+                infer_default_aspect_method(method, &target_name, ctx, fun_generalizations)?;
             }
             Ok(InferType::unit())
         }
@@ -231,6 +238,59 @@ fn infer_impl_method(
     let saved_ret = ctx.push_return_type(ret_ty.clone());
     let body_ty = infer_block(&method.body, ctx, fun_generalizations)?;
     ctx.add_constraint(body_ty, ret_ty.clone(), method.body.span.clone());
+    ctx.pop_return_type(saved_ret);
+    ctx.swap_type_params(saved_type_params);
+    ctx.pop_scope();
+
+    let partial_subst = ctx.solve()?;
+    let fun_ty = InferType::Fun(param_types, Box::new(ret_ty));
+    let resolved_fun_ty = partial_subst.apply(&fun_ty);
+    ctx.register_method(target_name.to_string(), method.name.clone(), resolved_fun_ty);
+    Ok(())
+}
+
+fn infer_default_aspect_method(
+    method: &AspectMethod,
+    target_name: &str,
+    ctx: &mut InferContext,
+    fun_generalizations: &mut Vec<FunGeneralization>,
+) -> Result<(), MetelError> {
+    let generic_map: HashMap<String, TypeVar> = method.generics.iter()
+        .map(|g| (g.name.clone(), ctx.fresh_type_var_raw()))
+        .collect();
+
+    let te_to_infer = |te: &TypeExpr| -> InferType {
+        if generic_map.is_empty() {
+            type_expr_to_infer_with_self(te, target_name)
+        } else {
+            type_expr_to_infer_with_generics_and_self(te, &generic_map, target_name)
+        }
+    };
+
+    let self_ty = InferType::Named(target_name.to_string(), vec![]);
+    let param_types: Vec<InferType> = method.params.iter().map(|p| {
+        if p.name == "self" {
+            self_ty.clone()
+        } else if let Some(ann) = &p.type_ann {
+            te_to_infer(ann)
+        } else {
+            ctx.fresh_var()
+        }
+    }).collect();
+    let ret_ty = method.return_type.as_ref()
+        .map(te_to_infer)
+        .unwrap_or_else(InferType::unit);
+    let body = method.default_body.as_ref()
+        .ok_or_else(|| MetelError::internal("missing aspect default body"))?;
+
+    ctx.push_scope();
+    for (p, pt) in method.params.iter().zip(param_types.iter()) {
+        ctx.bind_mono(&p.name, pt.clone(), p.mutable);
+    }
+    let saved_type_params = ctx.swap_type_params(generic_map);
+    let saved_ret = ctx.push_return_type(ret_ty.clone());
+    let body_ty = infer_block(body, ctx, fun_generalizations)?;
+    ctx.add_constraint(body_ty, ret_ty.clone(), body.span.clone());
     ctx.pop_return_type(saved_ret);
     ctx.swap_type_params(saved_type_params);
     ctx.pop_scope();

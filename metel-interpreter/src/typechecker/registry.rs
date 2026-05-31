@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{Decl, Program, Span, TypeExpr, AspectDecl};
+use crate::ast::{AspectDecl, AspectMethod, Decl, Program, Span, TypeExpr};
 use crate::typeinference::{
     EnumInfo, FieldEntry, InferContext, InferType, TypeDefinitionRegistry, TypeScheme, TypeVar,
     TypeVarGenerator, VariantInfo,
@@ -96,7 +96,7 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
         ],
     });
 
-    // Hoist user-defined structs, enums, and impl method signatures.
+    // Pass 1: register user-defined structs, enums, and aspects.
     for decl in &program.decls {
         match decl {
             Decl::Struct(sd) if sd.generics.is_empty() => {
@@ -141,12 +141,20 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
             Decl::Aspect(ad) => {
                 register_aspect_decl(ad, &mut registry);
             }
+            _ => {}
+        }
+    }
+
+    // Pass 2: register impl method signatures once all aspect definitions are known.
+    for decl in &program.decls {
+        match decl {
             Decl::Impl(ib) => {
                 let target_name = match &ib.target_type {
                     TypeExpr::Named(name, _) => name.clone(),
                     _ => continue,
                 };
                 register_impl_methods(ib.methods.iter(), &target_name, gen, &mut registry);
+                register_default_aspect_methods(ib, &target_name, gen, &mut registry);
                 // Track which aspects this type implements (with concrete type args).
                 if let Some(aspect_name) = &ib.aspect_name {
                     let type_args: Vec<crate::types::Type> = ib.aspect_type_args.iter()
@@ -172,6 +180,7 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
 fn register_aspect_decl(ad: &AspectDecl, registry: &mut TypeDefinitionRegistry) {
     let method_names = ad.methods.iter().map(|m| m.name.clone()).collect();
     registry.register_aspect(ad.name.clone(), method_names);
+    registry.register_aspect_method_defs(ad.name.clone(), ad.methods.clone());
 }
 
 fn register_impl_methods<'a>(
@@ -201,6 +210,52 @@ fn register_impl_methods<'a>(
             InferType::Fun(param_types, Box::new(ret_ty)),
         );
     }
+}
+
+fn register_default_aspect_methods(
+    ib: &crate::ast::ImplBlock,
+    target_name: &str,
+    gen: &mut TypeVarGenerator,
+    registry: &mut TypeDefinitionRegistry,
+) {
+    let Some(aspect_name) = &ib.aspect_name else { return; };
+    let Some(methods) = registry.aspect_method_defs(aspect_name).cloned() else { return; };
+    let provided: std::collections::HashSet<&str> =
+        ib.methods.iter().map(|m| m.name.as_str()).collect();
+
+    for method in methods {
+        if method.default_body.is_none() || provided.contains(method.name.as_str()) {
+            continue;
+        }
+        register_default_aspect_method(&method, target_name, gen, registry);
+    }
+}
+
+fn register_default_aspect_method(
+    method: &AspectMethod,
+    target_name: &str,
+    gen: &mut TypeVarGenerator,
+    registry: &mut TypeDefinitionRegistry,
+) {
+    let mut param_types = vec![];
+    for p in &method.params {
+        let pt = if p.name == "self" {
+            InferType::Named(target_name.to_string(), vec![])
+        } else if let Some(ann) = &p.type_ann {
+            type_expr_to_infer_with_self(ann, target_name)
+        } else {
+            InferType::Var(gen.fresh())
+        };
+        param_types.push(pt);
+    }
+    let ret_ty = method.return_type.as_ref()
+        .map(|ann| type_expr_to_infer_with_self(ann, target_name))
+        .unwrap_or_else(InferType::unit);
+    registry.register_method(
+        target_name.to_string(),
+        method.name.clone(),
+        InferType::Fun(param_types, Box::new(ret_ty)),
+    );
 }
 
 /// Seed `ctx` with all built-in free-function bindings from `StdPrelude`,

@@ -1,0 +1,24 @@
+// Positive: aspect default methods can be omitted in impl blocks and inherited.
+
+struct Person {
+    name: String,
+}
+
+aspect Greet {
+    fun name(self) -> String;
+
+    fun greet(self) -> String {
+        return "Hello, " + self.name();
+    }
+}
+
+impl Greet for Person {
+    fun name(self) -> String {
+        return self.name;
+    }
+}
+
+fun main() {
+    let p = Person { name: "Ada" };
+    let msg: String = p.greet();
+}

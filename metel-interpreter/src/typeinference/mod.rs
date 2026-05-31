@@ -3,7 +3,7 @@
 //! Implements Hindley-Milner type inference with let-polymorphism.
 //! See `docs/internal/typechecker.md` for theory background and implementation notes.
 
-use crate::ast::Span;
+use crate::ast::{AspectMethod, Span};
 use crate::types::Type;
 use crate::error::MetelError;
 use std::collections::{HashMap, HashSet};
@@ -449,6 +449,8 @@ pub struct TypeDefinitionRegistry {
     /// aspect name → ordered list of method names the aspect declares.
     /// Used to verify impl blocks are complete.
     aspect_env:  HashMap<String, Vec<String>>,
+    /// aspect name → full declared methods, including default bodies.
+    aspect_method_defs: HashMap<String, Vec<AspectMethod>>,
     /// (target_type_name, aspect_name) → list of type-arg vectors, one per registered impl.
     /// E.g. ("Int", "From") → [[Type::Float]] means `impl From<Float> for Int`.
     impl_aspect_env: HashMap<(String, String), Vec<Vec<Type>>>,
@@ -463,6 +465,7 @@ impl TypeDefinitionRegistry {
             method_env:         HashMap::new(),
             enum_env:           HashMap::new(),
             aspect_env:         HashMap::new(),
+            aspect_method_defs: HashMap::new(),
             impl_aspect_env:    HashMap::new(),
         }
     }
@@ -518,8 +521,16 @@ impl TypeDefinitionRegistry {
         self.aspect_env.insert(name, methods);
     }
 
+    pub fn register_aspect_method_defs(&mut self, name: String, methods: Vec<AspectMethod>) {
+        self.aspect_method_defs.insert(name, methods);
+    }
+
     pub fn aspect_methods(&self, name: &str) -> Option<&Vec<String>> {
         self.aspect_env.get(name)
+    }
+
+    pub fn aspect_method_defs(&self, name: &str) -> Option<&Vec<AspectMethod>> {
+        self.aspect_method_defs.get(name)
     }
 
     pub fn register_aspect_impl(&mut self, target: String, aspect: String, type_args: Vec<Type>) {
@@ -579,6 +590,9 @@ impl TypeDefinitionRegistry {
         }
         for (k, v) in &other.aspect_env {
             self.aspect_env.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+        for (k, v) in &other.aspect_method_defs {
+            self.aspect_method_defs.entry(k.clone()).or_insert_with(|| v.clone());
         }
         for (k, v) in &other.impl_aspect_env {
             self.impl_aspect_env.entry(k.clone()).or_insert_with(|| v.clone());
@@ -672,6 +686,10 @@ impl InferContext {
 
     pub fn aspect_methods(&self, name: &str) -> Option<&Vec<String>> {
         self.registry.aspect_methods(name)
+    }
+
+    pub fn aspect_method_defs(&self, name: &str) -> Option<&Vec<AspectMethod>> {
+        self.registry.aspect_method_defs(name)
     }
 
     pub fn has_from_impl(&self, target: &str, source: &Type) -> bool {

@@ -433,6 +433,11 @@ fun load() -> Result<Int, AppError> {
     #[test]
     fn stage11_neg_generic_struct_field_conflict() { check("generics/stage11_neg_01_generic_struct_field_conflict.mtl"); }
 
+    // ── Aspects ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn stage12_default_methods() { check("aspects/stage12_01_default_methods.mtl"); }
+
     // ── Known limitations ─────────────────────────────────────────────────────
 
     #[test]

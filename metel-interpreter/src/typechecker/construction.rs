@@ -259,9 +259,10 @@ fn construct_impl_decl(ib: &ImplBlock, ctx: &mut ConstructCtx) -> Result<TypedDe
         TypeExpr::Named(name, _) => name.clone(),
         _ => return Err(MetelError::not_implemented("generic impl blocks not yet supported")),
     };
-    let methods = ib.methods.iter()
+    let mut methods = ib.methods.iter()
         .map(|m| construct_impl_method(m, &target_name, ctx))
         .collect::<Result<Vec<_>, _>>()?;
+    methods.extend(construct_default_aspect_methods(ib, &target_name, ctx)?);
     Ok(TypedDecl::Impl(TypedImplBlock {
         aspect_name:      ib.aspect_name.clone(),
         aspect_type_args: ib.aspect_type_args.clone(),
@@ -302,6 +303,67 @@ fn construct_impl_method(
     }
     let saved_return = ctx.push_return_type(ret_ty.clone());
     let typed_block = construct_block(&method.body, ret_ty.as_ref(), ctx)?;
+    ctx.pop_return_type(saved_return);
+    ctx.pop_scope();
+    Ok(TypedFunDecl {
+        name:        method.name.clone(),
+        generics:    method.generics.clone(),
+        params:      method.params.clone(),
+        return_type: method.return_type.clone(),
+        body:        FunBody::Typed(typed_block),
+        span:        method.span.clone(),
+    })
+}
+
+fn construct_default_aspect_methods(
+    ib: &ImplBlock,
+    target_name: &str,
+    ctx: &mut ConstructCtx,
+) -> Result<Vec<TypedFunDecl>, MetelError> {
+    let Some(aspect_name) = &ib.aspect_name else { return Ok(vec![]); };
+    let Some(methods) = ctx.registry.aspect_method_defs(aspect_name).cloned() else { return Ok(vec![]); };
+    let provided: std::collections::HashSet<&str> =
+        ib.methods.iter().map(|m| m.name.as_str()).collect();
+
+    methods.iter()
+        .filter(|method| method.default_body.is_some() && !provided.contains(method.name.as_str()))
+        .map(|method| construct_default_aspect_method(method, target_name, ctx))
+        .collect()
+}
+
+fn construct_default_aspect_method(
+    method: &AspectMethod,
+    target_name: &str,
+    ctx: &mut ConstructCtx,
+) -> Result<TypedFunDecl, MetelError> {
+    let self_ty = Type::Named(target_name.to_string(), vec![]);
+    let te_to_infer = |te: &TypeExpr| type_expr_to_infer_with_self(te, target_name);
+    let param_types: Vec<Type> = method.params.iter()
+        .map(|p| {
+            if p.name == "self" {
+                Ok(self_ty.clone())
+            } else {
+                p.type_ann.as_ref()
+                    .map(|ann| resolved_to_type(&te_to_infer(ann), ctx.subst, &p.span))
+                    .unwrap_or_else(|| Err(MetelError::type_error(
+                        TypeErrorCode::T0002,
+                        format!("parameter `{}` needs a type annotation", p.name),
+                        &p.span,
+                    )))
+            }
+        })
+        .collect::<Result<_, _>>()?;
+    let ret_ty = method.return_type.as_ref()
+        .map(|ann| resolved_to_type(&te_to_infer(ann), ctx.subst, &method.span))
+        .transpose()?;
+    let body = method.default_body.as_ref()
+        .ok_or_else(|| MetelError::internal("missing aspect default body"))?;
+    ctx.push_scope();
+    for (p, ty) in method.params.iter().zip(param_types.iter()) {
+        ctx.bind(&p.name, ty.clone());
+    }
+    let saved_return = ctx.push_return_type(ret_ty.clone());
+    let typed_block = construct_block(body, ret_ty.as_ref(), ctx)?;
     ctx.pop_return_type(saved_return);
     ctx.pop_scope();
     Ok(TypedFunDecl {

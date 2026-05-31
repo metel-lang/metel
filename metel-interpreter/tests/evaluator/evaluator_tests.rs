@@ -368,6 +368,9 @@ mod tests {
     fn iterable_edge_cases() { check("aspects/62_iterable_edge_cases.mtl"); }
 
     #[test]
+    fn default_methods() { check("aspects/63_default_methods.mtl"); }
+
+    #[test]
     fn neg_missing_aspect_method() { check("aspects/neg_22_missing_aspect_method.mtl"); }
 
     // ── Error handling ────────────────────────────────────────────────────────
