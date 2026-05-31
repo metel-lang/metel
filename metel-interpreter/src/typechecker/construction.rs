@@ -7,7 +7,13 @@ use crate::typeinference::*;
 use crate::types::Type;
 
 use super::SchemeEnv;
-use super::conversions::{infer_type_to_type, resolved_to_type, type_expr_to_infer, type_to_infer};
+use super::conversions::{
+    infer_type_to_type,
+    resolved_to_type,
+    type_expr_to_infer,
+    type_expr_to_infer_with_self,
+    type_to_infer,
+};
 
 /// Build the concrete (fully-resolved `Type`) struct field map from inference results.
 /// Generic structs are excluded — they are resolved per-use-site during construction.
@@ -271,13 +277,14 @@ fn construct_impl_method(
     ctx: &mut ConstructCtx,
 ) -> Result<TypedFunDecl, MetelError> {
     let self_ty = Type::Named(target_name.to_string(), vec![]);
+    let te_to_infer = |te: &TypeExpr| type_expr_to_infer_with_self(te, target_name);
     let param_types: Vec<Type> = method.params.iter()
         .map(|p| {
             if p.name == "self" {
                 Ok(self_ty.clone())
             } else {
                 p.type_ann.as_ref()
-                    .map(|ann| resolved_to_type(&type_expr_to_infer(ann), ctx.subst, &p.span))
+                    .map(|ann| resolved_to_type(&te_to_infer(ann), ctx.subst, &p.span))
                     .unwrap_or_else(|| Err(MetelError::type_error(
                         TypeErrorCode::T0002,
                         format!("parameter `{}` needs a type annotation", p.name),
@@ -287,7 +294,7 @@ fn construct_impl_method(
         })
         .collect::<Result<_, _>>()?;
     let ret_ty = method.return_type.as_ref()
-        .map(|ann| resolved_to_type(&type_expr_to_infer(ann), ctx.subst, &method.span))
+        .map(|ann| resolved_to_type(&te_to_infer(ann), ctx.subst, &method.span))
         .transpose()?;
     ctx.push_scope();
     for (p, ty) in method.params.iter().zip(param_types.iter()) {

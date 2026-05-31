@@ -4,23 +4,27 @@ use crate::error::{TypeErrorCode, MetelError};
 use crate::typeinference::{InferType, Substitution, TypeVar};
 use crate::types::Type;
 
-/// Like `type_expr_to_infer` but substitutes known generic parameter names with their
-/// corresponding `InferType::Var`s.  Call this when inferring a generic function body
-/// where `generics` maps each parameter name (e.g. `"T"`) to its fresh `TypeVar`.
-pub(super) fn type_expr_to_infer_with_generics(
+fn type_expr_to_infer_in_context(
     te: &TypeExpr,
-    generics: &HashMap<String, TypeVar>,
+    generics: Option<&HashMap<String, TypeVar>>,
+    self_ty_name: Option<&str>,
 ) -> InferType {
     match te {
         TypeExpr::Named(name, args) => {
-            // Zero-arg named type that matches a generic param → type variable.
             if args.is_empty() {
-                if let Some(&tv) = generics.get(name.as_str()) {
-                    return InferType::Var(tv);
+                if let Some(generics) = generics {
+                    if let Some(&tv) = generics.get(name.as_str()) {
+                        return InferType::Var(tv);
+                    }
+                }
+                if name == "Self" {
+                    if let Some(self_ty_name) = self_ty_name {
+                        return InferType::Named(self_ty_name.to_string(), vec![]);
+                    }
                 }
             }
             let arg_tys: Vec<_> = args.iter()
-                .map(|a| type_expr_to_infer_with_generics(a, generics))
+                .map(|a| type_expr_to_infer_in_context(a, generics, self_ty_name))
                 .collect();
             match (name.as_str(), arg_tys.len()) {
                 ("Int",    0) => InferType::int(),
@@ -33,44 +37,50 @@ pub(super) fn type_expr_to_infer_with_generics(
         }
         TypeExpr::Unit => InferType::unit(),
         TypeExpr::Tuple(ts) => InferType::Tuple(
-            ts.iter().map(|t| type_expr_to_infer_with_generics(t, generics)).collect(),
+            ts.iter().map(|t| type_expr_to_infer_in_context(t, generics, self_ty_name)).collect(),
         ),
         TypeExpr::Array(t) => InferType::Array(
-            Box::new(type_expr_to_infer_with_generics(t, generics)),
+            Box::new(type_expr_to_infer_in_context(t, generics, self_ty_name)),
         ),
         TypeExpr::Fun(ps, ret) => InferType::Fun(
-            ps.iter().map(|p| type_expr_to_infer_with_generics(p, generics)).collect(),
+            ps.iter().map(|p| type_expr_to_infer_in_context(p, generics, self_ty_name)).collect(),
             Box::new(
                 ret.as_deref()
-                    .map(|r| type_expr_to_infer_with_generics(r, generics))
+                    .map(|r| type_expr_to_infer_in_context(r, generics, self_ty_name))
                     .unwrap_or(InferType::unit()),
             ),
         ),
     }
 }
 
+/// Like `type_expr_to_infer` but substitutes known generic parameter names with their
+/// corresponding `InferType::Var`s.  Call this when inferring a generic function body
+/// where `generics` maps each parameter name (e.g. `"T"`) to its fresh `TypeVar`.
+pub(super) fn type_expr_to_infer_with_generics(
+    te: &TypeExpr,
+    generics: &HashMap<String, TypeVar>,
+) -> InferType {
+    type_expr_to_infer_in_context(te, Some(generics), None)
+}
+
+pub(super) fn type_expr_to_infer_with_generics_and_self(
+    te: &TypeExpr,
+    generics: &HashMap<String, TypeVar>,
+    self_ty_name: &str,
+) -> InferType {
+    type_expr_to_infer_in_context(te, Some(generics), Some(self_ty_name))
+}
+
 /// Convert a source-level `TypeExpr` to an `InferType` for use during inference.
 pub(super) fn type_expr_to_infer(te: &TypeExpr) -> InferType {
-    match te {
-        TypeExpr::Named(name, args) => {
-            let arg_tys: Vec<_> = args.iter().map(type_expr_to_infer).collect();
-            match (name.as_str(), arg_tys.len()) {
-                ("Int",    0) => InferType::int(),
-                ("Float",  0) => InferType::float(),
-                ("Bool",   0) => InferType::bool(),
-                ("String", 0) => InferType::str(),
-                ("Never",  0) => InferType::never(),
-                _             => InferType::Named(name.clone(), arg_tys),
-            }
-        }
-        TypeExpr::Unit         => InferType::unit(),
-        TypeExpr::Tuple(ts)    => InferType::Tuple(ts.iter().map(type_expr_to_infer).collect()),
-        TypeExpr::Array(t)     => InferType::Array(Box::new(type_expr_to_infer(t))),
-        TypeExpr::Fun(ps, ret) => InferType::Fun(
-            ps.iter().map(type_expr_to_infer).collect(),
-            Box::new(ret.as_deref().map(type_expr_to_infer).unwrap_or(InferType::unit())),
-        ),
-    }
+    type_expr_to_infer_in_context(te, None, None)
+}
+
+pub(super) fn type_expr_to_infer_with_self(
+    te: &TypeExpr,
+    self_ty_name: &str,
+) -> InferType {
+    type_expr_to_infer_in_context(te, None, Some(self_ty_name))
 }
 
 /// Convert a fully-solved `InferType` to a concrete `Type`.

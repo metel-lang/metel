@@ -277,6 +277,9 @@ fun load() -> Result<Int, AppError> {
     fn stage5_builtin_type_methods() { check("structs/stage5_02_builtin_type_methods.mtl"); }
 
     #[test]
+    fn stage5_self_method_signatures() { check("structs/stage5_03_self_method_signatures.mtl"); }
+
+    #[test]
     fn stage5_neg_struct_field_type_mismatch() { check("structs/stage5_neg_01_struct_field_type_mismatch.mtl"); }
 
     #[test]

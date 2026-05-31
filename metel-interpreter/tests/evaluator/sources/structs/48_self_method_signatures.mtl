@@ -1,0 +1,34 @@
+struct Point { x: Int }
+
+impl Point {
+    fun clone(self) -> Self {
+        self
+    }
+
+    fun same_as(self, other: Self) -> Bool {
+        self.x == other.x
+    }
+}
+
+enum Token {
+    Int { value: Int },
+}
+
+impl Token {
+    fun identity(self) -> Self {
+        self
+    }
+}
+
+fun main() {
+    let p = Point { x: 3 };
+    let q = p.clone();
+    assert(q.x == 3);
+    assert(p.same_as(q));
+
+    let token = Token::Int { value: 9 };
+    let token_copy = token.identity();
+    match token_copy {
+        Token::Int { value } => assert(value == 9),
+    }
+}

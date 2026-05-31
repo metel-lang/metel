@@ -305,6 +305,9 @@ mod tests {
     fn local_struct_scope() { check("structs/46_local_struct_scope.mtl"); }
 
     #[test]
+    fn self_method_signatures() { check("structs/48_self_method_signatures.mtl"); }
+
+    #[test]
     fn neg_missing_field() { check("structs/neg_12_missing_field.mtl"); }
 
     // ── Enums ─────────────────────────────────────────────────────────────────

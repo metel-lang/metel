@@ -6,7 +6,11 @@ use crate::typeinference::{
     TypeVarGenerator, VariantInfo,
 };
 
-use super::conversions::{type_expr_to_infer, type_expr_to_infer_with_generics};
+use super::conversions::{
+    type_expr_to_infer,
+    type_expr_to_infer_with_generics,
+    type_expr_to_infer_with_self,
+};
 
 fn dbg_scheme(t: TypeVar) -> TypeScheme {
     TypeScheme {
@@ -182,14 +186,14 @@ fn register_impl_methods<'a>(
             let pt = if p.name == "self" {
                 InferType::Named(target_name.to_string(), vec![])
             } else if let Some(ann) = &p.type_ann {
-                type_expr_to_infer(ann)
+                type_expr_to_infer_with_self(ann, target_name)
             } else {
                 InferType::Var(gen.fresh())
             };
             param_types.push(pt);
         }
         let ret_ty = method.return_type.as_ref()
-            .map(type_expr_to_infer)
+            .map(|ann| type_expr_to_infer_with_self(ann, target_name))
             .unwrap_or_else(InferType::unit);
         registry.register_method(
             target_name.to_string(),
@@ -268,4 +272,3 @@ pub(super) fn populate_std_schemes(map: &mut HashMap<String, TypeScheme>, gen: &
     map.insert("assert".into(),        mono(vec![bool_ty.clone()], unit_ty.clone()));
     map.insert("assert_msg".into(),    mono(vec![bool_ty, str_ty], unit_ty));
 }
-

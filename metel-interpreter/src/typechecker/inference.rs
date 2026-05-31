@@ -6,7 +6,12 @@ use crate::typeinference::*;
 use crate::types::Type;
 
 use super::FunGeneralization;
-use super::conversions::{type_expr_to_infer, type_expr_to_infer_with_generics};
+use super::conversions::{
+    type_expr_to_infer,
+    type_expr_to_infer_with_generics,
+    type_expr_to_infer_with_generics_and_self,
+    type_expr_to_infer_with_self,
+};
 
 /// Resolve a type annotation, substituting any name that matches the current
 /// function's generic type params with the corresponding TypeVar rather than
@@ -198,9 +203,9 @@ fn infer_impl_method(
 
     let te_to_infer = |te: &TypeExpr| -> InferType {
         if generic_map.is_empty() {
-            type_expr_to_infer(te)
+            type_expr_to_infer_with_self(te, target_name)
         } else {
-            type_expr_to_infer_with_generics(te, &generic_map)
+            type_expr_to_infer_with_generics_and_self(te, &generic_map, target_name)
         }
     };
 

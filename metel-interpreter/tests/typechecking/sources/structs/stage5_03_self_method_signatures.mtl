@@ -1,0 +1,32 @@
+// Stage 5: `Self` should resolve in ordinary struct and enum method signatures.
+
+struct Point {
+    x: Int,
+}
+
+impl Point {
+    fun clone(self) -> Self {
+        self
+    }
+
+    fun same_as(self, other: Self) -> Bool {
+        self.x == other.x
+    }
+}
+
+enum Token {
+    Int { value: Int },
+}
+
+impl Token {
+    fun identity(self) -> Self {
+        self
+    }
+}
+
+let p = Point { x: 1 };
+let q: Point = p.clone();
+let same: Bool = p.same_as(q);
+
+let token = Token::Int { value: 7 };
+let token_copy: Token = token.identity();
