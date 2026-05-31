@@ -33,12 +33,6 @@ root      self      std       struct    super     true      where
 while
 ```
 
-The following identifiers are reserved and may not be used as names. They are not currently used as syntax:
-
-```
-mod   use
-```
-
 ## Literals
 
 **Integers** — decimal, with optional `_` separators:

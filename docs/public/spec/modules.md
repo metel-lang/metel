@@ -2,12 +2,14 @@
 
 ## Files and Modules
 
+> **Availability:** Since v0.5.0.
+
 Every `.mln` source file is a module. There is no `mod` declaration — the module graph is built entirely from `import` declarations.
 
 The root file passed to the toolchain is the root module:
 
 ```bash
-metel run src/main.mln
+metel src/main.mln
 ```
 
 In that example, `root::` refers to `src/main.mln`.
@@ -54,7 +56,7 @@ Path roots are:
 | Root | Meaning |
 |---|---|
 | `root::` | The selected root module for the current program |
-| `std::` | The bundled standard library root — no std modules are available in v0.6.0 |
+| `std::` | The bundled standard library root; `std::core` is always available |
 | `self::` | The current module |
 | `super::` | The parent module; invalid from the root module |
 | imported module handle | A module brought into scope by `import path::module;` |
@@ -62,7 +64,18 @@ Path roots are:
 Fully-qualified paths are valid anywhere a name is expected:
 
 ```metel
-let token: root::parser::Token = root::parser::Token::new();
+// src/main.mln
+import root::parser::Token;
+
+fun main() -> Int {
+    let token: root::parser::Token = root::parser::Token { value: 42 };
+    return token.value;
+}
+
+// src/parser.mln
+pub struct Token {
+    value: Int,
+}
 ```
 
 ## Imports
@@ -70,10 +83,30 @@ let token: root::parser::Token = root::parser::Token::new();
 `import` loads the referenced module file and declares which names from it are in scope for the current module:
 
 ```metel
-import parser::{Ast, Token};       // loads parser.mln; Ast and Token are in scope
-import root::lexer::Token as Tok;  // absolute path with alias
-import parser::*;                  // glob — all public names from parser.mln
-import std::math;                  // loads std/math; math is a module handle (v0.6.0+)
+// src/main.mln
+import parser::{Ast, Token};
+import root::lexer::Token as Tok;
+import parser::*;
+import std::core;
+
+fun main() -> Int {
+    let ast = Ast { token: Token { value: 1 } };
+    let tok: Tok = core::dbg(Token { value: 2 });
+    return ast.token.value + tok.value + parse(ast.token);
+}
+
+// src/parser.mln
+export ast::Ast;
+export ast::parse;
+export lexer::Token;
+
+// src/parser/ast.mln
+import super::lexer::Token;
+pub struct Ast { token: Token }
+pub fun parse(token: Token) -> Int { token.value }
+
+// src/lexer.mln
+pub struct Token { value: Int }
 ```
 
 Import forms:
@@ -96,6 +129,10 @@ Import forms:
 export ast::Ast;
 export lexer::{Token, Span};
 export ast::ParseError as Error;
+
+fun main() -> Int {
+    return 0;
+}
 ```
 
 `export` and `import` share the same path and tree syntax. Re-exported names are indistinguishable from names defined directly in the re-exporting module.
@@ -111,19 +148,28 @@ export ast::ParseError as Error;
 
 ## std::core Auto-Import
 
+> **Availability:** Since v0.6.1.
+
 Every module automatically has `std::core` glob-imported at the lowest priority tier. This means `Perhaps`, `Result`, `Display`, `Iterable`, `From`, and all built-in functions are available in every module without any explicit import statement.
 
 ```metel
 // No import needed — Perhaps and Result are always in scope
 fun maybe_parse(s: String) -> Perhaps<Int> {
-    if (s == "1") { Perhaps::Some { value: 1 } }
-    else { None }
+    if (s == "1") { return Perhaps::Some { value: 1 }; }
+    return None;
+}
+
+fun main() -> Int {
+    match maybe_parse("1") {
+        Perhaps::Some { value } => value,
+        Perhaps::None => 0,
+    }
 }
 ```
 
 You can still write `import std::core::Perhaps;` or `import std::core::*;` explicitly — the result is the same. If a local declaration or explicit import shadows a `std::core` name, the local binding wins silently.
 
-`std::core` is currently a **virtual module** — it has no physical `.mln` file and cannot be listed or enumerated. Its contents are seeded by the runtime.
+`std::core` is a **virtual module** — it has no physical `.mln` file and cannot be listed or enumerated. Its contents are seeded by the runtime.
 
 ## Import Conflicts
 
@@ -147,14 +193,21 @@ Conflict rules:
 Declarations are module-private by default. A declaration is accessible from outside its module only if it is annotated with `pub`.
 
 ```metel
-pub struct Token { kind: TokenKind, span: Span }
+pub struct Token { kind: Int, span: Int }
 struct InternalState { count: Int }
 
-pub fun parse(tokens: Token[]) -> Ast { ... }
-fun helper(token: Token) -> Bool { ... }
+pub fun parse(tokens: Token[]) -> Int { return array_len(tokens); }
+fun helper(token: Token) -> Bool { return token.kind == 0; }
+
+fun main() -> Int {
+    let token = Token { kind: 0, span: 1 };
+    let state = InternalState { count: 2 };
+    if (helper(token)) { return parse([token]) + state.count; }
+    return 0;
+}
 ```
 
-`pub` is valid on `struct`, `enum`, `fun`, `linear struct`, `linear enum`, `aspect`, and top-level `let`/`mut` bindings.
+`pub` is valid on `struct`, `enum`, `fun`, `aspect`, and top-level `let`/`mut` bindings.
 
 Fields of a `pub struct` are public. Fields of a private struct are private because the struct itself is not externally nameable.
 

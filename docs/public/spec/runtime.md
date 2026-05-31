@@ -12,34 +12,20 @@ Panics are triggered by:
 
 ## Built-in Functions
 
-> **Note.** Built-in functions are part of `std::core`, which is auto-imported into every module. They will eventually migrate into dedicated stdlib modules (`std::io`, `std::string`, `std::array`, etc.) when those are implemented. The global form is provided by `std::core` auto-import — do not design new features that require builtins to remain globals.
-
 These are available in every module without any `import` declaration (provided by `std::core` auto-import):
 
 | Name              | Signature                            | Description                              |
 |-------------------|--------------------------------------|------------------------------------------|
-| `print`           | `<T: Display>(v: T)`                 | Print to stdout, no newline              |
-| `println`         | `<T: Display>(v: T)`                 | Print to stdout with newline             |
+| `print`           | `<T>(v: T)`                          | Print to stdout, no newline              |
+| `println`         | `<T>(v: T)`                          | Print to stdout with newline             |
 | `string_len`      | `(s: String) -> Int`                 | Number of characters in a string        |
-| `string_concat`   | `(a: String, b: String) -> String`   | Concatenate two strings (also via `+`)  |
+| `string_concat`   | `(a: String, b: String) -> String`   | Concatenate two strings                 |
 | `array_push`      | `(arr: T[], value: T)`               | Append a value (mutates the array)      |
 | `array_len`       | `(arr: T[]) -> Int`                  | Number of elements in an array          |
 | `clock`           | `() -> Int`                          | Unix timestamp in milliseconds          |
 | `assert`          | `(cond: Bool)`                       | Panic with `"assertion failed"` if `cond` is `false` |
 | `assert_msg`      | `(cond: Bool, msg: String)`          | Panic with `msg` if `cond` is `false`   |
 | `dbg`             | `<T>(v: T) -> T`                     | Print `[dbg] <value>` to stderr and return the value unchanged |
-
-**Deprecated in v0.4.0** (use `.to_string()` and `print`/`println` instead):
-
-| Name              | Replacement                           |
-|-------------------|---------------------------------------|
-| `print_int`       | `print(n)` (polymorphic via Display)  |
-| `println_int`     | `println(n)`                          |
-| `print_float`     | `print(f)`                            |
-| `println_float`   | `println(f)`                          |
-| `int_to_string`   | `n.to_string()`                       |
-| `float_to_string` | `f.to_string()`                       |
-| `bool_to_string`  | `b.to_string()`                       |
 
 ## Built-in Aspects
 

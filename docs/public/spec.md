@@ -1,8 +1,8 @@
 ---
-id: doc-2
+id: spec
 title: "Metel Language Specification"
 type: spec
-version: v0.2
+version: v0.6.4
 created_date: '2026-05-16'
 ---
 
@@ -15,7 +15,8 @@ Source files use the \`.mln\` extension.
 
 ## Overview
 
-Metel is a statically typed, expression-oriented language with a Rust-inspired syntax that runs in two first-class execution modes: a production-quality interpreter and a native compiler. The same source file runs in both. Neither mode is a prototype or a stepping stone — both are permanent, supported, and maintained to the same standard.
+Metel is a statically typed, expression-oriented language with a Rust-inspired syntax.
+This specification describes the language accepted by the current interpreter.
 
 The language's core design principles are:
 
@@ -25,18 +26,6 @@ The language's core design principles are:
 - **Explicit nullability** — absence of a value is represented by `Perhaps<T>`, never by null
 - **Explicit error handling** — errors are values, represented as `Result<T, E>`
 - **Safe memory by default** — reference counting, no ownership semantics required
-- **Opt-in memory control** — linear types for deterministic, zero-overhead allocation in the compiler; static resource safety in the interpreter
-
-### Execution modes
-
-| Mode | Use case | Memory model |
-|---|---|---|
-| **Interpreter** | Scripting, embedding, rapid iteration, REPL | RC runtime; linear types enforced statically |
-| **Compiler** | Production, performance-critical code, native binaries | Linear types enforced statically + zero-cost at runtime |
-
-The type checker — including the linear type system — runs identically in both modes. Observable behaviour is identical. Performance characteristics differ: the compiler eliminates RC overhead for linear values; the interpreter does not.
-
-See `docs/internal/vision.md` for the full design rationale and competitive positioning.
 
 ---
 
@@ -53,4 +42,4 @@ See `docs/internal/vision.md` for the full design rationale and competitive posi
 | [Runtime](spec/runtime.md) | Panics, built-in functions |
 | [Grammar](spec/grammar.md) | Formal grammar |
 
-See [Changelog](../changelog.md) for version history.
+See [Changelog](changelog.md) for version history.
