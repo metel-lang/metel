@@ -109,12 +109,14 @@ Create a new RFC and register it in Plane. RFC content lives in Plane pages; the
 
 ## Lifecycle
 
-| Stage | Action |
-|---|---|
-| **Draft** | Content in Plane page. Work item RFC Status = `draft`. |
-| **Accepted** | Update RFC Status = `accepted`. Assign to a Plane milestone for the target version. Update the Decision section in the Plane page. |
-| **Incorporated** | Spec updated. Commit the RFC as a file to `docs/internal/rfcs/rfc-NNNN-<slug>.md` with minimal frontmatter (`id`, `title`, `date` only). Set RFC Status = `incorporated`, Spec Status = `done`, Doc Path = the repo file path. |
-| **Superseded** | Set RFC Status = `superseded`. Add a note to the Plane page pointing to the superseding RFC. Create the superseding RFC as a new work item + page. |
+| Stage | RFC Status | Action |
+|---|---|---|
+| **Draft** | `draft` | Content in Plane page. |
+| **Accepted** | `accepted` | Assign to a Plane milestone. Update Decision section in the page. |
+| **Incorporated** | `incorporated` | Spec updated. Commit the RFC file to `docs/internal/rfcs/rfc-NNNN-<slug>.md`. Set Doc Path property. |
+| **Implemented** | `implemented` | Feature working in the interpreter. |
+| **Superseded** | `superseded` | Add a note to the page pointing to the superseding RFC. Create the new RFC as a separate work item + page. |
+| **Deferred** | `deferred` | No action planned yet. |
 
 ## Incorporated RFC file template
 
@@ -148,6 +150,5 @@ date: '<YYYY-MM-DD>'
 ## Notes
 - **No `status:`, `spec_status:`, or `target:` fields in the repo file** — lifecycle is tracked in Plane only.
 - The RFC must be accepted and the relevant `docs/public/spec/` file updated before implementation begins.
-- Milestones (not the Target Version property) track which release an RFC is scoped to.
-- Spec Status options: `pending`, `done`.
-- RFC Status options: `draft`, `accepted`, `incorporated`, `superseded`, `deferred`.
+- Milestones (not a Target Version property) track which release an RFC is scoped to.
+- RFC Status options: `draft`, `accepted`, `incorporated`, `implemented`, `superseded`, `deferred`.
