@@ -12,10 +12,7 @@
 
 use std::collections::HashSet;
 
-use crate::ast::{
-    Block, Decl, Expr, ForInit, FunDecl, ImplBlock, Literal, MatchArm, MatchExpr, MutDecl,
-    Pattern, ReturnStmt, Span, Stmt,
-};
+use crate::ast::{Block, Decl, Expr, ForInit, FunDecl, ImplBlock, MatchArm, MutDecl, Stmt};
 use crate::error::MetelError;
 use crate::module_loader::{LoadedModule, ModuleGraph};
 use crate::name_resolver::{ModuleScope, ResolvedNames};
@@ -45,7 +42,6 @@ pub fn normalize(
         .collect();
 
     for loaded in &mut graph.modules {
-        desugar_propagate_error(&mut loaded.program.decls); // ADR-0030: must run before inference
         let scope = names.scopes.get(&loaded.module_path);
         normalize_program_decls(&mut loaded.program.decls, scope, &module_names)?;
     }
@@ -226,9 +222,7 @@ fn normalize_expr(
             for (_, v) in fields { normalize_expr(v, scope, module_names)?; }
             Ok(())
         }
-        Expr::PropagateError { .. } => {
-            unreachable!("PropagateError must be desugared before normalize_expr")
-        }
+        Expr::PropagateError { expr, .. } => normalize_expr(expr, scope, module_names),
     }
 }
 
@@ -341,160 +335,3 @@ fn try_normalize_struct_path(
 
 // ── Desugar ? operator ────────────────────────────────────────────────────────
 //
-// Replaces every `Expr::PropagateError { expr, span }` with a match expression:
-//   match expr { Result::Ok { value } => value, Result::Err { error } => return Result::Err { error: error } }
-//
-// This runs before typechecking (inside `normalize()` and inside `typechecker::check()`).
-// From coercion via ? is deferred to #13; the Err arm emits plain `error` with no From::from call.
-
-pub fn desugar_propagate_error(decls: &mut Vec<Decl>) {
-    for decl in decls {
-        desugar_decl(decl);
-    }
-}
-
-fn desugar_decl(decl: &mut Decl) {
-    match decl {
-        Decl::Let(ld)  => desugar_expr(&mut ld.value),
-        Decl::Mut(md)  => desugar_expr(&mut md.value),
-        Decl::Fun(fd)  => desugar_block(&mut fd.body),
-        Decl::Impl(ib) => {
-            for method in &mut ib.methods { desugar_block(&mut method.body); }
-        }
-        Decl::Stmt(s)  => desugar_stmt(s),
-        Decl::Struct(_) | Decl::Enum(_) | Decl::Aspect(_) => {}
-    }
-}
-
-fn desugar_block(block: &mut Block) {
-    for decl in &mut block.stmts { desugar_decl(decl); }
-    if let Some(tail) = &mut block.tail { desugar_expr(tail); }
-}
-
-fn desugar_stmt(stmt: &mut Stmt) {
-    match stmt {
-        Stmt::Expr(e)   => desugar_expr(e),
-        Stmt::Return(r) => { if let Some(v) = &mut r.value { desugar_expr(v); } }
-        Stmt::Break(b)  => { if let Some(v) = &mut b.value { desugar_expr(v); } }
-        Stmt::Continue(_) => {}
-        Stmt::While(w) => {
-            desugar_expr(&mut w.condition);
-            desugar_block(&mut w.body);
-        }
-        Stmt::For(f) => {
-            if let Some(init) = &mut f.init {
-                match init {
-                    ForInit::Expr(e) => desugar_expr(e),
-                    ForInit::Mut(md) => desugar_expr(&mut md.value),
-                }
-            }
-            if let Some(cond) = &mut f.condition { desugar_expr(cond); }
-            if let Some(step) = &mut f.step      { desugar_expr(step); }
-            desugar_block(&mut f.body);
-        }
-        Stmt::ForIn(fi) => {
-            desugar_expr(&mut fi.iterable);
-            desugar_block(&mut fi.body);
-        }
-    }
-}
-
-fn desugar_expr(expr: &mut Expr) {
-    // Recurse into children first (bottom-up), then replace.
-    match expr {
-        Expr::Literal(_, _) | Expr::Ident(_, _) | Expr::Path(_, _)
-        | Expr::ResolvedPath { .. } => {}
-        Expr::Tuple(elems, _) | Expr::Array(elems, _) => {
-            for e in elems { desugar_expr(e); }
-        }
-        Expr::BinOp(lhs, _, rhs, _) => { desugar_expr(lhs); desugar_expr(rhs); }
-        Expr::UnaryOp(_, operand, _) => desugar_expr(operand),
-        Expr::Cast { expr: inner, .. } | Expr::Ascribe { expr: inner, .. } => desugar_expr(inner),
-        Expr::Assign { value, .. } => desugar_expr(value),
-        Expr::Call { callee, args, .. } => {
-            desugar_expr(callee);
-            for a in args { desugar_expr(a); }
-        }
-        Expr::MethodCall { receiver, args, .. } => {
-            desugar_expr(receiver);
-            for a in args { desugar_expr(a); }
-        }
-        Expr::FieldAccess { object, .. } | Expr::TupleAccess { object, .. } => desugar_expr(object),
-        Expr::Index { object, index, .. } => { desugar_expr(object); desugar_expr(index); }
-        Expr::If { condition, then_branch, else_branch, .. } => {
-            desugar_expr(condition);
-            desugar_block(then_branch);
-            if let Some(eb) = else_branch { desugar_block(eb); }
-        }
-        Expr::Loop { body, .. } | Expr::Closure { body, .. } => desugar_block(body),
-        Expr::Match(m) => {
-            desugar_expr(&mut m.scrutinee);
-            for arm in &mut m.arms {
-                if let Some(guard) = &mut arm.guard { desugar_expr(guard); }
-                desugar_block(&mut arm.body);
-            }
-        }
-        Expr::StructLiteral { fields, .. } => {
-            for (_, v) in fields { desugar_expr(v); }
-        }
-        Expr::PropagateError { expr: inner, .. } => {
-            desugar_expr(inner);
-        }
-    }
-
-    if let Expr::PropagateError { .. } = expr {
-        let owned = std::mem::replace(expr, Expr::Literal(Literal::Unit, Span::new(0, 0, "")));
-        if let Expr::PropagateError { expr: inner, span } = owned {
-            *expr = make_question_mark_match(*inner, span);
-        }
-    }
-}
-
-fn make_question_mark_match(scrutinee: Expr, span: Span) -> Expr {
-    let ok_arm = MatchArm {
-        pattern: Pattern::EnumVariant {
-            path:   vec!["Result".to_string(), "Ok".to_string()],
-            fields: vec!["value".to_string()],
-            span:   span.clone(),
-        },
-        guard: None,
-        body: Block {
-            stmts: vec![],
-            tail:  Some(Box::new(Expr::Ident("value".to_string(), span.clone()))),
-            span:  span.clone(),
-        },
-        span: span.clone(),
-    };
-
-    let err_arm = MatchArm {
-        pattern: Pattern::EnumVariant {
-            path:   vec!["Result".to_string(), "Err".to_string()],
-            fields: vec!["error".to_string()],
-            span:   span.clone(),
-        },
-        guard: None,
-        body: Block {
-            stmts: vec![Decl::Stmt(Box::new(Stmt::Return(ReturnStmt {
-                value: Some(Expr::StructLiteral {
-                    path:   vec!["Result".to_string(), "Err".to_string()],
-                    fields: vec![("error".to_string(), Expr::Ident("error".to_string(), span.clone()))],
-                    span:   span.clone(),
-                }),
-                span: span.clone(),
-            })))],
-            tail: None,
-            span: span.clone(),
-        },
-        span: span.clone(),
-    };
-
-    Expr::Match(MatchExpr {
-        scrutinee: Box::new(scrutinee),
-        arms: vec![ok_arm, err_arm],
-        span,
-    })
-}
-
-// ── Unused span helper ────────────────────────────────────────────────────────
-#[allow(dead_code)]
-fn dummy_span() -> Span { Span::new(0, 0, "") }

@@ -4,7 +4,7 @@ use crate::ast::{Decl, Program, Visibility};
 use crate::error::MetelError;
 use crate::module_loader::LoadedModule;
 use crate::name_resolver::{GlobTier, ResolvedNames};
-use crate::path_normalizer::{desugar_propagate_error, NormalizedModuleGraph};
+use crate::path_normalizer::NormalizedModuleGraph;
 use crate::error::TypeErrorCode;
 use crate::typed_ast::{TypedDecl, TypedModule, TypedModuleGraph, TypedProgram};
 use crate::typeinference::*;
@@ -412,8 +412,7 @@ fn filter_pub_schemes(
 }
 
 /// Run the type checker over an untyped AST, producing a fully typed AST.
-pub fn check(mut program: Program) -> Result<TypedProgram, MetelError> {
-    desugar_propagate_error(&mut program.decls);
+pub fn check(program: Program) -> Result<TypedProgram, MetelError> {
     let (decls, _, _) = check_impl(&program, &HashMap::new(), &TypeDefinitionRegistry::new(), &StdPrelude::default())?;
     Ok(decls)
 }

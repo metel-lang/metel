@@ -99,6 +99,37 @@ mod tests {
     #[test]
     fn stage1_neg_ordering_on_bool() { check("arithmetic/neg_05_ordering_on_bool.mtl"); }
 
+    #[test]
+    fn stage1_neg_string_add_mismatch() { check("arithmetic/neg_06_string_add_mismatch.mtl"); }
+
+    #[test]
+    fn question_mark_reports_the_postfix_column() {
+        let source = r#"
+struct ParseError { msg: String }
+struct AppError { msg: String }
+
+fun parse() -> Result<Int, ParseError> {
+    Result::Err { error: ParseError { msg: "bad" } }
+}
+
+fun load() -> Result<Int, AppError> {
+    let value = parse()?;
+    Result::Ok { value: value }
+}
+"#;
+        let program = parser::parse(source, "qmark_span.mtl")
+            .unwrap_or_else(|e| panic!("parse error: {e}"));
+        match typechecker::check(program) {
+            Err(MetelError::TypeError { code, line, col, .. }) => {
+                assert_eq!(format!("{code}"), "T0007");
+                assert_eq!(line, 10);
+                assert_eq!(col, 24);
+            }
+            Err(other) => panic!("expected TypeError, got: {other}"),
+            Ok(_) => panic!("expected type error for missing From impl"),
+        }
+    }
+
     // ── Functions ─────────────────────────────────────────────────────────────
 
     #[test]

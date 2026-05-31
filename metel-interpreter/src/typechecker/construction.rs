@@ -701,8 +701,8 @@ fn construct_expr(
             })
         }
         Expr::Match(m) => construct_match(m, expected_ty, ctx),
-        Expr::PropagateError { .. } => {
-            unreachable!("PropagateError must be desugared before construction")
+        Expr::PropagateError { expr, span } => {
+            construct_propagate_error(expr, span, ctx)
         }
         Expr::Ascribe { expr, ann, span } => {
             let ty = resolved_to_type(&type_expr_to_infer(ann), ctx.subst, span)?;
@@ -1220,7 +1220,18 @@ fn construct_binop(
     let lhs = construct_expr(lhs, None, ctx)?;
     let rhs = construct_expr(rhs, None, ctx)?;
     let ty = match op {
-        BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => {
+        BinOp::Add => {
+            let t = lhs.ty();
+            if !matches!(t, Type::Int | Type::Float | Type::Str | Type::Never) {
+                return Err(MetelError::type_error(
+                    TypeErrorCode::T0005,
+                    format!("`+` requires Int, Float, or String operands, got `{t}`"),
+                    span,
+                ));
+            }
+            t.clone()
+        }
+        BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => {
             let t = lhs.ty();
             if !matches!(t, Type::Int | Type::Float | Type::Never) {
                 return Err(MetelError::type_error(
@@ -1247,6 +1258,127 @@ fn construct_binop(
         BinOp::Range | BinOp::RangeInclusive => Type::Named("Range".to_string(), vec![Type::Int]),
     };
     Ok(TypedExpr::BinOp(Box::new(lhs), op.clone(), Box::new(rhs), ty, span.clone()))
+}
+
+fn type_to_type_expr(ty: &Type) -> TypeExpr {
+    match ty {
+        Type::Int => TypeExpr::Named("Int".to_string(), vec![]),
+        Type::Float => TypeExpr::Named("Float".to_string(), vec![]),
+        Type::Bool => TypeExpr::Named("Bool".to_string(), vec![]),
+        Type::Str => TypeExpr::Named("String".to_string(), vec![]),
+        Type::Unit => TypeExpr::Unit,
+        Type::Never => TypeExpr::Named("!".to_string(), vec![]),
+        Type::Tuple(items) => TypeExpr::Tuple(items.iter().map(type_to_type_expr).collect()),
+        Type::Array(item) => TypeExpr::Array(Box::new(type_to_type_expr(item))),
+        Type::Fun(params, ret) => TypeExpr::Fun(
+            params.iter().map(type_to_type_expr).collect(),
+            Some(Box::new(type_to_type_expr(ret))),
+        ),
+        Type::Named(name, args) => {
+            TypeExpr::Named(name.clone(), args.iter().map(type_to_type_expr).collect())
+        }
+    }
+}
+
+fn construct_propagate_error(
+    expr: &Expr,
+    span: &Span,
+    ctx: &mut ConstructCtx,
+) -> Result<TypedExpr, MetelError> {
+    let scrutinee = construct_expr(expr, None, ctx)?;
+    let (ok_ty, source_err_ty) = match scrutinee.ty() {
+        Type::Named(name, args) if name == "Result" && args.len() == 2 => {
+            (args[0].clone(), args[1].clone())
+        }
+        other => {
+            return Err(MetelError::type_error(
+                TypeErrorCode::T0005,
+                format!("`?` requires a Result<T, E> expression, got `{other}`"),
+                span,
+            ));
+        }
+    };
+
+    let return_ty = ctx.current_return_ty.clone().ok_or_else(|| {
+        MetelError::type_error(
+            TypeErrorCode::T0005,
+            "`?` can only be used inside a function or closure that returns Result<T, E>",
+            span,
+        )
+    })?;
+    let target_err_ty = match &return_ty {
+        Type::Named(name, args) if name == "Result" && args.len() == 2 => args[1].clone(),
+        other => {
+            return Err(MetelError::type_error(
+                TypeErrorCode::T0005,
+                format!("`?` requires the enclosing function to return Result<T, E>, got `{other}`"),
+                span,
+            ));
+        }
+    };
+
+    let ok_arm = TypedMatchArm {
+        pattern: Pattern::EnumVariant {
+            path: vec!["Result".to_string(), "Ok".to_string()],
+            fields: vec!["value".to_string()],
+            span: span.clone(),
+        },
+        guard: None,
+        body: TypedBlock {
+            stmts: vec![],
+            tail: Some(Box::new(TypedExpr::Ident(
+                "value".to_string(),
+                ok_ty.clone(),
+                span.clone(),
+            ))),
+            span: span.clone(),
+        },
+        span: span.clone(),
+    };
+
+    let err_value = if source_err_ty == target_err_ty {
+        TypedExpr::Ident("error".to_string(), source_err_ty, span.clone())
+    } else {
+        TypedExpr::Cast {
+            expr: Box::new(TypedExpr::Ident(
+                "error".to_string(),
+                source_err_ty,
+                span.clone(),
+            )),
+            target_type: type_to_type_expr(&target_err_ty),
+            ty: target_err_ty,
+            span: span.clone(),
+        }
+    };
+    let err_arm = TypedMatchArm {
+        pattern: Pattern::EnumVariant {
+            path: vec!["Result".to_string(), "Err".to_string()],
+            fields: vec!["error".to_string()],
+            span: span.clone(),
+        },
+        guard: None,
+        body: TypedBlock {
+            stmts: vec![TypedDecl::Stmt(Box::new(TypedStmt::Return(TypedReturnStmt {
+                value: Some(TypedExpr::StructLiteral {
+                    path: vec!["Result".to_string(), "Err".to_string()],
+                    fields: vec![("error".to_string(), err_value)],
+                    ty: return_ty,
+                    span: span.clone(),
+                }),
+                span: span.clone(),
+            })))],
+            tail: None,
+            span: span.clone(),
+        },
+        span: span.clone(),
+    };
+
+    Ok(TypedExpr::Match(TypedMatchExpr {
+        scrutinee: Box::new(scrutinee),
+        arms: vec![ok_arm, err_arm],
+        expr_type: ok_ty,
+        span: span.clone(),
+    }))
 }
 
 fn construct_unaryop(

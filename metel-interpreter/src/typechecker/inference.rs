@@ -667,8 +667,8 @@ fn infer_expr(
             Ok(InferType::Fun(param_types, Box::new(ret_ty)))
         }
         Expr::Match(m) => infer_match(m, ctx, fun_generalizations),
-        Expr::PropagateError { .. } => {
-            unreachable!("PropagateError must be desugared before type inference")
+        Expr::PropagateError { expr, span } => {
+            infer_propagate_error(expr, span, ctx, fun_generalizations)
         }
     }
 }
@@ -783,7 +783,40 @@ fn infer_binop(
     let lhs_ty = infer_expr(lhs, ctx, fun_generalizations)?;
     let rhs_ty = infer_expr(rhs, ctx, fun_generalizations)?;
     match op {
-        BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => {
+        BinOp::Add => {
+            let subst = ctx.solve()?;
+            let lhs_resolved = subst.apply(&lhs_ty);
+            let rhs_resolved = subst.apply(&rhs_ty);
+            if matches!(lhs_resolved, InferType::Concrete(Type::Str))
+                || matches!(rhs_resolved, InferType::Concrete(Type::Str))
+            {
+                match (&lhs_resolved, &rhs_resolved) {
+                    (InferType::Concrete(Type::Str), InferType::Concrete(Type::Str)) => {
+                        return Ok(InferType::str());
+                    }
+                    (InferType::Concrete(Type::Str), InferType::Var(_))
+                    | (InferType::Var(_), InferType::Concrete(Type::Str)) => {
+                        ctx.add_constraint(lhs_ty, InferType::str(), span.clone());
+                        ctx.add_constraint(rhs_ty, InferType::str(), span.clone());
+                        return Ok(InferType::str());
+                    }
+                    _ => {
+                        return Err(MetelError::type_error(
+                            TypeErrorCode::T0005,
+                            format!(
+                                "`+` requires Int, Float, or String operands, got `{lhs_resolved}` and `{rhs_resolved}`"
+                            ),
+                            span,
+                        ));
+                    }
+                }
+            }
+            let result = ctx.fresh_var();
+            ctx.add_constraint(lhs_ty, result.clone(), span.clone());
+            ctx.add_constraint(rhs_ty, result.clone(), span.clone());
+            Ok(result)
+        }
+        BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => {
             let result = ctx.fresh_var();
             ctx.add_constraint(lhs_ty, result.clone(), span.clone());
             ctx.add_constraint(rhs_ty, result.clone(), span.clone());
@@ -804,6 +837,65 @@ fn infer_binop(
             Ok(InferType::Named("Range".to_string(), vec![InferType::int()]))
         }
     }
+}
+
+fn infer_propagate_error(
+    expr: &Expr,
+    span: &Span,
+    ctx: &mut InferContext,
+    fun_generalizations: &mut Vec<FunGeneralization>,
+) -> Result<InferType, MetelError> {
+    let ok_ty = ctx.fresh_var();
+    let source_err_ty = ctx.fresh_var();
+    let inner_ty = infer_expr(expr, ctx, fun_generalizations)?;
+    ctx.add_constraint(
+        inner_ty,
+        InferType::Named(
+            "Result".to_string(),
+            vec![ok_ty.clone(), source_err_ty.clone()],
+        ),
+        span.clone(),
+    );
+
+    let expected_return = ctx.current_return_type().cloned().ok_or_else(|| {
+        MetelError::type_error(
+            TypeErrorCode::T0005,
+            "`?` can only be used inside a function or closure that returns Result<T, E>",
+            span,
+        )
+    })?;
+
+    let target_ok_ty = ctx.fresh_var();
+    let target_err_ty = ctx.fresh_var();
+    ctx.add_constraint(
+        expected_return,
+        InferType::Named(
+            "Result".to_string(),
+            vec![target_ok_ty, target_err_ty.clone()],
+        ),
+        span.clone(),
+    );
+
+    let subst = ctx.solve()?;
+    let source_resolved = subst.apply(&source_err_ty);
+    let target_resolved = subst.apply(&target_err_ty);
+    if source_resolved != target_resolved {
+        let source_concrete = infer_to_type_for_from(&source_resolved);
+        let target_name = infer_type_name(&target_resolved);
+        if let (Some(src_t), Some(tgt)) = (source_concrete.as_ref(), target_name) {
+            if !ctx.has_from_impl(tgt, src_t) {
+                return Err(MetelError::type_error(
+                    TypeErrorCode::T0007,
+                    format!(
+                        "cannot propagate `{source_resolved}` as `{target_resolved}` — no `impl From<{source_resolved}> for {target_resolved}` found"
+                    ),
+                    span,
+                ));
+            }
+        }
+    }
+
+    Ok(ok_ty)
 }
 
 fn infer_unaryop(

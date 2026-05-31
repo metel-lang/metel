@@ -1,5 +1,4 @@
 // `?` operator with From coercion: E1 != E2.
-// Cross-type ? is deferred to #13; explicit match + `as` cast is used instead.
 
 aspect From<T> {
     fun from(value: T) -> Self;
@@ -27,11 +26,7 @@ fun parse_int(s: String) -> Result<Int, ParseError> {
 }
 
 fun load(s: String) -> Result<Int, AppError> {
-    // Cross-type ? deferred to #13; use explicit match + as-cast.
-    let n = match parse_int(s) {
-        Result::Ok { value } => value,
-        Result::Err { error } => return Result::Err { error: error as AppError },
-    };
+    let n = parse_int(s)?;
     return Result::Ok { value: n * 2 };
 }
 
