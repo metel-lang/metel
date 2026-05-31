@@ -1,0 +1,10 @@
+// Stage 8 negative: interpolation requires Display via .to_string().
+
+struct Point {
+    x: Int,
+}
+
+fun main() {
+    let point = Point { x: 1 };
+    let msg = "point=${point}"; // ERROR[T0003]
+}

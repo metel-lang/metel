@@ -585,13 +585,445 @@ fn parse_literal_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resu
                 line: span.line, col: span.col, source_line: None,
             })?
         ),
-        Rule::string_lit => Literal::Str(unescape(&text[1..text.len()-1])),
+        Rule::string_lit => return parse_string_literal_expr(text, span, filename),
         Rule::bool_lit   => Literal::Bool(text == "true"),
         Rule::none_lit   => Literal::None,
         Rule::unit_lit   => Literal::Unit,
         r => return Err(MetelError::internal(format!("parse_literal_expr: unexpected rule {r:?}"))),
     };
     Ok(Expr::Literal(lit, span))
+}
+
+fn parse_string_literal_expr(text: &str, span: Span, filename: &str) -> Result<Expr, MetelError> {
+    let raw = &text[1..text.len() - 1];
+    if !raw.contains("${") && !raw.contains("\\$") {
+        return Ok(Expr::Literal(Literal::Str(unescape(raw)), span));
+    }
+
+    let mut parts: Vec<Expr> = vec![];
+    let mut text_buf = String::new();
+    let mut text_start: Option<usize> = None;
+    let mut i = 0usize;
+    while i < raw.len() {
+        let c = raw[i..].chars().next()
+            .ok_or_else(|| MetelError::internal("string interpolation: invalid char boundary"))?;
+        let next = i + c.len_utf8();
+        if c == '\\' {
+            let escaped = raw[next..].chars().next();
+            let decoded = match escaped {
+                Some('n')  => '\n',
+                Some('t')  => '\t',
+                Some('r')  => '\r',
+                Some('\\') => '\\',
+                Some('"')  => '"',
+                Some('$')  => '$',
+                Some(other) => {
+                    text_buf.push('\\');
+                    text_buf.push(other);
+                    if text_start.is_none() {
+                        text_start = Some(i);
+                    }
+                    i = next + other.len_utf8();
+                    continue;
+                }
+                None => {
+                    text_buf.push('\\');
+                    if text_start.is_none() {
+                        text_start = Some(i);
+                    }
+                    i = next;
+                    continue;
+                }
+            };
+            if text_start.is_none() {
+                text_start = Some(i);
+            }
+            text_buf.push(decoded);
+            i = next + escaped.map(char::len_utf8).unwrap_or(0);
+            continue;
+        }
+
+        if c == '$' && raw[next..].starts_with('{') {
+            if !text_buf.is_empty() {
+                let seg_start = text_start.unwrap_or(i);
+                let seg_span = make_relative_span(&span, raw, seg_start, i);
+                parts.push(Expr::Literal(Literal::Str(std::mem::take(&mut text_buf)), seg_span));
+                text_start = None;
+            }
+
+            let interp_start = i;
+            let expr_start = next + 1;
+            let expr_end = find_interpolation_end(raw, expr_start, &span)?;
+            let expr_span = make_relative_span(&span, raw, expr_start, expr_end);
+            let placeholder_span = make_relative_span(&span, raw, interp_start, expr_end + 1);
+            let mut expr = parse_interpolation_expr(&raw[expr_start..expr_end], &expr_span, filename)?;
+            shift_expr_span(&mut expr, expr_span.start, expr_span.line, expr_span.col);
+            parts.push(Expr::MethodCall {
+                receiver: Box::new(expr),
+                method: "to_string".to_string(),
+                args: vec![],
+                span: placeholder_span,
+            });
+            i = expr_end + 1;
+            continue;
+        }
+
+        if text_start.is_none() {
+            text_start = Some(i);
+        }
+        text_buf.push(c);
+        i = next;
+    }
+
+    if !text_buf.is_empty() {
+        let seg_start = text_start.unwrap_or(raw.len());
+        let seg_span = make_relative_span(&span, raw, seg_start, raw.len());
+        parts.push(Expr::Literal(Literal::Str(text_buf), seg_span));
+    }
+
+    let mut iter = parts.into_iter();
+    let Some(mut expr) = iter.next() else {
+        return Ok(Expr::Literal(Literal::Str(String::new()), span));
+    };
+    for rhs in iter {
+        expr = Expr::BinOp(Box::new(expr), BinOp::Add, Box::new(rhs), span.clone());
+    }
+    Ok(expr)
+}
+
+fn parse_interpolation_expr(source: &str, span: &Span, filename: &str) -> Result<Expr, MetelError> {
+    let source = unescape(source);
+    let mut pairs = MetelParser::parse(Rule::expr, &source).map_err(|e| {
+        let (start, end) = match e.location {
+            pest::error::InputLocation::Pos(p) => (p, p),
+            pest::error::InputLocation::Span((s, e)) => (s, e),
+        };
+        let (line, col) = match &e.line_col {
+            pest::error::LineColLocation::Pos((l, c)) => (*l as u32, *c as u32),
+            pest::error::LineColLocation::Span((l, c), _) => (*l as u32, *c as u32),
+        };
+        let (line, col) = shift_line_col(line, col, span.line, span.col);
+        MetelError::ParseError {
+            code: ParseErrorCode::P0001,
+            message: e.variant.to_string(),
+            start: span.start + start,
+            end: span.start + end,
+            filename: filename.to_string(),
+            line,
+            col,
+            source_line: Some(e.line().to_string()),
+        }
+    })?;
+    let pair = pairs.next()
+        .ok_or_else(|| MetelError::internal("string interpolation: missing expr pair"))?;
+    parse_expr(pair, filename)
+}
+
+fn find_interpolation_end(raw: &str, expr_start: usize, literal_span: &Span) -> Result<usize, MetelError> {
+    let mut depth = 1usize;
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut i = expr_start;
+    while i < raw.len() {
+        let c = raw[i..].chars().next()
+            .ok_or_else(|| MetelError::internal("string interpolation: invalid char boundary"))?;
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if c == '\\' {
+                escaped = true;
+            } else if c == '"' {
+                in_string = false;
+            }
+        } else {
+            match c {
+                '"' => in_string = true,
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Ok(i);
+                    }
+                }
+                _ => {}
+            }
+        }
+        i += c.len_utf8();
+    }
+
+    Err(MetelError::parse(
+        ParseErrorCode::P0001,
+        "unterminated string interpolation",
+        literal_span,
+    ))
+}
+
+fn make_relative_span(literal_span: &Span, raw: &str, start: usize, end: usize) -> Span {
+    let (line, col) = advance_line_col(literal_span.line, literal_span.col + 1, &raw[..start]);
+    Span {
+        start: literal_span.start + 1 + start,
+        end: literal_span.start + 1 + end,
+        filename: literal_span.filename.clone(),
+        line,
+        col,
+    }
+}
+
+fn advance_line_col(mut line: u32, mut col: u32, text: &str) -> (u32, u32) {
+    for ch in text.chars() {
+        if ch == '\n' {
+            line += 1;
+            col = 1;
+        } else {
+            col += 1;
+        }
+    }
+    (line, col)
+}
+
+fn shift_line_col(local_line: u32, local_col: u32, base_line: u32, base_col: u32) -> (u32, u32) {
+    if local_line <= 1 {
+        (base_line, base_col + local_col.saturating_sub(1))
+    } else {
+        (base_line + local_line - 1, local_col)
+    }
+}
+
+fn shift_span(span: &mut Span, base_start: usize, base_line: u32, base_col: u32) {
+    span.start += base_start;
+    span.end += base_start;
+    let (line, col) = shift_line_col(span.line, span.col, base_line, base_col);
+    span.line = line;
+    span.col = col;
+}
+
+fn shift_expr_span(expr: &mut Expr, base_start: usize, base_line: u32, base_col: u32) {
+    match expr {
+        Expr::Literal(_, span)
+        | Expr::Ident(_, span)
+        | Expr::Path(_, span)
+        | Expr::Tuple(_, span)
+        | Expr::Array(_, span)
+        | Expr::BinOp(_, _, _, span)
+        | Expr::UnaryOp(_, _, span)
+        | Expr::PropagateError { span, .. } => {
+            shift_span(span, base_start, base_line, base_col);
+        }
+        Expr::ResolvedPath { span, .. } => {
+            shift_span(span, base_start, base_line, base_col);
+        }
+        Expr::Assign { target, value, span, .. } => {
+            shift_assign_target_span(target, base_start, base_line, base_col);
+            shift_expr_span(value, base_start, base_line, base_col);
+            shift_span(span, base_start, base_line, base_col);
+        }
+        Expr::Call { callee, args, span } => {
+            shift_expr_span(callee, base_start, base_line, base_col);
+            for arg in args { shift_expr_span(arg, base_start, base_line, base_col); }
+            shift_span(span, base_start, base_line, base_col);
+        }
+        Expr::MethodCall { receiver, args, span, .. } => {
+            shift_expr_span(receiver, base_start, base_line, base_col);
+            for arg in args { shift_expr_span(arg, base_start, base_line, base_col); }
+            shift_span(span, base_start, base_line, base_col);
+        }
+        Expr::FieldAccess { object, span, .. }
+        | Expr::TupleAccess { object, span, .. } => {
+            shift_expr_span(object, base_start, base_line, base_col);
+            shift_span(span, base_start, base_line, base_col);
+        }
+        Expr::Index { object, index, span } => {
+            shift_expr_span(object, base_start, base_line, base_col);
+            shift_expr_span(index, base_start, base_line, base_col);
+            shift_span(span, base_start, base_line, base_col);
+        }
+        Expr::Cast { expr, span, .. } | Expr::Ascribe { expr, span, .. } => {
+            shift_expr_span(expr, base_start, base_line, base_col);
+            shift_span(span, base_start, base_line, base_col);
+        }
+        Expr::Match(m) => {
+            shift_expr_span(&mut m.scrutinee, base_start, base_line, base_col);
+            for arm in &mut m.arms { shift_match_arm_span(arm, base_start, base_line, base_col); }
+            shift_span(&mut m.span, base_start, base_line, base_col);
+        }
+        Expr::If { condition, then_branch, else_branch, span } => {
+            shift_expr_span(condition, base_start, base_line, base_col);
+            shift_block_span(then_branch, base_start, base_line, base_col);
+            if let Some(block) = else_branch {
+                shift_block_span(block, base_start, base_line, base_col);
+            }
+            shift_span(span, base_start, base_line, base_col);
+        }
+        Expr::Loop { body, span } => {
+            shift_block_span(body, base_start, base_line, base_col);
+            shift_span(span, base_start, base_line, base_col);
+        }
+        Expr::Closure { params, body, span, .. } => {
+            for param in params { shift_span(&mut param.span, base_start, base_line, base_col); }
+            shift_block_span(body, base_start, base_line, base_col);
+            shift_span(span, base_start, base_line, base_col);
+        }
+        Expr::StructLiteral { fields, span, .. } => {
+            for (_, expr) in fields { shift_expr_span(expr, base_start, base_line, base_col); }
+            shift_span(span, base_start, base_line, base_col);
+        }
+    }
+}
+
+fn shift_assign_target_span(target: &mut AssignTarget, base_start: usize, base_line: u32, base_col: u32) {
+    match target {
+        AssignTarget::Ident(_, span) => shift_span(span, base_start, base_line, base_col),
+        AssignTarget::FieldAccess { object, span, .. } => {
+            shift_expr_span(object, base_start, base_line, base_col);
+            shift_span(span, base_start, base_line, base_col);
+        }
+        AssignTarget::Index { object, index, span } => {
+            shift_expr_span(object, base_start, base_line, base_col);
+            shift_expr_span(index, base_start, base_line, base_col);
+            shift_span(span, base_start, base_line, base_col);
+        }
+    }
+}
+
+fn shift_block_span(block: &mut Block, base_start: usize, base_line: u32, base_col: u32) {
+    for stmt in &mut block.stmts {
+        shift_decl_span(stmt, base_start, base_line, base_col);
+    }
+    if let Some(tail) = &mut block.tail {
+        shift_expr_span(tail, base_start, base_line, base_col);
+    }
+    shift_span(&mut block.span, base_start, base_line, base_col);
+}
+
+fn shift_decl_span(decl: &mut Decl, base_start: usize, base_line: u32, base_col: u32) {
+    match decl {
+        Decl::Let(ld) => {
+            shift_expr_span(&mut ld.value, base_start, base_line, base_col);
+            shift_span(&mut ld.span, base_start, base_line, base_col);
+        }
+        Decl::Mut(md) => {
+            shift_expr_span(&mut md.value, base_start, base_line, base_col);
+            shift_span(&mut md.span, base_start, base_line, base_col);
+        }
+        Decl::Fun(fd) => {
+            for param in &mut fd.params {
+                shift_span(&mut param.span, base_start, base_line, base_col);
+            }
+            shift_block_span(&mut fd.body, base_start, base_line, base_col);
+            shift_span(&mut fd.span, base_start, base_line, base_col);
+        }
+        Decl::Struct(sd) => {
+            for field in &mut sd.fields {
+                shift_span(&mut field.span, base_start, base_line, base_col);
+            }
+            shift_span(&mut sd.span, base_start, base_line, base_col);
+        }
+        Decl::Enum(ed) => {
+            for variant in &mut ed.variants {
+                for field in &mut variant.fields {
+                    shift_span(&mut field.span, base_start, base_line, base_col);
+                }
+                shift_span(&mut variant.span, base_start, base_line, base_col);
+            }
+            shift_span(&mut ed.span, base_start, base_line, base_col);
+        }
+        Decl::Impl(ib) => {
+            for method in &mut ib.methods {
+                for param in &mut method.params {
+                    shift_span(&mut param.span, base_start, base_line, base_col);
+                }
+                shift_block_span(&mut method.body, base_start, base_line, base_col);
+                shift_span(&mut method.span, base_start, base_line, base_col);
+            }
+            shift_span(&mut ib.span, base_start, base_line, base_col);
+        }
+        Decl::Aspect(ad) => {
+            for method in &mut ad.methods {
+                for param in &mut method.params {
+                    shift_span(&mut param.span, base_start, base_line, base_col);
+                }
+                if let Some(body) = &mut method.default_body {
+                    shift_block_span(body, base_start, base_line, base_col);
+                }
+                shift_span(&mut method.span, base_start, base_line, base_col);
+            }
+            shift_span(&mut ad.span, base_start, base_line, base_col);
+        }
+        Decl::Stmt(stmt) => shift_stmt_span(stmt, base_start, base_line, base_col),
+    }
+}
+
+fn shift_stmt_span(stmt: &mut Stmt, base_start: usize, base_line: u32, base_col: u32) {
+    match stmt {
+        Stmt::While(ws) => {
+            shift_expr_span(&mut ws.condition, base_start, base_line, base_col);
+            shift_block_span(&mut ws.body, base_start, base_line, base_col);
+            shift_span(&mut ws.span, base_start, base_line, base_col);
+        }
+        Stmt::For(fs) => {
+            if let Some(init) = &mut fs.init {
+                match init {
+                    ForInit::Mut(md) => {
+                        shift_expr_span(&mut md.value, base_start, base_line, base_col);
+                        shift_span(&mut md.span, base_start, base_line, base_col);
+                    }
+                    ForInit::Expr(expr) => shift_expr_span(expr, base_start, base_line, base_col),
+                }
+            }
+            if let Some(condition) = &mut fs.condition {
+                shift_expr_span(condition, base_start, base_line, base_col);
+            }
+            if let Some(step) = &mut fs.step {
+                shift_expr_span(step, base_start, base_line, base_col);
+            }
+            shift_block_span(&mut fs.body, base_start, base_line, base_col);
+            shift_span(&mut fs.span, base_start, base_line, base_col);
+        }
+        Stmt::ForIn(fi) => {
+            shift_expr_span(&mut fi.iterable, base_start, base_line, base_col);
+            shift_block_span(&mut fi.body, base_start, base_line, base_col);
+            shift_span(&mut fi.span, base_start, base_line, base_col);
+        }
+        Stmt::Return(ret) => {
+            if let Some(expr) = &mut ret.value {
+                shift_expr_span(expr, base_start, base_line, base_col);
+            }
+            shift_span(&mut ret.span, base_start, base_line, base_col);
+        }
+        Stmt::Break(brk) => {
+            if let Some(expr) = &mut brk.value {
+                shift_expr_span(expr, base_start, base_line, base_col);
+            }
+            shift_span(&mut brk.span, base_start, base_line, base_col);
+        }
+        Stmt::Continue(span) => shift_span(span, base_start, base_line, base_col),
+        Stmt::Expr(expr) => shift_expr_span(expr, base_start, base_line, base_col),
+    }
+}
+
+fn shift_match_arm_span(arm: &mut MatchArm, base_start: usize, base_line: u32, base_col: u32) {
+    shift_pattern_span(&mut arm.pattern, base_start, base_line, base_col);
+    if let Some(guard) = &mut arm.guard {
+        shift_expr_span(guard, base_start, base_line, base_col);
+    }
+    shift_block_span(&mut arm.body, base_start, base_line, base_col);
+    shift_span(&mut arm.span, base_start, base_line, base_col);
+}
+
+fn shift_pattern_span(pattern: &mut Pattern, base_start: usize, base_line: u32, base_col: u32) {
+    match pattern {
+        Pattern::Wildcard(span)
+        | Pattern::None(span)
+        | Pattern::Binding(_, span)
+        | Pattern::Literal(_, span) => shift_span(span, base_start, base_line, base_col),
+        Pattern::EnumVariant { span, .. } => shift_span(span, base_start, base_line, base_col),
+        Pattern::Tuple(items, span) => {
+            for item in items {
+                shift_pattern_span(item, base_start, base_line, base_col);
+            }
+            shift_span(span, base_start, base_line, base_col);
+        }
+    }
 }
 
 fn parse_path_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Expr, MetelError> {
@@ -1295,6 +1727,7 @@ fn unescape(s: &str) -> String {
                 Some('r')  => out.push('\r'),
                 Some('\\') => out.push('\\'),
                 Some('"')  => out.push('"'),
+                Some('$')  => out.push('$'),
                 Some(c)    => { out.push('\\'); out.push(c); }
                 None       => out.push('\\'),
             }

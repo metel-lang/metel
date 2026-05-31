@@ -386,6 +386,9 @@ fun load() -> Result<Int, AppError> {
     #[test]
     fn stage8_neg_ascribe_wrong_struct() { check("builtins/stage8_neg_04_ascribe_wrong_struct.mtl"); }
 
+    #[test]
+    fn stage8_neg_interpolation_non_display() { check("builtins/stage8_neg_05_interpolation_non_display.mtl"); }
+
     // ── Generics ──────────────────────────────────────────────────────────────
 
     #[test]

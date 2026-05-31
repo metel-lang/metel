@@ -16,6 +16,12 @@ fun main() {
     assert(string_concat("", "xyz")    == "xyz");
     assert(string_concat("abc", "")    == "abc");
     assert("hello" + ", " + "world" == "hello, world");
+    let who = "world";
+    assert("hello, ${who}" == "hello, world");
+    assert("n=${42}" == "n=42");
+    assert("flag=${true}" == "flag=true");
+    assert("\${value}" == "\${value}");
+    assert("$5" == "$5");
     // array_len and array_push
     mut arr = [10, 20, 30];
     assert(array_len(arr) == 3);

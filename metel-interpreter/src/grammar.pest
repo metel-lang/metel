@@ -226,7 +226,7 @@ decimal_int = @{ ASCII_DIGIT+ }
 
 string_lit  = @{ "\"" ~ string_char* ~ "\"" }
 string_char = _{ "\\" ~ escape_seq | (!("\"" | "\\") ~ ANY) }
-escape_seq  = _{ "n" | "t" | "r" | "\\" | "\"" }
+escape_seq  = _{ "n" | "t" | "r" | "\\" | "\"" | "$" }
 
 bool_lit  = @{ ("true" | "false") ~ !(ASCII_ALPHANUMERIC | "_") }
 none_lit  = @{ "None" ~ !(ASCII_ALPHANUMERIC | "_") }
