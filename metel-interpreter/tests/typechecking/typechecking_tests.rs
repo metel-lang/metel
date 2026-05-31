@@ -410,6 +410,9 @@ fun load() -> Result<Int, AppError> {
     fn stage10_generic_nested_types() { check("generics/stage10_05_generic_nested_types.mtl"); }
 
     #[test]
+    fn stage10_none_ascribed_generic_return() { check("generics/stage10_06_none_ascribed_generic_return.mtl"); }
+
+    #[test]
     fn stage10_neg_type_param_conflict() { check("generics/stage10_neg_01_type_param_conflict.mtl"); }
 
     #[test]

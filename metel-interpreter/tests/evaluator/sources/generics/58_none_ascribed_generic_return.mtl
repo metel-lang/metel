@@ -1,0 +1,21 @@
+fun maybe_head<T>(items: T[]) {
+    if (array_len(items) == 0) {
+        return None : Perhaps<T>;
+    }
+    return Perhaps::Some { value: items[0] };
+}
+
+fun main() {
+    let present = maybe_head([1, 2, 3]);
+    let empty = maybe_head([] : Int[]);
+
+    match present {
+        Perhaps::Some { value } => assert(value == 1),
+        Perhaps::None => assert(false),
+    }
+
+    match empty {
+        Perhaps::Some { value } => assert(false),
+        Perhaps::None => assert(true),
+    }
+}

@@ -573,7 +573,7 @@ fn infer_expr(
         }
         Expr::Ascribe { expr, ann, span } => {
             let inner_ty = infer_expr(expr, ctx, fun_generalizations)?;
-            let ascribed_ty = type_expr_to_infer(ann);
+            let ascribed_ty = ann_to_infer(ann, ctx);
             ctx.add_constraint(inner_ty.clone(), ascribed_ty, span.clone());
             Ok(inner_ty)
         }

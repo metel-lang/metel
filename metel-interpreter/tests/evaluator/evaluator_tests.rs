@@ -351,6 +351,9 @@ mod tests {
     fn generic_enum_infer_context() { check("generics/57_generic_enum_infer_context.mtl"); }
 
     #[test]
+    fn none_ascribed_generic_return() { check("generics/58_none_ascribed_generic_return.mtl"); }
+
+    #[test]
     fn neg_generic_type_conflict() { check("generics/neg_21_generic_type_conflict.mtl"); }
 
     // ── Aspects ───────────────────────────────────────────────────────────────
