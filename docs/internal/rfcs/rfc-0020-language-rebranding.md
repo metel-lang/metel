@@ -2,7 +2,6 @@
 id: rfc-0020
 title: "Language Keyword Rebranding"
 date: '2026-05-23'
-status: incorporated
 ---
 
 ## Summary

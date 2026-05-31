@@ -2,8 +2,6 @@
 id: rfc-0022
 title: "Braceless if body syntax"
 date: '2026-05-23'
-status: incorporated
-target: v0.3
 ---
 
 ## Summary

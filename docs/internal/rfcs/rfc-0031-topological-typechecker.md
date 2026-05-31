@@ -2,7 +2,6 @@
 id: rfc-0031
 title: "Topological Per-Module Typechecking"
 date: '2026-05-28'
-status: incorporated
 ---
 
 ## Summary

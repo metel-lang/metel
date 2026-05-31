@@ -2,8 +2,6 @@
 id: rfc-0030
 title: "Module System Redesign"
 date: '2026-05-28'
-status: incorporated
-supersedes: [rfc-0009, rfc-0029]
 ---
 
 ## Summary
