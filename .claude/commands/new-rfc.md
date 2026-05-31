@@ -81,7 +81,9 @@ Create a new RFC and register it in Plane. RFC content lives in Plane pages; the
 
    Fill in sections if there is enough context from the conversation. Leave blank only when there is genuinely insufficient information.
 
-4. **Create a Plane work item** linked to the page:
+4. **Create a Plane work item** linked to the page using the real page URL:
+
+   Page URL format: `https://app.plane.so/vladastos/projects/ec7904a4-cd24-40bd-8089-19a5eb8875ab/pages/<page_id>/`
 
    ```
    mcp__plane__create_work_item(
@@ -89,7 +91,7 @@ Create a new RFC and register it in Plane. RFC content lives in Plane pages; the
      name="RFC-NNNN: <title>",
      type_id=RFC_TYPE_ID,
      state=BACKLOG_STATE_ID,
-     description_html="<p>See Plane page: <strong>RFC-NNNN: <title></strong></p>"
+     description_html='<p>RFC content: <a href="https://app.plane.so/vladastos/projects/ec7904a4-cd24-40bd-8089-19a5eb8875ab/pages/<page_id>/">RFC-NNNN page</a></p>'
    )
    ```
 
