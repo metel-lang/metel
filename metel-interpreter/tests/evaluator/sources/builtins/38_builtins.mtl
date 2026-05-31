@@ -20,6 +20,8 @@ fun main() {
     assert("hello, ${who}" == "hello, world");
     assert("n=${42}" == "n=42");
     assert("flag=${true}" == "flag=true");
+    assert("value=${\"x\"}" == "value=x");
+    assert("pair=${string_concat(\"x\", \"y\")}" == "pair=xy");
     assert("\${value}" == "\${value}");
     assert("$5" == "$5");
     // array_len and array_push

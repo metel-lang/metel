@@ -725,8 +725,7 @@ fn find_interpolation_end(raw: &str, expr_start: usize, literal_span: &Span) -> 
     let mut escaped = false;
     let mut i = expr_start;
     while i < raw.len() {
-        let c = raw[i..].chars().next()
-            .ok_or_else(|| MetelError::internal("string interpolation: invalid char boundary"))?;
+        let (c, consumed) = decoded_interpolation_char(raw, i)?;
         if in_string {
             if escaped {
                 escaped = false;
@@ -748,7 +747,7 @@ fn find_interpolation_end(raw: &str, expr_start: usize, literal_span: &Span) -> 
                 _ => {}
             }
         }
-        i += c.len_utf8();
+        i += consumed;
     }
 
     Err(MetelError::parse(
@@ -756,6 +755,28 @@ fn find_interpolation_end(raw: &str, expr_start: usize, literal_span: &Span) -> 
         "unterminated string interpolation",
         literal_span,
     ))
+}
+
+fn decoded_interpolation_char(raw: &str, start: usize) -> Result<(char, usize), MetelError> {
+    let c = raw[start..].chars().next()
+        .ok_or_else(|| MetelError::internal("string interpolation: invalid char boundary"))?;
+    if c != '\\' {
+        return Ok((c, c.len_utf8()));
+    }
+
+    let next_start = start + c.len_utf8();
+    let escaped = raw[next_start..].chars().next()
+        .ok_or_else(|| MetelError::internal("string interpolation: trailing backslash"))?;
+    let decoded = match escaped {
+        'n'  => '\n',
+        't'  => '\t',
+        'r'  => '\r',
+        '\\' => '\\',
+        '"'  => '"',
+        '$'  => '$',
+        other => other,
+    };
+    Ok((decoded, c.len_utf8() + escaped.len_utf8()))
 }
 
 fn make_relative_span(literal_span: &Span, raw: &str, start: usize, end: usize) -> Span {

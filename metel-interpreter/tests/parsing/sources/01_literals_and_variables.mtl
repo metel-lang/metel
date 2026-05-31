@@ -28,6 +28,8 @@ fun main() {
     let subject = "world";
     let interpolated = "hello, ${subject}! n=${42}";
     println(interpolated);              // hello, world! n=42
+    let nested_interpolated = "value=${\"x\"}";
+    println(nested_interpolated);       // value=x
     let escaped_dollar = "\${not interpolation}";
     println(escaped_dollar);            // ${not interpolation}
     let plain_dollar = "$5";
