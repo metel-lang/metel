@@ -592,15 +592,28 @@ fn user_glob_overrides_std_core_same_name_in_multi_module() {
     let main = dir.join("main.mtl");
     write(
         &dir.join("mylib.mtl"),
-        "pub fun double(x: Int) -> Int { return x * 2; }\n",
+        "pub fun print(x: Int) -> Int { return x + 1; }\n",
     );
     write(
         &main,
         "import mylib::*;\
          \nfun main() {\
-         \n    let result = double(21);\
+         \n    let result = print(41);\
          \n    assert(result == 42);\
          \n}\n",
+    );
+    run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn local_function_overrides_std_core_builtin() {
+    // Local declarations beat the std::core auto-glob in both inference and construction.
+    let dir = fixture_dir("local_overrides_std");
+    let main = dir.join("main.mtl");
+    write(
+        &main,
+        "fun print(x: Int) -> Int { return x + 1; }\
+         \nfun main() -> Int { return print(41); }\n",
     );
     run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
 }

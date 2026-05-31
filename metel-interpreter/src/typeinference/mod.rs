@@ -768,6 +768,16 @@ impl InferContext {
         self.poly_env.last_mut().unwrap().insert(name.into(), scheme);
     }
 
+    /// Bind a polymorphic scheme only if the current scope does not already
+    /// contain that name. Used for lower-priority prelude names.
+    pub fn bind_poly_if_absent(&mut self, name: impl Into<String>, scheme: TypeScheme) {
+        self.poly_env
+            .last_mut()
+            .unwrap()
+            .entry(name.into())
+            .or_insert(scheme);
+    }
+
     /// Look up a name. Polymorphic bindings are automatically instantiated with
     /// fresh variables; monomorphic bindings are searched innermost-scope-first.
     /// Poly env takes precedence over mono env within each scope level.

@@ -456,8 +456,6 @@ fn check_impl(
         let scheme = generalize(resolved, &fg.env_fvs);
         scheme_env.insert(fg.name, scheme);
     }
-    registry::register_builtin_schemes(&mut scheme_env, std_prelude);
-
     // Imported schemes must be visible in the construction pass so calls to imported
     // functions can be constructed. Use or_insert so locally-defined names shadow imports.
     // INVARIANT: imported_schemes must be seeded into BOTH InferContext (above, via
@@ -466,6 +464,7 @@ fn check_impl(
     for (name, scheme) in imported_schemes {
         scheme_env.entry(name.clone()).or_insert_with(|| scheme.clone());
     }
+    registry::register_builtin_schemes(&mut scheme_env, std_prelude);
 
     // Pass 2: construct typed AST for the current module only.
     // The registry owns all type definitions; ConstructCtx derives concrete envs from it.
@@ -475,12 +474,24 @@ fn check_impl(
 
     // Return only user-defined names. Builtins (from StdPrelude) are available to
     // every module via the auto-glob and don't need to be in GlobalExports.
+    let local_value_names = top_level_value_names(program);
     let user_scheme_env: SchemeEnv = scheme_env.into_iter()
-        .filter(|(name, _)| !std_prelude.contains(name))
+        .filter(|(name, _)| !std_prelude.contains(name) || local_value_names.contains(name))
         .collect();
 
     let final_registry = ctx.into_registry();
     Ok((typed_decls, user_scheme_env, final_registry))
+}
+
+fn top_level_value_names(program: &Program) -> HashSet<String> {
+    program.decls.iter()
+        .filter_map(|decl| match decl {
+            Decl::Fun(d) => Some(d.name.clone()),
+            Decl::Let(d) => Some(d.name.clone()),
+            Decl::Mut(d) => Some(d.name.clone()),
+            _ => None,
+        })
+        .collect()
 }
 
 #[cfg(test)]

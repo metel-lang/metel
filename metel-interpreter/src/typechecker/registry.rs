@@ -268,7 +268,7 @@ pub(super) fn register_builtins(ctx: &mut InferContext, prelude: &super::StdPrel
 
     // Free-function builtins all come from StdPrelude — no separate list needed.
     for (name, scheme) in prelude.schemes() {
-        ctx.bind_poly(name, scheme.clone());
+        ctx.bind_poly_if_absent(name, scheme.clone());
     }
 
     // Methods are not free functions; they're not in StdPrelude::schemes.
@@ -298,7 +298,9 @@ pub(super) fn register_builtin_schemes(
     prelude: &super::StdPrelude,
 ) {
     for (name, scheme) in prelude.schemes() {
-        scheme_env.insert(name.clone(), scheme.clone());
+        scheme_env
+            .entry(name.clone())
+            .or_insert_with(|| scheme.clone());
     }
 }
 
