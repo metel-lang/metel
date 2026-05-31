@@ -1,6 +1,7 @@
 // 01 — Literals and variables
 // Covers: integer/float/string/bool/nope literals, let, mut, type inference,
-//         explicit annotations, shadowing, compound assignment, string ops.
+//         explicit annotations, shadowing, compound assignment, string ops,
+//         mod and use as plain identifiers (METEL-75 regression).
 
 fun main() {
     // --- integer literals ---
@@ -63,4 +64,9 @@ fun main() {
     // --- string concatenation with + ---
     let full = "hello" + ", " + "world";
     println(full);                      // hello, world
+
+    // --- mod and use are plain identifiers, not reserved keywords (METEL-75) ---
+    let mod = 1;
+    let use = 2;
+    println(int_to_string(mod + use));  // 3
 }

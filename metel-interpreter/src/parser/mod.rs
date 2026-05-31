@@ -594,6 +594,9 @@ fn parse_literal_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resu
     Ok(Expr::Literal(lit, span))
 }
 
+// Interpolated strings are lowered to plain string-concatenation here in the parser.
+// No `Expr::Interpolation` AST node is emitted; downstream passes see only `BinOp(Plus, …)`
+// and `.to_string()` calls. See ADR-0033.
 fn parse_string_literal_expr(text: &str, span: Span, filename: &str) -> Result<Expr, MetelError> {
     let raw = &text[1..text.len() - 1];
     if !raw.contains("${") && !raw.contains("\\$") {

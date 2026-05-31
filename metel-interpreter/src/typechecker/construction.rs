@@ -315,6 +315,9 @@ fn construct_impl_method(
     })
 }
 
+// Synthesize typed method bodies for aspect methods not provided by this impl block.
+// Bodies come from the aspect's default_body; Self is substituted with the concrete target type.
+// The evaluator never needs to know about defaults — see ADR-0034.
 fn construct_default_aspect_methods(
     ib: &ImplBlock,
     target_name: &str,

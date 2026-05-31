@@ -1,7 +1,6 @@
-// ? with mismatched error types and no From impl must fail with T0001.
-// After #214 desugaring, the plain Err arm produces a type mismatch.
-// Before desugaring, the inference pass already rejects it here.
-// Either way the result is T0001. This test locks in that behaviour.
+// ? with mismatched error types and no From impl must fail with T0007.
+// METEL-80 routes ? through From-based coercion; when no From impl exists,
+// the coercion is invalid and the typechecker emits T0007 (invalid cast).
 // From coercion for arbitrary type pairs is deferred to #13.
 
 fun inner() -> Result<Int, String> {
@@ -9,7 +8,7 @@ fun inner() -> Result<Int, String> {
 }
 
 fun outer() -> Result<Int, Int> {
-    let x = inner()?; // ERROR[T0001]
+    let x = inner()?; // ERROR[T0007]
     Result::Ok { value: x }
 }
 

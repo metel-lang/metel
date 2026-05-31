@@ -209,9 +209,11 @@ This function goes away when RFC-0001 (memory model with mutable references) is 
 
 `run_passes` runs all three passes (1a placeholders, 1b closures, 2 bindings) for one module before moving to the next. If function `foo` in module A calls `bar` in module B and `bar` calls `foo`, the circular dependency requires a specific multi-module structure (A and B are peers, both importing a third module C). When A is being evaluated, B's environment doesn't exist yet, so A's closures cannot capture B's functions. The fix requires running Pass 1a for all modules before Pass 1b for any module. No current test program exercises this pattern.
 
-### `?` with mismatched error types does not perform From coercion (#13)
+### `?` with mismatched error types — From coercion is required
 
-The `?` operator propagates the inner `Result::Err` directly: the Err arm is `return Result::Err { error: error }` with no `From::from` call. If the function's return error type `E2` differs from the inner error type `E1`, the typechecker rejects the program with T0001 unless an `impl From<E1> for E2` is registered. The only registered From impls are `From<Float> for Int` and `From<Int> for Float`. Cross-type error coercion via `?` for other type pairs is not implemented and will fail at typecheck time. Full From-based coercion is tracked in #13.
+> *Updated in v0.7.0 (METEL-80).*
+
+The `?` operator is desugared in the `path_normalizer` pre-pass and then, during construction, checked for error-type compatibility. If the inner `Result<_, E1>` and the enclosing function's return type `Result<_, E2>` have different error types, the typechecker looks up `impl From<E1> for E2`. If a matching impl is found, the desugared Err arm calls `From::from`; if not, the program is rejected with T0007 (invalid cast). The only built-in From impls are `From<Float> for Int` and `From<Int> for Float`. User types must register a `From` impl explicitly. Full coercion for arbitrary type pairs is tracked in #13.
 
 ### Closure/scope mutation semantics unspecified
 
@@ -221,9 +223,9 @@ The PoC's `Rc<RefCell<Value>>` environment gives closures reference semantics fo
 
 ## Extension Points
 
-### v0.4 — Aspects / `?` coercion (partially shipped)
+### v0.7.0 — `?` From coercion (shipped, METEL-80)
 
-`PropagateError` has partial `From<E>` coercion support in the current inference pass: the typechecker detects `E1 != E2` via a mid-inference partial solve and checks for a registered `impl From<E1> for E2`. Only `From<Float> for Int` and `From<Int> for Float` are registered. Cross-type `?` for other pairs is rejected at T0001. Full From-based coercion is tracked in #13. After issue #214 (`?` desugaring), the Err arm emits plain `error` with no `From::from` call; From coercion will slot into the desugared form when #13 is implemented.
+`?` From coercion is fully wired: when `E1 ≠ E2` the construction pass checks `has_from_impl(E2, E1)` and, if found, emits a `PropagateError` node carrying the `from_key`; the evaluator calls the impl at runtime. If no impl exists, T0007 (invalid cast) is emitted at typecheck time. Built-in impls: `From<Float> for Int`, `From<Int> for Float`. Additional user-defined impls may be registered via `aspect From<S>` implementations.
 
 ### Rewrite
 
