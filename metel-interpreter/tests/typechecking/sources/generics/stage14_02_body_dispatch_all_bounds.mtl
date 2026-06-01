@@ -1,0 +1,33 @@
+// Positive: function body can call methods from both inline and where clause bounds
+// on the same type parameter.
+
+aspect Printable {
+    fun print(self);
+}
+
+aspect Serializable {
+    fun serialize(self) -> String;
+}
+
+struct Record {
+    name: String,
+}
+
+impl Printable for Record {
+    fun print(self) {}
+}
+
+impl Serializable for Record {
+    fun serialize(self) -> String {
+        self.name
+    }
+}
+
+fun process<T: Printable>(x: T) -> String where T: Serializable {
+    x.print();
+    x.serialize()
+}
+
+fun run(r: Record) -> String {
+    process(r)
+}

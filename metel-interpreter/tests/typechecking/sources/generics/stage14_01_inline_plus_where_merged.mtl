@@ -1,0 +1,32 @@
+// Positive: function with both inline + bound and where clause bound on the same
+// param. Both must be satisfied at the call site.
+
+aspect Printable {
+    fun print(self);
+}
+
+aspect Comparable {
+    fun compare(self, other: Self) -> Int;
+}
+
+struct Entry {
+    value: Int,
+}
+
+impl Printable for Entry {
+    fun print(self) {}
+}
+
+impl Comparable for Entry {
+    fun compare(self, other: Entry) -> Int {
+        self.value - other.value
+    }
+}
+
+fun process<T: Printable>(x: T) where T: Comparable {
+    x.print()
+}
+
+fun run(e: Entry) {
+    process(e)
+}

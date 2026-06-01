@@ -1,0 +1,27 @@
+// Positive: impl Aspect param coexists with a where clause on a named type param.
+// Both are enforced independently.
+
+aspect Printable {
+    fun print(self);
+}
+
+aspect Serializable {
+    fun serialize(self) -> String;
+}
+
+struct A { value: Int }
+struct B { name: String }
+
+impl Printable for A { fun print(self) {} }
+impl Serializable for B {
+    fun serialize(self) -> String { self.name }
+}
+
+fun process<U>(x: impl Printable, y: U) -> String where U: Serializable {
+    x.print();
+    y.serialize()
+}
+
+fun run(a: A, b: B) -> String {
+    process(a, b)
+}

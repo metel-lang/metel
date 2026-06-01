@@ -452,6 +452,18 @@ fun load() -> Result<Int, AppError> {
     fn stage13_neg_second_of_two_bounds_violated() { check("generics/stage13_neg_03_second_of_two_bounds_violated.mtl"); }
 
     #[test]
+    fn stage14_inline_plus_where_merged() { check("generics/stage14_01_inline_plus_where_merged.mtl"); }
+
+    #[test]
+    fn stage14_body_dispatch_all_bounds() { check("generics/stage14_02_body_dispatch_all_bounds.mtl"); }
+
+    #[test]
+    fn stage14_impl_aspect_plus_where() { check("generics/stage14_03_impl_aspect_plus_where.mtl"); }
+
+    #[test]
+    fn stage14_neg_where_bound_of_merged_violated() { check("generics/stage14_neg_01_where_bound_of_merged_violated.mtl"); }
+
+    #[test]
     fn stage12_fun_bound_satisfied() { check("generics/stage12_01_fun_bound_satisfied.mtl"); }
 
     #[test]

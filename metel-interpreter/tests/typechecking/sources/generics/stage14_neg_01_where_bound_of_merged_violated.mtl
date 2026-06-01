@@ -1,0 +1,28 @@
+// Negative: function has inline bound (satisfied) and where clause bound (NOT satisfied).
+// The where clause bound must also be checked. Expect T0012.
+
+aspect Printable {
+    fun print(self);
+}
+
+aspect Comparable {
+    fun compare(self, other: Self) -> Int;
+}
+
+struct PrintOnly {
+    value: Int,
+}
+
+impl Printable for PrintOnly {
+    fun print(self) {}
+}
+
+// PrintOnly does NOT implement Comparable.
+
+fun process<T: Printable>(x: T) where T: Comparable {
+    x.print()
+}
+
+fun bad(p: PrintOnly) {
+    process(p) // ERROR[T0012]
+}
