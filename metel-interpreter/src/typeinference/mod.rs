@@ -460,6 +460,10 @@ pub struct TypeDefinitionRegistry {
     /// Ordered type-parameter names per generic struct/enum. Parallel to struct_type_params.
     /// Used when setting up impl method scopes so param names resolve to TypeVars.
     struct_generic_names: HashMap<String, Vec<String>>,
+    /// Polymorphic method schemes for methods on generic structs that reference the struct's
+    /// type params. Key: (type_name, method_name) → (scheme, struct_tvars_ordered).
+    /// struct_tvars_ordered[i] corresponds to the i-th type arg of the receiver at the call site.
+    method_scheme_env: HashMap<String, HashMap<String, (TypeScheme, Vec<TypeVar>)>>,
     /// Per-type-param aspect bounds for generic structs and enums.
     /// Key: type name. Value: one Vec<String> per type param (same order as struct_type_params),
     /// each containing the aspect names that param must satisfy.
@@ -488,6 +492,7 @@ impl TypeDefinitionRegistry {
             struct_env:          HashMap::new(),
             struct_type_params:  HashMap::new(),
             struct_generic_names: HashMap::new(),
+            method_scheme_env:   HashMap::new(),
             type_param_bounds:   HashMap::new(),
             fun_bounds:          HashMap::new(),
             struct_scope_stack:  Vec::new(),
@@ -532,6 +537,27 @@ impl TypeDefinitionRegistry {
 
     pub fn struct_generic_names_for(&self, name: &str) -> Option<&Vec<String>> {
         self.struct_generic_names.get(name)
+    }
+
+    pub fn register_method_scheme(
+        &mut self,
+        type_name: String,
+        method_name: String,
+        scheme: TypeScheme,
+        struct_tvars: Vec<TypeVar>,
+    ) {
+        self.method_scheme_env
+            .entry(type_name)
+            .or_default()
+            .insert(method_name, (scheme, struct_tvars));
+    }
+
+    pub fn method_scheme_for(
+        &self,
+        type_name: &str,
+        method_name: &str,
+    ) -> Option<&(TypeScheme, Vec<TypeVar>)> {
+        self.method_scheme_env.get(type_name)?.get(method_name)
     }
 
     pub fn register_type_param_bounds(&mut self, name: String, bounds: Vec<Vec<String>>) {
@@ -644,6 +670,9 @@ impl TypeDefinitionRegistry {
         }
         for (k, v) in &other.struct_generic_names {
             self.struct_generic_names.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+        for (k, v) in &other.method_scheme_env {
+            self.method_scheme_env.entry(k.clone()).or_insert_with(|| v.clone());
         }
         for (k, v) in &other.type_param_bounds {
             self.type_param_bounds.entry(k.clone()).or_insert_with(|| v.clone());
@@ -829,6 +858,24 @@ impl InferContext {
 
     pub fn get_type_param_bounds(&self, name: &str) -> Option<&Vec<Vec<String>>> {
         self.registry.type_param_bounds_for(name)
+    }
+
+    pub fn register_method_scheme(
+        &mut self,
+        type_name: String,
+        method_name: String,
+        scheme: TypeScheme,
+        struct_tvars: Vec<TypeVar>,
+    ) {
+        self.registry.register_method_scheme(type_name, method_name, scheme, struct_tvars);
+    }
+
+    pub fn method_scheme_for(
+        &self,
+        type_name: &str,
+        method_name: &str,
+    ) -> Option<&(TypeScheme, Vec<TypeVar>)> {
+        self.registry.method_scheme_for(type_name, method_name)
     }
 
     /// Return a new generator whose counter starts immediately past all vars

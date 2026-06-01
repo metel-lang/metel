@@ -1,0 +1,29 @@
+// Positive: impl method on a bounded generic struct. The method takes a T-typed
+// param, calls an aspect method on it, and returns a value. Tests that:
+// 1. The method is stored as a polymorphic scheme (not in concrete method_env)
+// 2. The scheme is instantiated correctly at the call site
+// 3. The bound's aspect methods are available in the method body
+
+aspect Comparable {
+    fun compare(self, other: Self) -> Int;
+}
+
+struct SortedList<T: Comparable> {
+    items: T[],
+}
+
+struct Num { value: Int }
+
+impl Comparable for Num {
+    fun compare(self, other: Num) -> Int { self.value - other.value }
+}
+
+impl SortedList<T> {
+    fun rank(self, item: T, pivot: T) -> Int {
+        item.compare(pivot)
+    }
+}
+
+fun run(s: SortedList<Num>, a: Num, b: Num) -> Int {
+    s.rank(a, b)
+}

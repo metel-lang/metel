@@ -35,6 +35,8 @@ pub(super) fn build_concrete_struct_env(
 }
 
 /// Build the concrete method type map from inference results.
+/// Methods that still have free TypeVars (generic struct params) are skipped here;
+/// they are resolved at the call site via method_scheme_env.
 pub(super) fn build_concrete_method_env(
     registry: &TypeDefinitionRegistry,
     subst:    &Substitution,
@@ -42,9 +44,17 @@ pub(super) fn build_concrete_method_env(
     let dummy = Span::new(0, 0, "");
     registry.raw_method_env().iter()
         .map(|(type_name, methods)| {
-            let concrete = methods.iter()
-                .map(|(mname, mty)| Ok((mname.clone(), infer_type_to_type(&subst.apply(mty), &dummy)?)))
-                .collect::<Result<HashMap<_, _>, _>>()?;
+            let concrete: HashMap<_, _> = methods.iter()
+                .filter_map(|(mname, mty)| {
+                    let resolved = subst.apply(mty);
+                    // Skip methods that still have unresolved TypeVars — they belong in scheme env.
+                    if !typeinference::free_vars(&resolved).is_empty() {
+                        return None;
+                    }
+                    infer_type_to_type(&resolved, &dummy).ok()
+                        .map(|t| (mname.clone(), t))
+                })
+                .collect();
             Ok((type_name.clone(), concrete))
         })
         .collect()
@@ -277,6 +287,20 @@ fn construct_impl_method(
     target_name: &str,
     ctx: &mut ConstructCtx,
 ) -> Result<TypedFunDecl, MetelError> {
+    // Methods on generic structs have T-typed params that can't be resolved to concrete
+    // types in Pass 2 without call-site type args. Store the body as Generic (untyped)
+    // so the evaluator handles dispatch at runtime — same pattern as top-level generic fns.
+    if ctx.registry.raw_struct_type_params().contains_key(target_name) {
+        return Ok(TypedFunDecl {
+            name:        method.name.clone(),
+            generics:    method.generics.clone(),
+            params:      method.params.clone(),
+            return_type: method.return_type.clone(),
+            body:        FunBody::Generic(method.body.clone()),
+            span:        method.span.clone(),
+        });
+    }
+
     let self_ty = Type::Named(target_name.to_string(), vec![]);
     let te_to_infer = |te: &TypeExpr| type_expr_to_infer_with_self(te, target_name);
     let param_types: Vec<Type> = method.params.iter()
@@ -638,22 +662,41 @@ fn construct_expr(
         }
         Expr::MethodCall { receiver, method, args, span } => {
             let typed_receiver = construct_expr(receiver, None, ctx)?;
-            let struct_name = match typed_receiver.ty() {
-                Type::Named(name, _) => name.clone(),
-                Type::Str            => "String".to_string(),
-                Type::Int            => "Int".to_string(),
-                Type::Float          => "Float".to_string(),
-                Type::Bool           => "Bool".to_string(),
+            let (struct_name, receiver_type_args) = match typed_receiver.ty() {
+                Type::Named(name, targs) => (name.clone(), targs.clone()),
+                Type::Str   => ("String".to_string(), vec![]),
+                Type::Int   => ("Int".to_string(),    vec![]),
+                Type::Float => ("Float".to_string(),  vec![]),
+                Type::Bool  => ("Bool".to_string(),   vec![]),
                 t => return Err(MetelError::internal(
                     format!("method call on non-struct type {t}")
                 )),
             };
-            let method_fun_ty = ctx.method_env.get(&struct_name)
+
+            // Fast path: concrete method type already in method_env.
+            let method_fun_ty = if let Some(ty) = ctx.method_env.get(&struct_name)
                 .and_then(|m| m.get(method.as_str()))
                 .cloned()
-                .ok_or_else(|| MetelError::internal(
-                    format!("no method `{method}` on `{struct_name}`")
-                ))?;
+            {
+                ty
+            } else {
+                // Slow path: method on a generic struct — look up polymorphic scheme and
+                // instantiate it using the receiver's concrete type arguments.
+                let (scheme, struct_tvars) = ctx.registry
+                    .method_scheme_for(&struct_name, method)
+                    .ok_or_else(|| MetelError::internal(
+                        format!("no method `{method}` on `{struct_name}`")
+                    ))?;
+                // Build substitution: struct_tvars[i] → receiver_type_args[i].
+                let mut subst = Substitution::new();
+                for (&tv, concrete) in struct_tvars.iter().zip(receiver_type_args.iter()) {
+                    subst.bind(tv, type_to_infer(concrete));
+                }
+                // Apply to the scheme's type to get the concrete method type.
+                let instantiated = subst.apply(&scheme.ty);
+                infer_type_to_type(&instantiated, span)?
+            };
+
             let typed_args: Vec<TypedExpr> = args.iter()
                 .map(|a| construct_expr(a, None, ctx))
                 .collect::<Result<_, _>>()?;

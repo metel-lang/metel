@@ -1,0 +1,18 @@
+// Positive: impl method on a generic struct with a parameter of the struct's
+// type param T. Previously failed with T0002 because method_env required
+// concrete types — now stored as a polymorphic scheme and instantiated at
+// each call site.
+
+struct Stack<T> {
+    items: T[],
+}
+
+impl Stack<T> {
+    fun peek(self, fallback: T) -> T {
+        fallback
+    }
+}
+
+fun run(s: Stack<Int>) -> Int {
+    s.peek(0)
+}

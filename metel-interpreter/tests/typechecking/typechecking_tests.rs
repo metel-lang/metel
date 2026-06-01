@@ -494,6 +494,12 @@ fun load() -> Result<Int, AppError> {
     fn stage14_neg_bound_method_wrong_arg_type() { check("generics/stage14_neg_06_bound_method_wrong_arg_type.mtl"); }
 
     #[test]
+    fn stage14_impl_method_with_type_param() { check("generics/stage14_09_impl_method_with_type_param.mtl"); }
+
+    #[test]
+    fn stage14_impl_method_with_bounded_type_param() { check("generics/stage14_10_impl_method_with_bounded_type_param.mtl"); }
+
+    #[test]
     fn stage12_fun_bound_satisfied() { check("generics/stage12_01_fun_bound_satisfied.mtl"); }
 
     #[test]

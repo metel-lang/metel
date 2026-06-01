@@ -245,6 +245,8 @@ fn infer_impl_method(
     // referencing e.g. `T` in `impl SortedList<T>` resolve to TypeVars and
     // aspect methods on bounded params are available in the body.
     let mut struct_bounds: HashMap<TypeVar, Vec<String>> = HashMap::new();
+    // Ordered TypeVars for the struct's generic params (same order as struct type args).
+    let mut struct_tvars_ordered: Vec<TypeVar> = Vec::new();
     if let Some(names) = ctx.struct_generic_names_for(target_name).cloned() {
         let bounds_by_pos: Option<Vec<Vec<String>>> =
             ctx.get_type_param_bounds(target_name).cloned();
@@ -252,6 +254,7 @@ fn infer_impl_method(
             if !generic_map.contains_key(name) {
                 let tv = ctx.fresh_type_var_raw();
                 generic_map.insert(name.clone(), tv);
+                struct_tvars_ordered.push(tv);
                 if let Some(ref bp) = bounds_by_pos {
                     if let Some(b) = bp.get(i) {
                         if !b.is_empty() { struct_bounds.insert(tv, b.clone()); }
@@ -269,7 +272,15 @@ fn infer_impl_method(
         }
     };
 
-    let self_ty = InferType::Named(target_name.to_string(), vec![]);
+    // Include struct TypeVars in self type so call-site unification resolves correctly.
+    let self_ty = if struct_tvars_ordered.is_empty() {
+        InferType::Named(target_name.to_string(), vec![])
+    } else {
+        InferType::Named(
+            target_name.to_string(),
+            struct_tvars_ordered.iter().map(|&tv| InferType::Var(tv)).collect(),
+        )
+    };
     let param_types: Vec<InferType> = method.params.iter().map(|p| {
         if p.name == "self" {
             self_ty.clone()
@@ -300,7 +311,24 @@ fn infer_impl_method(
     let partial_subst = ctx.solve()?;
     let fun_ty = InferType::Fun(param_types, Box::new(ret_ty));
     let resolved_fun_ty = partial_subst.apply(&fun_ty);
-    ctx.register_method(target_name.to_string(), method.name.clone(), resolved_fun_ty);
+
+    // If the resolved method type still has free TypeVars from the struct's generic params,
+    // store it as a polymorphic scheme so Pass 2 can instantiate it per call site.
+    let struct_tvars_free: std::collections::HashSet<TypeVar> =
+        struct_tvars_ordered.iter().copied().collect();
+    if !struct_tvars_free.is_empty()
+        && free_vars(&resolved_fun_ty).iter().any(|v| struct_tvars_free.contains(v))
+    {
+        let scheme = generalize(resolved_fun_ty, &std::collections::HashSet::new());
+        ctx.register_method_scheme(
+            target_name.to_string(),
+            method.name.clone(),
+            scheme,
+            struct_tvars_ordered,
+        );
+    } else {
+        ctx.register_method(target_name.to_string(), method.name.clone(), resolved_fun_ty);
+    }
     Ok(())
 }
 
@@ -656,13 +684,32 @@ fn infer_expr(
 
             // Fast path: concrete named type — look up method as usual.
             if let Some(struct_name) = named_type_name(&recv_ty) {
-                let method_ty = ctx.get_method_type(&struct_name, method)
-                    .cloned()
-                    .ok_or_else(|| MetelError::type_error(
+                let recv_type_args = if let InferType::Named(_, args) = &recv_ty {
+                    args.clone()
+                } else {
+                    vec![]
+                };
+
+                // Try concrete method_env first; fall back to method_scheme_env for generic structs.
+                let method_ty = if let Some(ty) = ctx.get_method_type(&struct_name, method).cloned() {
+                    ty
+                } else if let Some((scheme, struct_tvars)) =
+                    ctx.method_scheme_for(&struct_name, method)
+                {
+                    // Instantiate the scheme using the receiver's concrete type args.
+                    let mut subst = Substitution::new();
+                    for (&tv, arg) in struct_tvars.iter().zip(recv_type_args.iter()) {
+                        subst.bind(tv, arg.clone());
+                    }
+                    subst.apply(&scheme.ty)
+                } else {
+                    return Err(MetelError::type_error(
                         TypeErrorCode::T0003,
                         format!("no method `{method}` on `{struct_name}`"),
                         span,
-                    ))?;
+                    ));
+                };
+
                 let arg_tys: Vec<InferType> = args.iter()
                     .map(|a| infer_expr(a, ctx, fun_generalizations))
                     .collect::<Result<_, _>>()?;
