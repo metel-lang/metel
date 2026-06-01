@@ -135,6 +135,82 @@ If **any gate fails**, the sprint cannot close. Fix the issue, commit the fix to
 
 ---
 
+## RFC Workflow
+
+RFCs (Requests for Comments) are language design proposals. They are tracked in two places:
+- **Docs repo** (`metel-docs/internal/rfcs/`) — source of truth for RFC documents
+- **Plane** — personal project tracking for RFC progress and implementation
+
+### RFC Organization
+
+RFCs are organized by status in the docs repo:
+
+```
+metel-docs/internal/rfcs/
+├── active/       # Draft RFCs and ones under review
+└── implemented/  # Accepted RFCs that have been implemented
+```
+
+Each RFC file has a frontmatter field `status: active` or `status: accepted`.
+
+### RFC Lifecycle
+
+**Phase 1 — Draft (active):**
+1. Create RFC file in `metel-docs/internal/rfcs/active/` following naming convention `rfc-NNNN-topic-kebab.md`
+2. Fill frontmatter: `id`, `title`, `date`, `status: active`
+3. Write the RFC document with clear motivation, design, open questions, and placeholder Decision section
+4. Create Plane work item with type **RFC**, summary field only contains: "Summary of topic" + link to the RFC file: `[View RFC](https://github.com/metel-lang/metel-docs/blob/main/internal/rfcs/active/rfc-NNNN-...)`
+5. Discussion and feedback happens in the RFC document and Plane work item
+
+**Phase 2 — Accepted (still in active/):**
+1. Update RFC frontmatter: `status: accepted` and fill the Decision section with final outcomes and resolved questions
+2. Update Plane RFC work item — no change needed yet
+3. Create implementation work items (type: Task) linked to the RFC Plane work item. Link field should reference the RFC work item.
+
+**Phase 3 — Implemented (moved to implemented/):**
+1. When the last/final implementation work item completes:
+   - Move RFC file from `active/` to `implemented/`
+   - Mark Plane RFC work item as **Done**
+   - Update RFC frontmatter with any final notes (e.g., version shipped, implementation notes)
+2. Update the spec (`docs/public/spec/`) to document the implemented feature
+3. Update the changelog (`docs/public/changelog.md`)
+
+### Creating an RFC Work Item
+
+When creating a Plane work item for an RFC:
+
+**Type:** RFC  
+**Subject:** RFC title (e.g., "RFC-0034: Aspect Bounds on Struct and Enum Generic Parameters")  
+**Description:** Only a summary + link. Example:
+
+```
+Define aspect bounds on struct and enum generic type parameters.
+
+**View full RFC:** [RFC-0034 in docs repo](https://github.com/metel-lang/metel-docs/blob/main/internal/rfcs/active/rfc-0034-struct-enum-aspect-bounds.md)
+```
+
+No detailed description in Plane — the RFC document is the source of truth.
+
+### Linking Implementation Work Items
+
+When creating implementation work items for an accepted RFC:
+
+1. Create a normal Task work item with the implementation scope
+2. Add a relation to the RFC work item (in Plane's Relations field)
+3. The implementation items' titles should reference the RFC: `Implement RFC-0034: ...`
+
+When the implementation is complete and the final work item is marked done, close the RFC work item.
+
+### Why This Structure
+
+- **Docs repo is the source of truth** — RFCs are versioned with the project, reviewed via PR, and available in releases
+- **Plane tracks progress** — sprint progress, blockers, and implementation coordination
+- **Clear separation** — design decisions live in RFC documents; implementation tracking lives in Plane
+- **Status is unambiguous** — folder name and frontmatter status field make it obvious whether an RFC is active or accepted
+- **Traceability** — implementation work items link to the RFC; the RFC links back to the docs repo
+
+---
+
 ## Task Workflow
 
 ### Before starting a task (open → in-progress)
