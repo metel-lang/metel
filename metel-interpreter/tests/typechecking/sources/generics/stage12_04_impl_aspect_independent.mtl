@@ -1,0 +1,21 @@
+// Positive: two `impl Aspect` params in one signature are independent type variables.
+// The function can be called with two different types that both satisfy the bound.
+
+aspect Printable {
+    fun print(self);
+}
+
+struct A { value: Int }
+struct B { value: String }
+
+impl Printable for A { fun print(self) {} }
+impl Printable for B { fun print(self) {} }
+
+fun print_both(x: impl Printable, y: impl Printable) {
+    x.print();
+    y.print()
+}
+
+fun run(a: A, b: B) {
+    print_both(a, b)
+}

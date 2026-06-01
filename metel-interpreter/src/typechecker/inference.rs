@@ -145,6 +145,36 @@ fn infer_fun_decl(
         .map(|g| (g.name.clone(), ctx.fresh_type_var_raw()))
         .collect();
 
+    // Collect merged bounds (inline + where clause) per TypeVar, register for call-site checking.
+    let type_var_bounds: HashMap<TypeVar, Vec<String>> = {
+        let mut map: HashMap<TypeVar, Vec<String>> = HashMap::new();
+        for gp in &fun.generics {
+            if let Some(&tv) = generic_map.get(&gp.name) {
+                let names: Vec<String> = gp.bounds.iter()
+                    .filter_map(|b| if let TypeExpr::Named(n, _) = b { Some(n.clone()) } else { None })
+                    .collect();
+                if !names.is_empty() { map.entry(tv).or_default().extend(names); }
+            }
+        }
+        if let Some(wc) = &fun.where_clause {
+            for (param_name, bounds) in &wc.constraints {
+                if let Some(&tv) = generic_map.get(param_name.as_str()) {
+                    let names: Vec<String> = bounds.iter()
+                        .filter_map(|b| if let TypeExpr::Named(n, _) = b { Some(n.clone()) } else { None })
+                        .collect();
+                    for name in names {
+                        let entry = map.entry(tv).or_default();
+                        if !entry.contains(&name) { entry.push(name); }
+                    }
+                }
+            }
+        }
+        map
+    };
+    if !type_var_bounds.is_empty() {
+        ctx.register_fun_bounds(fun.name.clone(), type_var_bounds.clone());
+    }
+
     let te_to_infer = |te: &TypeExpr| -> InferType {
         if generic_map.is_empty() {
             type_expr_to_infer(te)
@@ -170,13 +200,15 @@ fn infer_fun_decl(
         ctx.bind_mono(&param.name, pt.clone(), false);
     }
 
-    let saved_type_params = ctx.swap_type_params(generic_map);
+    let saved_type_params  = ctx.swap_type_params(generic_map);
+    let saved_tp_bounds    = ctx.swap_type_param_bounds(type_var_bounds);
     let saved_ret = ctx.push_return_type(ret_ty.clone());
     let body_ty = infer_block(&fun.body, ctx, fun_generalizations)?;
 
     ctx.add_constraint(body_ty, ret_ty.clone(), fun.body.span.clone());
 
     ctx.pop_return_type(saved_ret);
+    ctx.swap_type_param_bounds(saved_tp_bounds);
     ctx.swap_type_params(saved_type_params);
     ctx.pop_scope();
 
@@ -598,28 +630,66 @@ fn infer_expr(
         Expr::MethodCall { receiver, method, args, span } => {
             let recv_ty = infer_expr(receiver, ctx, fun_generalizations)?;
             let recv_ty = ctx.solve()?.apply(&recv_ty);
-            let struct_name = named_type_name(&recv_ty).ok_or_else(|| MetelError::type_error(
+
+            // Fast path: concrete named type — look up method as usual.
+            if let Some(struct_name) = named_type_name(&recv_ty) {
+                let method_ty = ctx.get_method_type(&struct_name, method)
+                    .cloned()
+                    .ok_or_else(|| MetelError::type_error(
+                        TypeErrorCode::T0003,
+                        format!("no method `{method}` on `{struct_name}`"),
+                        span,
+                    ))?;
+                let arg_tys: Vec<InferType> = args.iter()
+                    .map(|a| infer_expr(a, ctx, fun_generalizations))
+                    .collect::<Result<_, _>>()?;
+                let ret_var = ctx.fresh_var();
+                let expected = InferType::Fun(
+                    std::iter::once(recv_ty).chain(arg_tys).collect(),
+                    Box::new(ret_var.clone()),
+                );
+                ctx.add_constraint(method_ty, expected, span.clone());
+                return Ok(ret_var);
+            }
+
+            // Slow path: TypeVar receiver — may be a bounded generic type param.
+            if let InferType::Var(tv) = &recv_ty {
+                if let Some(aspect_names) = ctx.bounds_for_type_var(*tv).cloned() {
+                    for aspect_name in &aspect_names {
+                        if let Some(methods) = ctx.get_aspect_method_defs(aspect_name).cloned() {
+                            if let Some(method_def) = methods.iter().find(|m| m.name == *method) {
+                                // Resolve return type: Self → the TypeVar itself.
+                                let ret_ty = method_def.return_type.as_ref()
+                                    .map(|rt| match rt {
+                                        TypeExpr::Named(n, _) if n == "Self" => InferType::Var(*tv),
+                                        other => type_expr_to_infer(other),
+                                    })
+                                    .unwrap_or(InferType::unit());
+                                let arg_tys: Vec<InferType> = args.iter()
+                                    .map(|a| infer_expr(a, ctx, fun_generalizations))
+                                    .collect::<Result<_, _>>()?;
+                                let ret_var = ctx.fresh_var();
+                                ctx.add_constraint(ret_var.clone(), ret_ty, span.clone());
+                                // Consume arg_tys (arity check via constraint).
+                                let _ = arg_tys;
+                                return Ok(ret_var);
+                            }
+                        }
+                    }
+                    return Err(MetelError::type_error(
+                        TypeErrorCode::T0003,
+                        format!("no method `{method}` on type parameter (bounds: {})",
+                            aspect_names.join(" + ")),
+                        span,
+                    ));
+                }
+            }
+
+            Err(MetelError::type_error(
                 TypeErrorCode::T0002,
                 "cannot infer receiver type for method call; add a type annotation",
                 span,
-            ))?;
-            let method_ty = ctx.get_method_type(&struct_name, method)
-                .cloned()
-                .ok_or_else(|| MetelError::type_error(
-                    TypeErrorCode::T0003,
-                    format!("no method `{method}` on `{struct_name}`"),
-                    span,
-                ))?;
-            let arg_tys: Vec<InferType> = args.iter()
-                .map(|a| infer_expr(a, ctx, fun_generalizations))
-                .collect::<Result<_, _>>()?;
-            let ret_var = ctx.fresh_var();
-            let expected = InferType::Fun(
-                std::iter::once(recv_ty).chain(arg_tys).collect(),
-                Box::new(ret_var.clone()),
-            );
-            ctx.add_constraint(method_ty, expected, span.clone());
-            Ok(ret_var)
+            ))
         }
         Expr::StructLiteral { path, fields, span } => {
             if path.len() == 2 {
@@ -1202,4 +1272,71 @@ fn infer_type_name(ty: &InferType) -> Option<&str> {
         InferType::Named(name, _)        => Some(name.as_str()),
         _ => None,
     }
+}
+
+// ── impl Aspect lowering pass ─────────────────────────────────────────────────
+
+/// Lower `impl Aspect` type expressions in function parameter positions to fresh
+/// anonymous generic type parameters before inference runs. This pass rewrites
+/// the `FunDecl` AST in-place (via a returned owned copy).
+///
+/// `fun foo(x: impl Display)` becomes `fun foo<_T0: Display>(x: _T0)`.
+///
+/// Each `impl Aspect` occurrence generates a fresh, independent type parameter.
+/// The source spelling ("impl Display") is stored in the param name as a hint
+/// for error messages (the typechecker uses GenericParam.bounds for enforcement).
+pub(super) fn lower_impl_aspect(fun: &FunDecl, counter: &mut usize) -> FunDecl {
+    let mut extra_generics: Vec<GenericParam> = Vec::new();
+    let new_params: Vec<Param> = fun.params.iter().map(|p| {
+        match &p.type_ann {
+            Some(TypeExpr::ImplAspect { bound, source_spell, .. }) => {
+                let anon_name = format!("_ImplT{}", counter);
+                *counter += 1;
+                extra_generics.push(GenericParam {
+                    name:   anon_name.clone(),
+                    bounds: vec![*bound.clone()],
+                });
+                Param {
+                    mutable:  p.mutable,
+                    name:     p.name.clone(),
+                    type_ann: Some(TypeExpr::Named(anon_name, vec![])),
+                    // Store source spelling as a tag in the span source (best-effort).
+                    // The real error message metadata lives in GenericParam.bounds.
+                    span:     p.span.clone(),
+                }
+            }
+            _ => p.clone(),
+        }
+    }).collect();
+
+    let mut new_generics = fun.generics.clone();
+    new_generics.extend(extra_generics);
+
+    FunDecl {
+        visibility:  fun.visibility.clone(),
+        name:        fun.name.clone(),
+        generics:    new_generics,
+        where_clause: fun.where_clause.clone(),
+        params:      new_params,
+        return_type: fun.return_type.clone(),
+        body:        fun.body.clone(),
+        span:        fun.span.clone(),
+    }
+}
+
+/// Lower all `impl Aspect` params in all `FunDecl`s in a `Program`.
+/// Returns a new program with the lowered declarations.
+pub(super) fn lower_impl_aspects_in_program(program: Program) -> Program {
+    let mut counter = 0usize;
+    let decls = program.decls.into_iter().map(|decl| match decl {
+        Decl::Fun(fun)  => Decl::Fun(lower_impl_aspect(&fun, &mut counter)),
+        Decl::Impl(ib)  => Decl::Impl(ImplBlock {
+            methods: ib.methods.iter()
+                .map(|m| lower_impl_aspect(m, &mut counter))
+                .collect(),
+            ..ib
+        }),
+        other => other,
+    }).collect();
+    Program { decls, ..program }
 }

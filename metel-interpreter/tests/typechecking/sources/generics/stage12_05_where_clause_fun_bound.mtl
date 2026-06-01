@@ -1,0 +1,23 @@
+// Positive: function with where clause bound, called with a satisfying type.
+
+aspect Serializable {
+    fun serialize(self) -> String;
+}
+
+struct Config {
+    name: String,
+}
+
+impl Serializable for Config {
+    fun serialize(self) -> String {
+        self.name
+    }
+}
+
+fun serialize_it<T>(x: T) -> String where T: Serializable {
+    x.serialize()
+}
+
+fun run(c: Config) -> String {
+    serialize_it(c)
+}

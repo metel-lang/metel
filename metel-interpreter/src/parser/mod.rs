@@ -1644,6 +1644,14 @@ fn parse_type_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<
             }
             Ok(TypeExpr::Named(name, args))
         }
+        Rule::impl_type => {
+            let span = Span::of(&pair, filename);
+            let source_spell = pair.as_str().to_string();
+            let bound_pair = pair.into_inner().next()
+                .ok_or_else(|| MetelError::internal("impl_type: expected bound"))?;
+            let bound = parse_type_expr(bound_pair, filename)?;
+            Ok(TypeExpr::ImplAspect { bound: Box::new(bound), source_spell, span })
+        }
         r => Err(MetelError::internal(format!("type_expr: unexpected rule {r:?}"))),
     }
 }

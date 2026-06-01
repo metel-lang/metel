@@ -1,0 +1,21 @@
+// Positive: generic function with inline bound, called with a satisfying type.
+
+aspect Printable {
+    fun print(self);
+}
+
+struct Label {
+    text: String,
+}
+
+impl Printable for Label {
+    fun print(self) {}
+}
+
+fun print_it<T: Printable>(x: T) {
+    x.print()
+}
+
+fun run(label: Label) {
+    print_it(label)
+}

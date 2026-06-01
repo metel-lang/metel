@@ -1,0 +1,23 @@
+// Positive: calling an aspect method on a bounded type param inside the function body.
+
+aspect Describable {
+    fun describe(self) -> String;
+}
+
+struct Item {
+    name: String,
+}
+
+impl Describable for Item {
+    fun describe(self) -> String {
+        self.name
+    }
+}
+
+fun describe_it<T: Describable>(x: T) -> String {
+    x.describe()
+}
+
+fun run(item: Item) -> String {
+    describe_it(item)
+}

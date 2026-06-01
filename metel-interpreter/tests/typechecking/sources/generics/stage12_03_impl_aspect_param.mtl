@@ -1,0 +1,21 @@
+// Positive: `impl Aspect` in parameter position desugars to a fresh type param.
+
+aspect Printable {
+    fun print(self);
+}
+
+struct Label {
+    text: String,
+}
+
+impl Printable for Label {
+    fun print(self) {}
+}
+
+fun print_it(x: impl Printable) {
+    x.print()
+}
+
+fun run(label: Label) {
+    print_it(label)
+}

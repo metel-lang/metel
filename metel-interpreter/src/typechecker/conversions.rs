@@ -50,6 +50,10 @@ fn type_expr_to_infer_in_context(
                     .unwrap_or(InferType::unit()),
             ),
         ),
+        // ImplAspect is removed by the lowering pass before inference runs.
+        // If it reaches here, treat as the bound type (best-effort fallback).
+        TypeExpr::ImplAspect { bound, .. } =>
+            type_expr_to_infer_in_context(bound, generics, self_ty_name),
     }
 }
 

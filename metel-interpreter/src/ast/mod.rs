@@ -425,6 +425,14 @@ pub enum TypeExpr {
     Tuple(Vec<TypeExpr>),
     Array(Box<TypeExpr>),
     Fun(Vec<TypeExpr>, Option<Box<TypeExpr>>),
+    /// `impl Aspect` in parameter position. Lowered to a fresh anonymous type param before
+    /// inference. Retained in the AST only until the lowering pass runs.
+    ImplAspect {
+        bound:        Box<TypeExpr>,
+        /// Source text ("impl Display") preserved for error messages after lowering.
+        source_spell: String,
+        span:         Span,
+    },
 }
 
 // ── Literals ──────────────────────────────────────────────────────────────────

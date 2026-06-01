@@ -1,0 +1,18 @@
+// Negative: generic function called with a type that does NOT implement
+// the required bound. Expect T0012.
+
+aspect Printable {
+    fun print(self);
+}
+
+struct Plain { x: Int }
+
+// Plain does not implement Printable.
+
+fun print_it<T: Printable>(x: T) {
+    x.print()
+}
+
+fun bad(p: Plain) {
+    print_it(p) // ERROR[T0012]
+}

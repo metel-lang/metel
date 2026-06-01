@@ -451,6 +451,27 @@ fun load() -> Result<Int, AppError> {
     #[test]
     fn stage13_neg_second_of_two_bounds_violated() { check("generics/stage13_neg_03_second_of_two_bounds_violated.mtl"); }
 
+    #[test]
+    fn stage12_fun_bound_satisfied() { check("generics/stage12_01_fun_bound_satisfied.mtl"); }
+
+    #[test]
+    fn stage12_bound_method_in_body() { check("generics/stage12_02_bound_method_in_body.mtl"); }
+
+    #[test]
+    fn stage12_impl_aspect_param() { check("generics/stage12_03_impl_aspect_param.mtl"); }
+
+    #[test]
+    fn stage12_impl_aspect_independent() { check("generics/stage12_04_impl_aspect_independent.mtl"); }
+
+    #[test]
+    fn stage12_where_clause_fun_bound() { check("generics/stage12_05_where_clause_fun_bound.mtl"); }
+
+    #[test]
+    fn stage12_neg_fun_bound_not_satisfied() { check("generics/stage12_neg_01_fun_bound_not_satisfied.mtl"); }
+
+    #[test]
+    fn stage12_neg_impl_aspect_bound_not_satisfied() { check("generics/stage12_neg_02_impl_aspect_bound_not_satisfied.mtl"); }
+
     // ── Aspects ───────────────────────────────────────────────────────────────
 
     #[test]

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::ast::*;
 use crate::error::{TypeErrorCode, MetelError};
 use crate::typed_ast::*;
-use crate::typeinference::*;
+use crate::typeinference::{self, *};
 use crate::types::Type;
 
 use super::SchemeEnv;
@@ -1196,7 +1196,8 @@ fn construct_call(
             let scheme = ctx.scheme_env.get(name.as_str()).ok_or_else(|| {
                 MetelError::type_error(TypeErrorCode::T0003, format!("undefined name `{name}`"), ident_span)
             })?;
-            let concrete = instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?;
+            let (concrete, var_map) = instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?;
+            check_fun_call_bounds(name, &var_map, span, ctx.registry)?;
             let typed = TypedExpr::Ident(name.clone(), concrete.clone(), ident_span.clone());
             (typed, concrete)
         }
@@ -1210,9 +1211,10 @@ fn construct_call(
                     .and_then(|m| m.get(segments[1].as_str()))
                     .is_some())
         } => {
-            let last = segments.last().unwrap();
+            let last = segments.last().unwrap().clone();
             let scheme = ctx.scheme_env.get(last.as_str()).unwrap();
-            let concrete = instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?;
+            let (concrete, var_map) = instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?;
+            check_fun_call_bounds(&last, &var_map, span, ctx.registry)?;
             let typed = TypedExpr::Path(segments.clone(), concrete.clone(), path_span.clone());
             (typed, concrete)
         }
@@ -1220,7 +1222,8 @@ fn construct_call(
             if ctx.lookup(resolved).is_none() && ctx.scheme_env.contains_key(resolved.as_str()) =>
         {
             let scheme = ctx.scheme_env.get(resolved.as_str()).unwrap();
-            let concrete = instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?;
+            let (concrete, var_map) = instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?;
+            check_fun_call_bounds(resolved, &var_map, span, ctx.registry)?;
             let typed = TypedExpr::Ident(resolved.clone(), concrete.clone(), rspan.clone());
             (typed, concrete)
         }
@@ -1255,13 +1258,44 @@ fn construct_call(
     }
 }
 
+/// Check that the concrete types instantiated for a function's generic type params
+/// satisfy the aspect bounds declared on that function. Emits T0012 on the call span.
+fn check_fun_call_bounds(
+    fun_name:    &str,
+    var_to_type: &HashMap<TypeVar, Type>,
+    span:        &Span,
+    registry:    &TypeDefinitionRegistry,
+) -> Result<(), MetelError> {
+    let Some(bounds_map) = registry.fun_bounds_for(fun_name) else { return Ok(()); };
+    for (tv, aspect_names) in bounds_map {
+        let concrete = match var_to_type.get(tv) {
+            Some(t) => t,
+            None    => continue,
+        };
+        let type_name = match concrete {
+            Type::Named(n, _) => n.clone(),
+            _                 => continue,
+        };
+        for aspect in aspect_names {
+            if !registry.impl_aspect_env_has(&type_name, aspect) {
+                return Err(MetelError::type_error(
+                    TypeErrorCode::T0012,
+                    format!("`{type_name}` does not implement `{aspect}` (required by `{fun_name}`)"),
+                    span,
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn instantiate_scheme_for_call(
     scheme:    &TypeScheme,
     arg_types: &[&Type],
     span:      &Span,
     gen:       &mut TypeVarGenerator,
-) -> Result<Type, MetelError> {
-    let instance = instantiate(scheme, gen);
+) -> Result<(Type, HashMap<TypeVar, Type>), MetelError> {
+    let (instance, renaming) = typeinference::instantiate_with_renaming(scheme, gen);
 
     let (params, ret) = match instance {
         InferType::Fun(p, r) => (p, r),
@@ -1281,7 +1315,16 @@ fn instantiate_scheme_for_call(
         .map(|p| infer_type_to_type(&subst.apply(p), span))
         .collect::<Result<_, _>>()?;
     let concrete_ret = infer_type_to_type(&subst.apply(&ret), span)?;
-    Ok(Type::Fun(concrete_params, Box::new(concrete_ret)))
+
+    // Build original-quantified-var → concrete-type mapping for bound checking.
+    let mut var_to_concrete: HashMap<TypeVar, Type> = HashMap::new();
+    for (orig_var, fresh_var) in &renaming {
+        if let Ok(t) = infer_type_to_type(&subst.apply(&InferType::Var(*fresh_var)), span) {
+            var_to_concrete.insert(*orig_var, t);
+        }
+    }
+
+    Ok((Type::Fun(concrete_params, Box::new(concrete_ret)), var_to_concrete))
 }
 
 fn construct_literal_type(

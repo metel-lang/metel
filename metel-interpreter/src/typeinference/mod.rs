@@ -409,6 +409,22 @@ pub fn instantiate(scheme: &TypeScheme, gen: &mut TypeVarGenerator) -> InferType
     subst.apply(&scheme.ty)
 }
 
+/// Like `instantiate` but also returns the mapping from each original quantified
+/// TypeVar to the fresh TypeVar it was replaced with.
+pub fn instantiate_with_renaming(
+    scheme: &TypeScheme,
+    gen:    &mut TypeVarGenerator,
+) -> (InferType, HashMap<TypeVar, TypeVar>) {
+    let mut renaming = HashMap::new();
+    let mut subst    = Substitution::new();
+    for &var in &scheme.quantified_vars {
+        let fresh = gen.fresh();
+        subst.bind(var, InferType::Var(fresh));
+        renaming.insert(var, fresh);
+    }
+    (subst.apply(&scheme.ty), renaming)
+}
+
 // ── Enum environment ─────────────────────────────────────────────────────────
 
 /// A single field entry in a struct or enum variant, carrying its declaration span.
@@ -445,6 +461,9 @@ pub struct TypeDefinitionRegistry {
     /// Key: type name. Value: one Vec<String> per type param (same order as struct_type_params),
     /// each containing the aspect names that param must satisfy.
     type_param_bounds: HashMap<String, Vec<Vec<String>>>,
+    /// Aspect bounds per generic function. Key: function name.
+    /// Value: map from each quantified TypeVar to the list of required aspect names.
+    fun_bounds: HashMap<String, HashMap<TypeVar, Vec<String>>>,
     /// Tracks which struct names were registered in each lexical scope so they
     /// can be removed on scope exit. Empty when outside any scoped block.
     struct_scope_stack: Vec<Vec<String>>,
@@ -466,6 +485,7 @@ impl TypeDefinitionRegistry {
             struct_env:         HashMap::new(),
             struct_type_params: HashMap::new(),
             type_param_bounds:  HashMap::new(),
+            fun_bounds:         HashMap::new(),
             struct_scope_stack: Vec::new(),
             method_env:         HashMap::new(),
             enum_env:           HashMap::new(),
@@ -513,6 +533,16 @@ impl TypeDefinitionRegistry {
     /// Returns true if `type_name` has a registered `impl AspectName` in the env.
     pub fn impl_aspect_env_has(&self, type_name: &str, aspect_name: &str) -> bool {
         self.impl_aspect_env.contains_key(&(type_name.to_string(), aspect_name.to_string()))
+    }
+
+    pub fn register_fun_bounds(&mut self, name: String, bounds: HashMap<TypeVar, Vec<String>>) {
+        if !bounds.is_empty() {
+            self.fun_bounds.insert(name, bounds);
+        }
+    }
+
+    pub fn fun_bounds_for(&self, name: &str) -> Option<&HashMap<TypeVar, Vec<String>>> {
+        self.fun_bounds.get(name)
     }
 
     pub fn register_enum(&mut self, name: String, info: EnumInfo) {
@@ -603,6 +633,9 @@ impl TypeDefinitionRegistry {
         for (k, v) in &other.type_param_bounds {
             self.type_param_bounds.entry(k.clone()).or_insert_with(|| v.clone());
         }
+        for (k, v) in &other.fun_bounds {
+            self.fun_bounds.entry(k.clone()).or_insert_with(|| v.clone());
+        }
         for (k, v) in &other.method_env {
             self.method_env.entry(k.clone()).or_insert_with(|| v.clone());
         }
@@ -646,6 +679,9 @@ pub struct InferContext {
     /// Type-param name → TypeVar for the currently-being-inferred generic function.
     /// Empty when inferring a non-generic function or at top level.
     current_type_params: HashMap<String, TypeVar>,
+    /// TypeVar → aspect names for the current generic function's bounded type params.
+    /// Parallel to current_type_params; swapped in/out alongside it.
+    current_type_param_bounds: HashMap<TypeVar, Vec<String>>,
 }
 
 impl InferContext {
@@ -667,6 +703,7 @@ impl InferContext {
             current_break_type:  None,
             registry,
             current_type_params: HashMap::new(),
+            current_type_param_bounds: HashMap::new(),
         };
         for (name, scheme) in imported_schemes {
             ctx.bind_poly(name, scheme.clone());
@@ -745,8 +782,30 @@ impl InferContext {
         std::mem::replace(&mut self.current_type_params, map)
     }
 
+    pub fn swap_type_param_bounds(&mut self, bounds: HashMap<TypeVar, Vec<String>>) -> HashMap<TypeVar, Vec<String>> {
+        std::mem::replace(&mut self.current_type_param_bounds, bounds)
+    }
+
     pub fn type_params(&self) -> &HashMap<String, TypeVar> {
         &self.current_type_params
+    }
+
+    /// Returns the aspect names required by a type param TypeVar in the current function scope.
+    pub fn bounds_for_type_var(&self, tv: TypeVar) -> Option<&Vec<String>> {
+        self.current_type_param_bounds.get(&tv)
+    }
+
+    /// Returns the aspect method defs from the registry.
+    pub fn get_aspect_method_defs(&self, aspect: &str) -> Option<&Vec<crate::ast::AspectMethod>> {
+        self.registry.aspect_method_defs(aspect)
+    }
+
+    pub fn register_fun_bounds(&mut self, name: String, bounds: HashMap<TypeVar, Vec<String>>) {
+        self.registry.register_fun_bounds(name, bounds);
+    }
+
+    pub fn fun_bounds_for(&self, name: &str) -> Option<&HashMap<TypeVar, Vec<String>>> {
+        self.registry.fun_bounds_for(name)
     }
 
     /// Return a new generator whose counter starts immediately past all vars

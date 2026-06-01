@@ -433,6 +433,10 @@ fn check_impl(
     base_registry: &TypeDefinitionRegistry,
     std_prelude: &StdPrelude,
 ) -> Result<(Vec<TypedDecl>, SchemeEnv, TypeDefinitionRegistry), MetelError> {
+    // Lowering pass: desugar `impl Aspect` params to fresh anonymous type params.
+    let program = inference::lower_impl_aspects_in_program(program.clone());
+    let program = &program;
+
     let mut gen = TypeVarGenerator::new();
     let mut reg = registry::build_registry(program, &mut gen);
     // Merge dependency type definitions so cross-module struct/enum refs resolve.
