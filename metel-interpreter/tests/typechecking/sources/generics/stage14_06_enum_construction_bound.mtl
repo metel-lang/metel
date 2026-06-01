@@ -1,0 +1,19 @@
+// Positive: enum with aspect bound on a type parameter, constructed with a
+// satisfying type.
+
+aspect Printable {
+    fun print(self);
+}
+
+enum Container<T: Printable> {
+    Some { value: T },
+    Empty {},
+}
+
+struct Item { name: String }
+
+impl Printable for Item { fun print(self) {} }
+
+fun wrap(item: Item) -> Container<Item> {
+    Container::Some { value: item }
+}

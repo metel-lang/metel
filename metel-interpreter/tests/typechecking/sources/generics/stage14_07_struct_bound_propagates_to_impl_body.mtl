@@ -1,0 +1,30 @@
+// Positive: a bounded struct can be constructed and used in a generic function
+// that re-uses the same bound, demonstrating that bounds are an invariant of
+// the type rather than just of the construction site.
+
+aspect Comparable {
+    fun compare(self, other: Self) -> Int;
+}
+
+struct SortedList<T: Comparable> {
+    items: T[],
+}
+
+struct Num { value: Int }
+
+impl Comparable for Num {
+    fun compare(self, other: Num) -> Int {
+        self.value - other.value
+    }
+}
+
+// A function that accepts the bounded struct and calls aspect methods on T.
+// The bound on SortedList<T> propagates — T: Comparable is available here.
+fun use_list<T: Comparable>(list: SortedList<T>, item: T) -> Int {
+    item.compare(item)
+}
+
+fun run(n: Num) -> Int {
+    let list = SortedList { items: [n] };
+    use_list(list, n)
+}

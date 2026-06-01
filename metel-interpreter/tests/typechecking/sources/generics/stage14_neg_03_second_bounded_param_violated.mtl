@@ -1,0 +1,26 @@
+// Negative: two bounded params; first is satisfied, second is NOT.
+// T0012 should be emitted (for the second param's bound).
+
+aspect Printable {
+    fun print(self);
+}
+
+aspect Serializable {
+    fun serialize(self) -> String;
+}
+
+struct A { value: Int }
+struct B { value: Int }
+
+impl Printable for A { fun print(self) {} }
+
+// B does NOT implement Serializable.
+
+fun dispatch<T: Printable, U: Serializable>(x: T, y: U) -> String {
+    x.print();
+    y.serialize()
+}
+
+fun bad(a: A, b: B) -> String {
+    dispatch(a, b) // ERROR[T0012]
+}

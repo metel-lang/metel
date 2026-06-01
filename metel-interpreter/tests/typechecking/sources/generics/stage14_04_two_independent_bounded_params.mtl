@@ -1,0 +1,27 @@
+// Positive: two type params with independent bounds — each checked separately.
+// T must implement Printable; U must implement Serializable.
+
+aspect Printable {
+    fun print(self);
+}
+
+aspect Serializable {
+    fun serialize(self) -> String;
+}
+
+struct A { value: Int }
+struct B { name: String }
+
+impl Printable for A { fun print(self) {} }
+impl Serializable for B {
+    fun serialize(self) -> String { self.name }
+}
+
+fun dispatch<T: Printable, U: Serializable>(x: T, y: U) -> String {
+    x.print();
+    y.serialize()
+}
+
+fun run(a: A, b: B) -> String {
+    dispatch(a, b)
+}

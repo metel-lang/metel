@@ -1,0 +1,20 @@
+// Positive: unbounded type param T can be any type; bounded param U: Printable
+// is enforced. The unbounded param does not generate a T0012 check.
+
+aspect Printable {
+    fun print(self);
+}
+
+struct Label { text: String }
+struct Payload { data: Int }
+
+impl Printable for Label { fun print(self) {} }
+
+fun tag<T, U: Printable>(payload: T, label: U) -> T {
+    label.print();
+    payload
+}
+
+fun run(p: Payload, l: Label) -> Payload {
+    tag(p, l)
+}

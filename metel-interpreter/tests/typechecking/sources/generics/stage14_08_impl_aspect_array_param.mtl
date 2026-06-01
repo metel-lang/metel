@@ -1,0 +1,18 @@
+// Positive: `impl Aspect` used as the element type of an array parameter.
+// Desugars to a fresh generic param; the array is typed as _T0[].
+
+aspect Printable {
+    fun print(self);
+}
+
+struct Item { name: String }
+
+impl Printable for Item { fun print(self) {} }
+
+fun print_first(items: impl Printable[]) {
+    // items has type _T0[] where _T0: Printable
+}
+
+fun run(items: Item[]) {
+    print_first(items)
+}

@@ -464,6 +464,30 @@ fun load() -> Result<Int, AppError> {
     fn stage14_neg_where_bound_of_merged_violated() { check("generics/stage14_neg_01_where_bound_of_merged_violated.mtl"); }
 
     #[test]
+    fn stage14_two_independent_bounded_params() { check("generics/stage14_04_two_independent_bounded_params.mtl"); }
+
+    #[test]
+    fn stage14_unbounded_param_alongside_bounded() { check("generics/stage14_05_unbounded_param_alongside_bounded.mtl"); }
+
+    #[test]
+    fn stage14_enum_construction_bound() { check("generics/stage14_06_enum_construction_bound.mtl"); }
+
+    #[test]
+    fn stage14_struct_bound_propagates_to_impl_body() { check("generics/stage14_07_struct_bound_propagates_to_impl_body.mtl"); }
+
+    #[test]
+    fn stage14_impl_aspect_array_param() { check("generics/stage14_08_impl_aspect_array_param.mtl"); }
+
+    #[test]
+    fn stage14_neg_method_not_in_bound() { check("generics/stage14_neg_02_method_not_in_bound.mtl"); }
+
+    #[test]
+    fn stage14_neg_second_bounded_param_violated() { check("generics/stage14_neg_03_second_bounded_param_violated.mtl"); }
+
+    #[test]
+    fn stage14_neg_enum_construction_bound_violated() { check("generics/stage14_neg_04_enum_construction_bound_violated.mtl"); }
+
+    #[test]
     fn stage12_fun_bound_satisfied() { check("generics/stage12_01_fun_bound_satisfied.mtl"); }
 
     #[test]

@@ -236,9 +236,30 @@ fn infer_impl_method(
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
 ) -> Result<(), MetelError> {
-    let generic_map: HashMap<String, TypeVar> = method.generics.iter()
+    // Start with the method's own generic params.
+    let mut generic_map: HashMap<String, TypeVar> = method.generics.iter()
         .map(|g| (g.name.clone(), ctx.fresh_type_var_raw()))
         .collect();
+
+    // Seed with the target struct/enum's generic params so that type annotations
+    // referencing e.g. `T` in `impl SortedList<T>` resolve to TypeVars and
+    // aspect methods on bounded params are available in the body.
+    let mut struct_bounds: HashMap<TypeVar, Vec<String>> = HashMap::new();
+    if let Some(names) = ctx.struct_generic_names_for(target_name).cloned() {
+        let bounds_by_pos: Option<Vec<Vec<String>>> =
+            ctx.get_type_param_bounds(target_name).cloned();
+        for (i, name) in names.iter().enumerate() {
+            if !generic_map.contains_key(name) {
+                let tv = ctx.fresh_type_var_raw();
+                generic_map.insert(name.clone(), tv);
+                if let Some(ref bp) = bounds_by_pos {
+                    if let Some(b) = bp.get(i) {
+                        if !b.is_empty() { struct_bounds.insert(tv, b.clone()); }
+                    }
+                }
+            }
+        }
+    }
 
     let te_to_infer = |te: &TypeExpr| -> InferType {
         if generic_map.is_empty() {
@@ -266,11 +287,13 @@ fn infer_impl_method(
     for (p, pt) in method.params.iter().zip(param_types.iter()) {
         ctx.bind_mono(&p.name, pt.clone(), p.mutable);
     }
-    let saved_type_params = ctx.swap_type_params(generic_map);
+    let saved_type_params  = ctx.swap_type_params(generic_map);
+    let saved_tp_bounds    = ctx.swap_type_param_bounds(struct_bounds);
     let saved_ret = ctx.push_return_type(ret_ty.clone());
     let body_ty = infer_block(&method.body, ctx, fun_generalizations)?;
     ctx.add_constraint(body_ty, ret_ty.clone(), method.body.span.clone());
     ctx.pop_return_type(saved_ret);
+    ctx.swap_type_param_bounds(saved_tp_bounds);
     ctx.swap_type_params(saved_type_params);
     ctx.pop_scope();
 

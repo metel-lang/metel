@@ -143,6 +143,10 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
                     .collect();
                 registry.register_struct_fields(sd.name.clone(), fields);
                 registry.register_struct_type_params(sd.name.clone(), type_params);
+                registry.register_struct_generic_names(
+                    sd.name.clone(),
+                    sd.generics.iter().map(|g| g.name.clone()).collect(),
+                );
                 let bounds = collect_type_param_bounds(&sd.generics, sd.where_clause.as_ref());
                 if bounds.iter().any(|b| !b.is_empty()) {
                     registry.register_type_param_bounds(sd.name.clone(), bounds);
@@ -162,6 +166,10 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
                         .map(|f| (f.name.clone(), type_expr_to_infer_with_generics(&f.type_ann, &gen_map), f.span.clone()))
                         .collect(),
                 }).collect();
+                registry.register_struct_generic_names(
+                    ed.name.clone(),
+                    ed.generics.iter().map(|g| g.name.clone()).collect(),
+                );
                 let bounds = collect_type_param_bounds(&ed.generics, ed.where_clause.as_ref());
                 registry.register_enum(ed.name.clone(), EnumInfo {
                     type_params,

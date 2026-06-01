@@ -1,0 +1,19 @@
+// Negative: enum with aspect bound constructed with a type that does NOT
+// implement the bound. Expect T0012.
+
+aspect Printable {
+    fun print(self);
+}
+
+enum Container<T: Printable> {
+    Some { value: T },
+    Empty {},
+}
+
+struct Plain { x: Int }
+
+// Plain does not implement Printable.
+
+fun bad(p: Plain) -> Container<Plain> {
+    Container::Some { value: p } // ERROR[T0012]
+}

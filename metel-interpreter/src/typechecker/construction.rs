@@ -1108,6 +1108,26 @@ fn construct_enum_literal_ty(
         })
         .collect::<Result<_, _>>()?;
 
+    // T0012: check each resolved type arg satisfies the enum's declared bounds.
+    if let Some(param_bounds) = ctx.registry.type_param_bounds_for(enum_name) {
+        for (i, bounds) in param_bounds.iter().enumerate() {
+            if bounds.is_empty() { continue; }
+            let type_name = match concrete_args.get(i) {
+                Some(Type::Named(n, _)) => n.clone(),
+                _ => continue,
+            };
+            for aspect in bounds {
+                if !ctx.registry.impl_aspect_env_has(&type_name, aspect) {
+                    return Err(MetelError::type_error(
+                        TypeErrorCode::T0012,
+                        format!("`{type_name}` does not implement `{aspect}` (required by `{enum_name}`)"),
+                        span,
+                    ));
+                }
+            }
+        }
+    }
+
     let infer_args: Vec<InferType> = concrete_args.iter().map(type_to_infer).collect();
     infer_type_to_type(&InferType::Named(enum_name.to_string(), infer_args), span)
 }
