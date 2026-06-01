@@ -1,402 +1,340 @@
-# Metel — Agent Guide
+# Metel - Agent Guide
 
 ## Project
 
-Metel is a statically-typed, expression-oriented language. This repository contains its tree-walk interpreter. Tasks are tracked in GitHub Projects v2; spec docs and decision records live in `docs/`. The versioning model (language versions, RFC lifecycle, doc conventions) is defined in [`docs/internal/versioning.md`](docs/internal/versioning.md).
+Metel is a statically typed, expression-oriented language. This repository contains the tree-walk interpreter and consumes the shared documentation repository as the `docs/` submodule.
+
+The interpreter is the shipped runtime. Treat it as the current product surface, not as throwaway compiler scaffolding. The language specification is the contract the interpreter must satisfy.
+
+The repository remote is Codeberg (`codeberg.org/metel-lang/metel`). Task tracking is in Plane, not GitHub Projects.
 
 ---
 
-## Documentation Structure
+## Current Documentation Structure
+
+`docs/` is the shared `metel-docs` submodule. Update it as a real submodule: make docs edits in the submodule, commit them there, then update the pointer in this repo.
 
 | Location | Purpose |
 |---|---|
-| `docs/public/spec.md` | **Language Specification** — entry point; links to all spec sections. If it's not here, it doesn't exist yet. |
-| `docs/public/spec/` | **Spec sections** — lexical, types, declarations, functions, expressions, runtime, grammar |
-| `docs/public/changelog.md` | **Changelog** — per-version feature list |
-| `docs/internal/rfcs/` | **RFCs** — language change proposals; see versioning model for lifecycle |
-| `docs/internal/versioning.md` | **Versioning model** — version numbering, RFC lifecycle, doc conventions |
-| `metel-interpreter/docs/architecture.md` | **Architecture Overview** — pipeline diagram, component boundaries |
-| `metel-interpreter/docs/typechecker.md` | **Typechecker** — HM theory background + implementation notes |
-| `metel-interpreter/docs/evaluator.md` | **Evaluator** — runtime values, signals, environment, known limitations |
-| `metel-interpreter/docs/decisions/` | **Decision records** — why a non-obvious implementation choice was made |
-| GitHub Projects v2 | **Task board** — canonical status view (https://github.com/orgs/metel-lang/projects/1) |
-| GitHub Issues | **Tasks** — unit of work; use `gh issue list` for CLI access |
-| GitHub Milestones | **Version milestones** (`v0.2`, `v0.3`, …) and **Epic milestones** (implementation groupings) |
+| `docs/README.md` | Authoritative public/internal docs layout |
+| `docs/public/getting-started/` | Intro, quickstart, and tutorials |
+| `docs/public/reference/spec.md` | Language specification entry point |
+| `docs/public/reference/spec/` | Spec sections: lexical, types, declarations, functions, expressions, modules, runtime, grammar |
+| `docs/public/reference/error-codes.md` | Error code reference |
+| `docs/public/release-notes/changelog.md` | Version changelog and release notes |
+| `docs/internal/versioning.md` | Version numbering, RFC lifecycle, and doc conventions |
+| `docs/internal/rfcs/active/` | RFCs under design or review |
+| `docs/internal/rfcs/accepted/` | Accepted RFCs not yet shipped |
+| `docs/internal/rfcs/implemented/` | Implemented/incorporated RFCs |
+| `docs/reports/` | Design reports and longer-form research notes |
+| `metel-interpreter/docs/architecture.md` | Interpreter pipeline and component boundaries |
+| `metel-interpreter/docs/typechecker.md` | Typechecker theory and implementation notes |
+| `metel-interpreter/docs/evaluator.md` | Runtime values, signals, environment, and evaluator notes |
+| `metel-interpreter/docs/decisions/` | Architectural decision records |
 
-## Wiki Release Workflow
+Public docs no longer live at `docs/public/spec.md`, `docs/public/spec/`, or `docs/public/changelog.md`. Those paths are stale.
 
-The public wiki lives in `metel-website` and consumes `metel-docs` as a submodule. Treat it as the user-facing documentation surface for public releases.
+---
 
-When a task or release affects public documentation:
+## Task Tracking: Plane
 
-1. Update `metel-docs` first.
-2. Point `metel-website` at the updated docs commit.
-3. If a new public docs release is being published, generate the versioned docs snapshot in `metel-website`.
-4. Publish the wiki only after the matching docs version is ready.
+Plane is the source of truth for tasks, RFC tracking, sprint cycles, and version milestones.
 
-For now, wiki publication remains manual. Do not assume automatic CI deployment is available unless the release workflow explicitly says so.
+Current Plane identifiers:
+
+| Field | Value |
+|---|---|
+| Project identifier | `METEL` |
+| Project ID | `ec7904a4-cd24-40bd-8089-19a5eb8875ab` |
+| States | `Backlog`, `Todo`, `In Progress`, `Done`, `Cancelled` |
+| Work item types | `Task`, `RFC`, `Epic` |
+| Product modules | `Interpreter`, `Wiki`, `Compiler`, `Playground`, `LSP` |
+
+Use Plane work item identifiers in user-facing references and commit messages, for example `METEL-57`. When a tool requires the UUID, use the project ID above.
+
+Common Plane actions:
+
+- Read a task: retrieve work item by project identifier `METEL` and sequence number.
+- Search tasks: list work items with a query, label, milestone, state, cycle, or module filter.
+- Start work: set the work item state to `In Progress`.
+- Finish work: set the work item state to `Done` only after acceptance criteria and tests pass.
+- Track dependencies: use work item relations (`blocked_by`, `blocking`, `relates_to`) rather than encoding dependency state in files.
+- Version planning: use Plane milestones such as `v0.6.4`, `0.7.0`, `v0.8.0`.
+- Sprint planning: use Plane cycles such as `Sprint 17 - Aspect Bounds`.
+
+Do not rely on `.github/` automation or GitHub issue labels. This checkout no longer has `.github/` workflow or issue-template files.
 
 ---
 
 ## Sprint Workflow
 
-Sprints are the unit of shipping. All sprint work must live on a dedicated branch and be merged into `main` via a pull request before the sprint is closed. The PR diff is the canonical sprint deliverable — it replaces any need to reconstruct what changed from individual commits.
+Sprints are Plane cycles and repository branches. Sprint branches still use the `sprint/<N>` convention.
 
-### Starting a sprint
+### Starting a Sprint
 
-1. **Create the sprint branch** from the current `main`:
-   ```bash
-   git checkout main && git pull
-   git checkout -b sprint/N        # e.g. sprint/3
-   git push -u origin sprint/N
-   ```
-   Branch naming convention: `sprint/<N>` where `N` is the sprint number (matches the kickoff issue number's sprint label).
+1. Create or confirm the Plane cycle (`Sprint N - Theme`).
+2. Add planned Plane work items to the cycle with state `Todo`.
+3. Create the branch from current `main`:
 
-2. **Create the kickoff issue** (title: `Sprint N Kickoff — <theme>`) listing all planned tracks and issues. Leave it open until the sprint closes.
-
-3. **Add all planned issues to the project board** with Status **Todo**. "In Progress" is reserved for tasks actively being worked on — sprint kickoff only moves issues from Backlog → Todo, never to In Progress.
-
-3. **All subsequent work on this sprint goes on `sprint/N`**. This includes code commits, doc commits, and submodule pointer updates.
-
-### During a sprint
-
-- Every commit must be on `sprint/N`. Do not commit sprint work directly to `main`.
-- Individual issue work follows the normal task workflow (see below).
-- The sprint branch is pushed to origin after each logical unit of work (issue closed, fix applied, etc.).
-
-### Closing a sprint
-
-**No sprint may be merged to `main` without passing the quality gate below.** This is not optional — skipping it defeats the purpose of the sprint process.
-
-#### Quality Gate (mandatory before PR)
-
-Run `/sprint-end` to execute the full checklist. It will not produce a PR until every gate passes. The gates are:
-
-1. **Test suite** — `cargo test` must pass with zero failures. Every single test, including those unrelated to the sprint's changes, must be green.
-
-2. **Code quality** — for every file touched in the sprint diff (`git diff main..HEAD --name-only`):
-   - No dead code that should have been cleaned up (unused variables, unreachable arms, stale comments).
-   - No `todo!()`, `unimplemented!()`, or `unreachable!()` added without a tracking issue.
-   - No `unwrap()` or `expect()` on paths that can realistically fail at runtime.
-   - Builtins registered in all required places (see issue #106 pattern — a builtin added to `registry.rs` must also appear in `construction.rs`).
-
-3. **Test coverage** — every feature or fix introduced in the sprint must have at least one test:
-   - New builtins → typechecking test in `tests/typechecking/sources/`.
-   - New grammar constructs → parsing test or typechecking test.
-   - New evaluator behaviour → evaluator test or integration test in `tests/`.
-   - Bug fixes → a regression test that would have caught the bug.
-   - If a case is genuinely untestable, document why in the review issue.
-
-4. **Spec accuracy** — for every language-visible change in the sprint:
-   - The feature or behaviour is described in `docs/public/spec/`. If it isn't there, it doesn't exist as far as users are concerned.
-   - The builtin table in `docs/public/spec/runtime.md` matches what `register_builtins` actually registers.
-   - Any accepted RFC implemented in the sprint has `status: incorporated` in its frontmatter.
-
-5. **Spec completeness** — read the full spec entry point (`docs/public/spec.md`) and every section it links to. Verify:
-   - No section refers to a feature that was removed or renamed during the sprint without updating the reference.
-   - No "TODO" or "TBD" markers were left behind by sprint work.
-   - The changelog (`docs/public/changelog.md`) has an entry for the sprint's version milestone.
-
-6. **Internal doc accuracy** — for every component touched:
-   - `metel-interpreter/docs/architecture.md` still accurately describes the pipeline.
-   - `metel-interpreter/docs/evaluator.md` reflects any new Value variants, signal types, or builtin behaviour.
-   - `metel-interpreter/docs/typechecker.md` reflects any new passes, constraints, or inference rules.
-
-7. **Architectural decision records** — review every commit on the sprint branch. For each non-obvious architectural decision (a choice between plausible designs, a deliberate deviation from a prior ADR or RFC, a constraint future contributors must know, or a workaround for a limitation not obvious from the code), a decision record must exist in `metel-interpreter/docs/decisions/`. Missing records must be created before the sprint PR is opened.
-
-If **any gate fails**, the sprint cannot close. Fix the issue, commit the fix to the sprint branch, and re-run the gate.
-
-#### Closing steps (after quality gate passes)
-
-1. **Update the kickoff issue** to reflect what was actually completed vs. deferred, as a factual record.
-2. **Create the sprint review issue** (title: `Sprint N Review — <theme>`) summarising what was delivered, what was deferred and why, architectural notes, and any quality gate findings that were resolved. Link it to the kickoff issue.
-3. **Open a PR** from `sprint/N` → `main`:
-   ```bash
-   gh pr create \
-     --repo metel-lang/metel \
-     --base main \
-     --head sprint/N \
-     --title "Sprint N — <theme>" \
-     --body "Sprint review: #<review-issue-number>
-
-   Closes #<review-issue-number>
-   Closes #<kickoff-issue-number>"
-   ```
-   The PR description must link the sprint review issue. The PR diff is the authoritative record of all changes made during the sprint.
-4. **Merge the PR** (squash or merge commit — no force-push). Close the kickoff issue if not auto-closed.
-5. **Delete the sprint branch** after merge.
-
-### Why this process
-
-- The PR diff makes sprint reviews straightforward: reviewers see exactly what changed, in what files, without reconstructing it from individual commits.
-- `main` always reflects a completed, reviewed sprint — never mid-sprint state.
-- The quality gate ensures that `main` is always in a state where the spec, docs, tests, and code agree with each other. Drifting any one of these degrades the project over time.
-- Rollback of a sprint is a single revert if needed.
-
----
-
-## RFC Workflow
-
-RFCs (Requests for Comments) are language design proposals. They are tracked in two places:
-- **Docs repo** (`metel-docs/internal/rfcs/`) — source of truth for RFC documents
-- **Plane** — personal project tracking for RFC progress and implementation
-
-### RFC Organization
-
-RFCs are organized by status in the docs repo:
-
-```
-metel-docs/internal/rfcs/
-├── active/       # RFCs under design review (open questions, proposals, no decision yet)
-├── accepted/     # RFCs reviewed and accepted (decision made, Outcome: Accepted)
-└── implemented/  # RFCs fully implemented (features in spec and interpreter)
+```bash
+git checkout main
+git pull --recurse-submodules
+git checkout -b sprint/N
+git push -u origin sprint/N
 ```
 
-Each RFC file has a frontmatter field `status: active` or `status: accepted`.
+4. Keep all sprint code, docs pointer updates, and release-prep commits on `sprint/N`.
 
-### RFC Lifecycle — Three States
+### During a Sprint
 
-**Phase 1 — Active (draft, under review):**
-1. Create RFC file in `metel-docs/internal/rfcs/active/` following naming convention `rfc-NNNN-topic-kebab.md`
-2. Fill frontmatter: `id`, `title`, `date`, `status: active`
-3. Write the RFC document with clear motivation, design, open questions, and placeholder Decision section
-4. Create Plane work item with type **RFC**, summary field only contains: "Summary of topic" + link to the RFC file: `[View RFC](https://github.com/metel-lang/metel-docs/blob/main/internal/rfcs/active/rfc-NNNN-...)`
-5. Discussion and feedback happens in the RFC document and Plane work item
+- Read the Plane work item before editing code.
+- Move only actively worked items to `In Progress`.
+- Keep commits on the sprint branch.
+- Push after each logical unit of completed work.
+- If public docs changed, commit in `docs/` first, then commit the updated submodule pointer in this repo.
 
-**Phase 2 — Accepted (content reviewed and design approved):**
-1. Once the RFC's contents have been reviewed and the design is approved:
-   - Update RFC frontmatter: `status: accepted` and fill the Decision section with final outcomes and resolved questions
-   - Move RFC file from `active/` to `accepted/`
-   - Update Plane RFC work item summary to reflect accepted status (add "Accepted" or similar indicator)
-2. Create implementation work items (type: Task) linked to the RFC Plane work item. Implementation work items should explicitly mention the design decisions and any limitations documented in the RFC.
-3. Accepted RFCs stay in `accepted/` until implementation is complete.
+### Closing a Sprint
 
-**Phase 3 — Implemented (features fully in spec and interpreter):**
-1. When all implementation work items are complete and the features are fully in the spec and interpreter:
-   - Move RFC file from `accepted/` to `implemented/`
-   - Mark Plane RFC work item as **Done**
-   - Update RFC frontmatter with any final notes (e.g., version shipped, implementation notes)
-2. Update the spec (`docs/public/spec/`) to document the implemented feature
-3. Update the changelog (`docs/public/changelog.md`)
+Before opening a pull request from `sprint/N` to `main`, run the quality gate below. If any gate fails, fix it on the sprint branch and run the gate again.
 
-### Creating an RFC Work Item
+1. **Tests** - `cargo test` from `metel-interpreter/` must pass with zero failures.
+2. **Code quality** - review every file in `git diff main..HEAD --name-only` for stale code, dead branches, accidental `todo!()`, `unimplemented!()`, `unreachable!()`, and fallible `unwrap()`/`expect()` paths.
+3. **Coverage** - every feature or fix needs a focused regression test:
+   - Parser or grammar changes: parsing tests or typechecking tests.
+   - Type system changes: typechecking tests in `tests/typechecking/sources/`.
+   - Evaluator/runtime changes: evaluator tests in `tests/evaluator/sources/` or module semantics tests.
+   - Module graph/name-resolution changes: `tests/module_loading/` or `tests/module_semantics/`.
+4. **Spec accuracy** - every language-visible change is documented in `docs/public/reference/spec.md` and the linked spec section.
+5. **Changelog** - version-visible work is recorded in `docs/public/release-notes/changelog.md`.
+6. **RFC state** - accepted RFCs implemented by the sprint are moved or marked according to `docs/internal/versioning.md`; incorporated RFCs must not remain in the accepted queue.
+7. **Internal docs** - update `metel-interpreter/docs/architecture.md`, `typechecker.md`, or `evaluator.md` when the corresponding pipeline, inference, construction, runtime, or builtin behavior changes.
+8. **Decision records** - add a new ADR in `metel-interpreter/docs/decisions/` for non-obvious architectural decisions, reversals, or workarounds future contributors must know.
+9. **Plane** - completed work items have satisfied acceptance criteria and are set to `Done`; deferred work is explicit in Plane, not hidden in comments.
 
-When creating a Plane work item for an RFC:
-
-**Type:** RFC  
-**Subject:** RFC title (e.g., "RFC-0034: Aspect Bounds on Struct and Enum Generic Parameters")  
-**Description:** Only a summary + link. Example:
-
-```
-Define aspect bounds on struct and enum generic type parameters.
-
-**View full RFC:** [RFC-0034 in docs repo](https://github.com/metel-lang/metel-docs/blob/main/internal/rfcs/active/rfc-0034-struct-enum-aspect-bounds.md)
-```
-
-No detailed description in Plane — the RFC document is the source of truth.
-
-### Linking Implementation Work Items
-
-When creating implementation work items for an accepted RFC:
-
-1. Create a normal Task work item with the implementation scope
-2. Add a relation to the RFC work item (in Plane's Relations field)
-3. The implementation items' titles should reference the RFC: `Implement RFC-0034: ...`
-
-When the implementation is complete and the final work item is marked done, close the RFC work item.
-
-### Why This Structure
-
-- **Docs repo is the source of truth** — RFCs are versioned with the project, reviewed via PR, and available in releases
-- **Plane tracks progress** — sprint progress, blockers, and implementation coordination
-- **Clear separation** — design decisions live in RFC documents; implementation tracking lives in Plane
-- **Status is unambiguous** — folder name and frontmatter status field make it obvious whether an RFC is active or accepted
-- **Traceability** — implementation work items link to the RFC; the RFC links back to the docs repo
+After the gate passes, open a pull request from `sprint/N` to `main` on Codeberg. The pull request diff is the authoritative sprint deliverable.
 
 ---
 
 ## Task Workflow
 
-### Before starting a task (open → in-progress)
+### Before Starting a Task
 
-1. **Read the full issue** including all acceptance criteria: `gh issue view <number>`
-2. **Check the spec** — read every spec section the task touches. Identify anything ambiguous or missing.
-   - If a spec gap exists: **STOP**. Fix the spec first (`docs/public/spec.md`). If the fix requires a non-obvious decision, write a decision record first.
-3. **Check existing decisions** — `grep` or `ls` in `metel-interpreter/docs/decisions/` for any ADR that governs the area being changed. Read it before writing any code.
-4. **Check dependencies** — verify every linked issue is closed and its implementation matches what this task expects.
-5. **If no clear path forward exists** — STOP. Ask for guidance before beginning implementation. Do not make a significant architectural decision unilaterally.
-6. **Mark in-progress**: `gh issue edit <number> --add-label "status:in-progress"` and set the project Status field to **In Progress**
+1. Retrieve and read the full Plane work item, including acceptance criteria, dependencies, labels, milestone, cycle, and module.
+2. Read every spec section the task touches. The spec entry point is `docs/public/reference/spec.md`.
+3. Read relevant RFCs in `docs/internal/rfcs/` and ADRs in `metel-interpreter/docs/decisions/`.
+4. Check dependency work items and confirm their implementation matches the contract this task depends on.
+5. If the spec is missing or ambiguous, update the spec first. If the choice is non-obvious, write an ADR before implementation.
+6. Move the Plane work item to `In Progress`.
 
-### During implementation
+### During Implementation
 
-- **Follow the spec exactly.** If behaviour is not described in the spec, it does not exist. Add it to the spec before implementing it.
-- **If an ambiguity surfaces mid-implementation**: stop, decide (write a decision record if non-obvious), update the spec, then continue. Never implement an undocumented behaviour and "fix the docs later."
-- **If a spec section turns out to be wrong or impractical**: stop, write a decision record superseding the previous understanding, update the spec, then implement against the updated spec.
-- **If an unexpected, undocumented limitation is encountered** (a constraint not described in any spec, doc, or known-limitations section): add an entry to the relevant known-limitations section immediately, then surface it to the user before continuing. Do not silently work around it.
-- **Do not expand scope.** If you discover necessary work outside the task boundary, open a new issue for it. Finish the current task first unless the out-of-scope work is a hard blocker.
+- Follow the spec exactly. If behavior is not in the spec, it does not exist yet.
+- Do not implement undocumented behavior and plan to fix docs later.
+- Keep scope tight. If required work falls outside the task, create or update a Plane work item and only proceed if it is a real blocker.
+- Preserve user changes in the worktree. Never revert unrelated dirty files.
+- Keep docs submodule changes and root-repo pointer changes distinct.
 
-### Before closing a task (in-progress → done)
+### Before Marking Done
 
-1. All acceptance criteria must be checked off — no exceptions.
-2. All tests must pass, including tests from earlier tasks.
-3. If any non-obvious decisions were made during implementation → create a decision record.
-4. If the implementation revealed spec gaps that you fixed → verify the spec edit is committed.
-5. **Close the issue**: `gh issue close <number>` (or include `Closes #<number>` in the commit body to auto-close on push). The project Status field updates to **Done** automatically, and the `status:in-progress` label is removed by CI.
+1. All acceptance criteria are satisfied.
+2. Relevant tests pass; for typechecker or inference changes, the full `cargo test` suite passes.
+3. Spec, changelog, RFC, internal docs, and ADR updates are complete where required.
+4. The work item is moved to `Done` in Plane.
 
-### Opening a new issue
+---
 
-```bash
-gh issue create \
-  --title "Brief imperative title" \
-  --label "generics" \
-  --milestone "v0.2" \
-  --body "## Description\n...\n\n## Acceptance Criteria\n- [ ] ..."
-```
+## RFC Workflow
 
-Search for duplicates first: `gh issue list --search "keyword"`
+RFCs live in `docs/internal/rfcs/` and are tracked in Plane with work item type `RFC`.
+
+Follow `docs/internal/versioning.md` for the lifecycle and frontmatter requirements. In practice, the folders are:
+
+- `active/` - design work not yet accepted or not yet scheduled.
+- `accepted/` - design accepted and assigned to a target version milestone.
+- `implemented/` - implemented and shipped/incorporated.
+
+Rules:
+
+- The RFC document is the source of truth for design details.
+- The Plane RFC item should summarize the topic and link to the RFC file; do not duplicate the whole RFC body in Plane.
+- Accepted RFCs must have the relevant spec or internal architecture docs updated before implementation work begins.
+- Implementation tasks should relate back to the RFC work item.
+- When the target version ships, incorporated RFCs must be moved or marked according to `docs/internal/versioning.md`.
+
+If an existing RFC's folder, frontmatter status, or `spec_status` contradicts `docs/internal/versioning.md`, stop and resolve the documentation workflow inconsistency before implementing against it.
 
 ---
 
 ## Commit Convention
 
-Every commit related to a task **must reference the issue number**:
+Every commit related to a Plane task should reference the work item identifier:
 
-```
-<type>(#<number>): <description>
-```
-
-Types: `feat`, `fix`, `refactor`, `test`, `docs`. Commits unrelated to any issue omit the reference: `docs: fix typo in README`.
-
-### One commit stream — sprint branch only
-
-Task state changes happen on GitHub Issues, not in the repo. **The main repo only gets a commit when actual code or docs are written.** During an active sprint, all commits go on the sprint branch (`sprint/N`). Nothing is committed directly to `main` while a sprint is in progress.
-
-### Commit reference table
-
-| Situation | Type | Example |
-|---|---|---|
-| Code change for a task | `feat` / `fix` / `refactor` / `test` | `feat(#42): add generic type inference` |
-| Spec or doc edit | `docs` | `docs(#42): clarify let-polymorphism in spec/declarations.md` |
-| Decision record | `docs` | `docs: add decision — unify type var generation` |
-
-### Closing commits require a body
-
-```
-feat(#42): add generic type inference
-
-- Added unification for generic type variables in typeinference/mod.rs
-- Extended TypeEnv to track generic constraints
-- Added 12 integration tests covering polymorphic functions
-
-Closes #42
+```text
+<type>(METEL-<number>): <description>
 ```
 
-`Closes #42` in the body auto-closes the issue when the commit lands on main.
+Types: `feat`, `fix`, `refactor`, `test`, `docs`.
 
----
+Examples:
 
-## When to STOP and Ask
-
-Stop and ask the user before proceeding when:
-
-- **A design decision is required** with no clearly correct answer — multiple options exist and the choice has architectural consequences.
-- **The spec is ambiguous** in a way that affects the implementation, and the right interpretation is not obvious.
-- **Implementing would require changing things outside the task scope** in ways that could affect other tasks or break existing behaviour.
-- **A dependency is incomplete or wrong** — the task assumes a contract that the dependency does not deliver.
-- **The task description seems out of date** — it references things that no longer exist or contradict the current codebase state.
-- **You are about to make an irreversible or difficult-to-reverse change** — schema changes, API breaks, deleted code.
-
-When you stop, explain clearly: what you found, what the options are, and what you recommend. Do not just block — give the user enough context to make a decision.
-
----
-
-## Decision Records
-
-Create a decision record (a new `.md` file in `metel-interpreter/docs/decisions/`, following the naming and format of existing records) when:
-
-- Multiple reasonable implementation options existed and the choice was non-trivial.
-- The rationale will matter when revisiting this area later.
-- A spec section is being changed due to an implementation finding.
-- A previous decision is being reversed.
-
-Do **not** create a decision record for:
-
-- Choices with an obvious single answer.
-- Routine implementation details that follow directly from the spec.
-- Things already covered by an existing decision record.
-
-Accepted decisions are never modified. To reverse one, create a new decision record that supersedes the old one and update its status field.
-
-### Linking decisions to code
-
-When a piece of code would surprise a future contributor — it looks wrong but isn't, it must stay a certain way, or it encodes a subtle invariant — add a one-line comment with the reason and an ADR reference:
-
-```rust
-// Flat merge: all module decls visible globally to the typechecker (ADR-0019).
-// Remove when name_resolver is wired into the check pipeline.
+```text
+feat(METEL-57): enforce function aspect bounds
+docs(METEL-58): update aspect bound spec text
+test(METEL-60): cover generic bound regressions
 ```
 
-Do **not** add ADR links to routine code. The link must carry information that a reader cannot recover from the code and its surrounding context alone. A bare `// see ADR-0019` with no hint of what the decision was is not useful.
+Commits not tied to a tracked item may omit the reference, for example `docs: point CLAUDE.md to AGENTS.md`.
 
-Reserve this for:
-- Code that looks like a bug but is intentional (a workaround, a deliberate shortcut, a known limitation).
-- An invariant the ADR documents as load-bearing — something a future refactor must not break silently.
+When a commit is intended to close work after merge, include a body describing what changed and reference the work item:
+
+```text
+feat(METEL-57): enforce function aspect bounds
+
+- Check call-site type arguments against declared bounds
+- Seed bound methods during function body inference
+- Add stage12 typechecking regressions
+
+Completes METEL-57
+```
+
+During an active sprint, commit only on `sprint/N`, not directly on `main`.
 
 ---
 
 ## Spec Discipline
 
-- The spec is the source of truth. Implementation follows the spec; the spec does not follow the implementation.
-- The spec does not contain rationale, history, or open questions. Those belong in decision records and the spec backlog respectively.
-- When an RFC is accepted and implemented, mark it `incorporated` in `docs/internal/rfcs/` and write the feature into the appropriate `docs/public/spec/` file.
-- Do not skip validation levels: interpreter validates before compiler implements.
+- The spec is the source of truth for language-visible behavior.
+- The spec contains rules and syntax, not rationale, history, or open questions. Put rationale in RFCs or ADRs.
+- New public behavior must be documented in `docs/public/reference/spec/`.
+- Runtime builtins documented in `docs/public/reference/spec/runtime.md` must match what the interpreter registers.
+- Version-visible changes must be reflected in `docs/public/release-notes/changelog.md`.
+- Patch releases must not introduce spec changes; see `docs/internal/versioning.md`.
+
+---
+
+## Interpreter Architecture Invariants
+
+The current interpreter pipeline is:
+
+```text
+.mln root file
+  -> Module Loader
+  -> Name Resolver
+  -> Path Normalizer
+  -> Type Checker
+  -> Evaluator
+```
+
+Do not skip stages.
+
+Important module-system invariants:
+
+- `module_loader::load_root` produces a `ModuleGraph` in topological order.
+- `name_resolver::resolve` owns import scopes, visibility, public surfaces, and re-exports.
+- `path_normalizer::normalize` rewrites qualified paths before typechecking.
+- `typechecker::check_graph` consumes the normalized graph plus resolved names and returns `TypedModuleGraph`.
+- `evaluator::evaluate_graph` consumes `TypedModuleGraph`.
+- Cross-module public APIs must be fully annotated; do not introduce cross-module type inference casually.
+
+If a change alters these boundaries, update `metel-interpreter/docs/architecture.md` and consider an ADR.
 
 ---
 
 ## Type System Stability
 
-The type inference (`src/typeinference/mod.rs`) and typechecker (`src/typechecker/mod.rs`) are the most sensitive components in the codebase. Bugs here produce silent mis-compilations — not crashes — and are hard to detect through tests alone. Treat changes to these files with more care than anything else.
+The sensitive areas are `metel-interpreter/src/typeinference/` and `metel-interpreter/src/typechecker/`. Bugs here can produce silent wrong typing, not just crashes.
 
-### Two-pass architecture invariants
+### Two-Pass Typechecker Boundary
 
-The typechecker runs in two passes that must remain strictly separated:
+The typechecker remains split into inference and construction:
 
-- **Pass 1 (inference)**: Walks the AST, pushes constraints, solves into `ctx.subst`. Side-effects only on `ctx`.
-- **Pass 2 (construct)**: Walks the AST again, reads `ctx.subst`, builds `TypedAST`. Must not infer or constrain — only resolve.
+- Pass 1 (`src/typechecker/inference.rs`): walk the AST, emit constraints, solve into substitutions, update inference context.
+- Pass 2 (`src/typechecker/construction.rs`): read solved substitutions and build typed AST nodes.
 
-Do not infer types in Pass 2. Do not build TypedAST nodes in Pass 1. If you find yourself doing either, stop and ask.
+Do not infer types in Pass 2. Do not build typed AST nodes in Pass 1. If a task seems to require that, stop and ask.
 
-### Key invariants to preserve
+### Key Invariants
 
-- **`Substitution::compose` is ordered**: `a.compose(b)` means "apply `b` to `a`'s values, then merge" — equivalent to `a ∘ b` (b first). Reversing the arguments changes the semantics. Always check which direction is correct at each call site.
-- **`Never` is a bottom type**: `unify(Never, T)` always succeeds. This means typechecking tests cannot distinguish a `Never`-typed expression from a correctly typed one. Use evaluator tests (once available) to verify runtime correctness.
-- **`type_to_infer` normalises `Perhaps`/`Result`**: These are distinct `Type` variants but normalise to `InferType::Named`. Code that pattern-matches on `Type::Named` will miss them unless routed through `type_to_infer` first.
-- **`TypeVar` vs `InferType::Var`**: Formal type parameters in `EnumInfo`/`StructInfo` are stored as `TypeVar`. Fresh variables at a usage site are `InferType::Var(TypeVar)`. Do not confuse the two — passing a formal `TypeVar` where a fresh `InferType::Var` is expected silently produces wrong substitutions.
-- **`instantiate_scheme_for_call` is the canonical pattern** for generic instantiation: create fresh `InferType::Var` per type param, build `init_subst`, unify instantiated types against actuals, then extract concrete types from the composed substitution. Replicate this pattern; do not invent alternatives.
+- `Substitution::compose` is ordered. Verify composition direction every time it is used.
+- `Never` is a bottom type. Typechecking tests alone may not distinguish a diverging expression from a correctly typed runtime path; use evaluator tests for runtime behavior.
+- Route conversions through `type_to_infer` where `Perhaps`/`Result` normalization matters.
+- Distinguish formal `TypeVar`s from fresh `InferType::Var(TypeVar)` usage-site variables.
+- Generic instantiation should follow the established `instantiate_scheme_for_call` pattern: fresh variables, initial substitution, unification against actuals, then extraction from the composed substitution.
+- Imported schemes must seed both inference and construction paths for a module. If only one pass sees imports, the typechecker is wrong.
+- Public module declarations that are consumed cross-module must have enough annotations to export concrete schemes.
 
-### Before committing changes to these files
+### Before Finalizing Type System Changes
 
-1. Run the **full test suite**: `cargo test` from `metel-interpreter/`. Every test must pass — regressions in unrelated tests are a signal that a shared invariant was broken.
-2. Run `/review-typechecker` and work through the checklist before finalising.
-3. If you added a new `unify` call: verify the argument order is `(expected, actual)` and that substitution composition is in the correct direction.
-4. If you added a new `infer_type_to_type` call: verify the call site has access to a `Span` and that all `InferType::Var` cases are resolved before the call.
-5. If you changed `construct_block`'s signature or the threading of `expected_ty`: verify every call site passes the correct expected type (function return type, annotation type, or `None`) — a `None` where a type is expected causes annotation-dependent failures.
+1. Run `cargo test` from `metel-interpreter/`.
+2. Run or manually apply the `/review-typechecker` checklist.
+3. For every new `unify` call, verify expected-vs-actual argument order and substitution composition direction.
+4. For every `infer_type_to_type` call, verify all type variables are resolved and a useful span is available.
+5. If `construct_block` expected-type threading changes, check every call site.
+6. Add regression tests that would fail without the fix.
 
-### When to STOP on type system changes
+Stop and ask if:
 
-- A change requires touching both `mod.rs` files simultaneously — this is a sign the boundary between passes is being violated.
-- You cannot find an existing pattern (in `instantiate_scheme_for_call`, `construct_expr`, etc.) that covers the new case — ask before inventing.
-- A test that was passing begins failing after a substitution composition change — the ordering bug may affect other cases not covered by tests.
+- You need to touch inference and construction in a way that blurs their boundary.
+- No existing pattern covers the new type-system behavior.
+- A substitution-order change breaks an existing test.
+- The task depends on a spec interpretation that is unclear.
 
+---
+
+## Decision Records
+
+Create an ADR in `metel-interpreter/docs/decisions/` when:
+
+- Multiple reasonable implementation options exist and the chosen tradeoff matters.
+- The decision changes or reverses a previous ADR or RFC.
+- A workaround or limitation would surprise a future contributor.
+- A spec or architecture doc changes because implementation revealed a real constraint.
+
+Do not create ADRs for routine implementation details that follow directly from the spec.
+
+Accepted ADRs are not edited to reverse them. Add a new ADR that supersedes the old one.
+
+When code intentionally encodes an ADR-backed invariant that may look wrong, add a concise comment with the reason and ADR number.
+
+---
+
+## Wiki and Public Docs Release Workflow
+
+The public website consumes the same `metel-docs` content through the docs submodule.
+
+When a task or release affects public documentation:
+
+1. Update and commit `docs/` first.
+2. Update this repo's `docs` submodule pointer on the sprint branch.
+3. Update `metel-website` to point at the same docs commit.
+4. For public releases, generate the versioned website snapshot if the release process requires it.
+5. Publish only after the docs version and website pointer match.
+
+Do not assume automatic publication unless the release workflow explicitly says it exists.
+
+---
+
+## When to Stop and Ask
+
+Stop before proceeding when:
+
+- A design decision has multiple plausible options with architectural consequences.
+- The spec is ambiguous in a way that affects implementation.
+- The task description contradicts current code, docs, or Plane state.
+- A dependency is incomplete or wrong.
+- Completing the task requires a scope expansion that could affect other work.
+- You are about to make an irreversible or hard-to-reverse change.
+
+When stopping, explain what you found, the options, and the recommended path.
 
 ---
 
 ## What Not to Do
 
-- Do not implement behaviour that is not in the spec.
-- Do not let implementation diverge from the spec and fix the docs later.
-- Do not add rationale or history to the spec — that belongs in a decision record.
-- Do not create new tracking documents — all open work goes into GitHub Issues and is tracked on the project board.
-- Do not start implementation if the task description has unresolved questions.
-- Do not mark a task done with unchecked acceptance criteria.
-- Do not make significant architectural decisions alone — ask first.
+- Do not implement behavior that is not in the spec.
+- Do not let implementation and docs diverge.
+- Do not add rationale or history to the spec.
+- Do not use GitHub Projects, GitHub issue labels, or `.github/` workflows as the current process.
+- Do not create new tracking documents for open work; use Plane.
+- Do not mark a Plane work item `Done` with unchecked acceptance criteria.
+- Do not commit sprint work directly to `main`.
