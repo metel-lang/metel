@@ -147,29 +147,33 @@ RFCs are organized by status in the docs repo:
 
 ```
 metel-docs/internal/rfcs/
-├── active/       # Draft RFCs and ones under review
-└── implemented/  # Accepted RFCs that have been implemented
+├── active/       # RFCs under design review (open questions, proposals, no decision yet)
+├── accepted/     # RFCs reviewed and accepted (decision made, Outcome: Accepted)
+└── implemented/  # RFCs fully implemented (features in spec and interpreter)
 ```
 
 Each RFC file has a frontmatter field `status: active` or `status: accepted`.
 
-### RFC Lifecycle
+### RFC Lifecycle — Three States
 
-**Phase 1 — Draft (active):**
+**Phase 1 — Active (draft, under review):**
 1. Create RFC file in `metel-docs/internal/rfcs/active/` following naming convention `rfc-NNNN-topic-kebab.md`
 2. Fill frontmatter: `id`, `title`, `date`, `status: active`
 3. Write the RFC document with clear motivation, design, open questions, and placeholder Decision section
 4. Create Plane work item with type **RFC**, summary field only contains: "Summary of topic" + link to the RFC file: `[View RFC](https://github.com/metel-lang/metel-docs/blob/main/internal/rfcs/active/rfc-NNNN-...)`
 5. Discussion and feedback happens in the RFC document and Plane work item
 
-**Phase 2 — Accepted (still in active/):**
-1. Update RFC frontmatter: `status: accepted` and fill the Decision section with final outcomes and resolved questions
-2. Update Plane RFC work item — no change needed yet
-3. Create implementation work items (type: Task) linked to the RFC Plane work item. Link field should reference the RFC work item.
+**Phase 2 — Accepted (content reviewed and design approved):**
+1. Once the RFC's contents have been reviewed and the design is approved:
+   - Update RFC frontmatter: `status: accepted` and fill the Decision section with final outcomes and resolved questions
+   - Move RFC file from `active/` to `accepted/`
+   - Update Plane RFC work item summary to reflect accepted status (add "Accepted" or similar indicator)
+2. Create implementation work items (type: Task) linked to the RFC Plane work item. Implementation work items should explicitly mention the design decisions and any limitations documented in the RFC.
+3. Accepted RFCs stay in `accepted/` until implementation is complete.
 
-**Phase 3 — Implemented (moved to implemented/):**
-1. When the last/final implementation work item completes:
-   - Move RFC file from `active/` to `implemented/`
+**Phase 3 — Implemented (features fully in spec and interpreter):**
+1. When all implementation work items are complete and the features are fully in the spec and interpreter:
+   - Move RFC file from `accepted/` to `implemented/`
    - Mark Plane RFC work item as **Done**
    - Update RFC frontmatter with any final notes (e.g., version shipped, implementation notes)
 2. Update the spec (`docs/public/spec/`) to document the implemented feature
@@ -384,57 +388,6 @@ Do not infer types in Pass 2. Do not build TypedAST nodes in Pass 1. If you find
 - You cannot find an existing pattern (in `instantiate_scheme_for_call`, `construct_expr`, etc.) that covers the new case — ask before inventing.
 - A test that was passing begins failing after a substitution composition change — the ordering bug may affect other cases not covered by tests.
 
----
-
-## RFC Workflow
-
-RFCs are design proposals for language changes. Content and lifecycle are tracked in **Plane** (project METEL). Incorporated RFCs are committed to `docs/internal/rfcs/` as permanent historical records; all others live solely in Plane pages.
-
-### RFC lifecycle
-
-| RFC Status | Plane state | Meaning |
-|---|---|---|
-| `draft` | Backlog | Design open; not ready for implementation |
-| `accepted` | Todo | Decision recorded; spec must be updated before implementation begins |
-| `incorporated` | Done | Spec updated to reflect the RFC decisions |
-| `implemented` | Done | Feature working in the interpreter |
-| `superseded` | Cancelled | Replaced by a newer RFC |
-| `deferred` | Cancelled | No action planned |
-
-Plane states mirror RFC Status as above. When you transition an RFC's status, update the Plane work item state to match.
-
-### When to read an RFC
-
-Before implementing any feature that has an associated RFC, check its RFC Status in Plane:
-
-| RFC Status | What to do |
-|---|---|
-| `draft` | **STOP** — design not settled; ask before implementing |
-| `accepted` | **STOP** — update the spec first (see below), then implement |
-| `incorporated` | Implementation may proceed; treat the updated spec as the source of truth |
-| `implemented` | Already shipped; read for context only |
-
-### When an RFC is accepted
-
-Immediately after setting RFC Status → `accepted` in Plane:
-
-1. Update the relevant spec or docs to reflect the RFC's decisions:
-   - Language-visible RFCs → update `docs/public/spec/` section(s) governing the feature.
-   - Implementation RFCs → update `metel-interpreter/docs/typechecker.md` or `architecture.md`.
-2. Set RFC Status → `incorporated` in Plane and update the Plane state to Done.
-3. Commit the RFC file to `docs/internal/rfcs/rfc-NNNN-<slug>.md` with minimal frontmatter (`id`, `title`, `date` only).
-4. Commit spec + RFC file together: `docs(rfc-NNNN): update spec to reflect accepted decisions`.
-
-Do not create or start any implementation work item until RFC Status is `incorporated`.
-
-### During implementation of an accepted RFC
-
-- Treat the relevant spec section (updated per the above) as the source of truth — not the RFC body.
-- Any deviation from the spec requires updating the spec first and writing a decision record.
-
-### After the feature ships in the interpreter
-
-Set RFC Status → `implemented` in Plane. State remains Done.
 
 ---
 
