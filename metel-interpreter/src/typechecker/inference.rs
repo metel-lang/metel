@@ -688,13 +688,42 @@ fn infer_expr(
                                         other => type_expr_to_infer(other),
                                     })
                                     .unwrap_or(InferType::unit());
+
+                                // Collect declared non-self params for arity + type checking.
+                                let declared_params: Vec<&Param> = method_def.params.iter()
+                                    .filter(|p| p.name != "self")
+                                    .collect();
+
+                                // Arity check.
+                                if args.len() != declared_params.len() {
+                                    return Err(MetelError::type_error(
+                                        TypeErrorCode::T0004,
+                                        format!(
+                                            "`{aspect_name}::{method}` expects {} argument(s), got {}",
+                                            declared_params.len(), args.len()
+                                        ),
+                                        span,
+                                    ));
+                                }
+
+                                // Infer arg types and constrain each against the declared param type.
                                 let arg_tys: Vec<InferType> = args.iter()
                                     .map(|a| infer_expr(a, ctx, fun_generalizations))
                                     .collect::<Result<_, _>>()?;
+
+                                for (arg_ty, param) in arg_tys.iter().zip(declared_params.iter()) {
+                                    if let Some(ann) = &param.type_ann {
+                                        // Substitute Self → TypeVar for the param's declared type.
+                                        let param_ty = match ann {
+                                            TypeExpr::Named(n, _) if n == "Self" => InferType::Var(*tv),
+                                            other => type_expr_to_infer(other),
+                                        };
+                                        ctx.add_constraint(arg_ty.clone(), param_ty, span.clone());
+                                    }
+                                }
+
                                 let ret_var = ctx.fresh_var();
                                 ctx.add_constraint(ret_var.clone(), ret_ty, span.clone());
-                                // Consume arg_tys (arity check via constraint).
-                                let _ = arg_tys;
                                 return Ok(ret_var);
                             }
                         }

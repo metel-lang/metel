@@ -1,0 +1,16 @@
+// Negative: calling a bound method with the wrong number of arguments.
+// compare(self, other: Self) takes 1 argument; calling with 0 should emit T0004.
+
+aspect Comparable {
+    fun compare(self, other: Self) -> Int;
+}
+
+struct Num { value: Int }
+
+impl Comparable for Num {
+    fun compare(self, other: Num) -> Int { self.value - other.value }
+}
+
+fun bad<T: Comparable>(x: T) -> Int {
+    x.compare() // ERROR[T0004]
+}

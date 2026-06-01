@@ -488,6 +488,12 @@ fun load() -> Result<Int, AppError> {
     fn stage14_neg_enum_construction_bound_violated() { check("generics/stage14_neg_04_enum_construction_bound_violated.mtl"); }
 
     #[test]
+    fn stage14_neg_bound_method_wrong_arity() { check("generics/stage14_neg_05_bound_method_wrong_arity.mtl"); }
+
+    #[test]
+    fn stage14_neg_bound_method_wrong_arg_type() { check("generics/stage14_neg_06_bound_method_wrong_arg_type.mtl"); }
+
+    #[test]
     fn stage12_fun_bound_satisfied() { check("generics/stage12_01_fun_bound_satisfied.mtl"); }
 
     #[test]
