@@ -124,6 +124,7 @@ pub struct FunDecl {
     pub visibility:  Visibility,
     pub name:        String,
     pub generics:    Vec<GenericParam>,
+    pub where_clause: Option<WhereClause>,
     pub params:      Vec<Param>,
     pub return_type: Option<TypeExpr>,
     pub body:        Block,
@@ -134,22 +135,24 @@ pub struct FunDecl {
 #[derive(Debug, Clone)]
 pub struct StructDecl {
     #[allow(dead_code)]
-    pub visibility: Visibility,
-    pub name:       String,
-    pub generics:   Vec<GenericParam>,
-    pub fields:     Vec<FieldDef>,
-    pub span:       Span,
+    pub visibility:  Visibility,
+    pub name:        String,
+    pub generics:    Vec<GenericParam>,
+    pub where_clause: Option<WhereClause>,
+    pub fields:      Vec<FieldDef>,
+    pub span:        Span,
 }
 
 
 #[derive(Debug, Clone)]
 pub struct EnumDecl {
     #[allow(dead_code)]
-    pub visibility: Visibility,
-    pub name:       String,
-    pub generics:   Vec<GenericParam>,
-    pub variants:   Vec<VariantDef>,
-    pub span:       Span,
+    pub visibility:  Visibility,
+    pub name:        String,
+    pub generics:    Vec<GenericParam>,
+    pub where_clause: Option<WhereClause>,
+    pub variants:    Vec<VariantDef>,
+    pub span:        Span,
 }
 
 
@@ -177,10 +180,13 @@ pub struct AspectDecl {
 
 #[derive(Debug, Clone)]
 pub struct GenericParam {
-    pub name:  String,
-    /// Reserved for aspect/type bounds — not yet enforced by the type checker.
-    #[allow(dead_code)]
-    pub bound: Option<TypeExpr>,
+    pub name:   String,
+    pub bounds: Vec<TypeExpr>,  // empty = unconstrained
+}
+
+#[derive(Debug, Clone)]
+pub struct WhereClause {
+    pub constraints: Vec<(String, Vec<TypeExpr>)>,  // (type_param_name, [bound, ...])
 }
 
 

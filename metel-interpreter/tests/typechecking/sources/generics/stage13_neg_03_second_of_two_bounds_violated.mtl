@@ -1,0 +1,28 @@
+// Negative: struct with two inline bounds; type satisfies the first but NOT
+// the second. Expect T0012.
+
+aspect Printable {
+    fun print(self);
+}
+
+aspect Comparable {
+    fun compare(self, other: Self) -> Int;
+}
+
+struct SortedList<T: Printable + Comparable> {
+    items: T[],
+}
+
+struct Partial {
+    value: Int,
+}
+
+impl Printable for Partial {
+    fun print(self) {}
+}
+
+// Partial does NOT implement Comparable.
+
+fun bad(p: Partial) -> SortedList<Partial> {
+    SortedList { items: [p] } // ERROR[T0012]
+}

@@ -1,0 +1,32 @@
+// Positive: struct with inline + multi-bound; constructed with a type that
+// satisfies both aspects.
+
+aspect Printable {
+    fun print(self);
+}
+
+aspect Comparable {
+    fun compare(self, other: Self) -> Int;
+}
+
+struct SortedList<T: Printable + Comparable> {
+    items: T[],
+}
+
+struct Item {
+    value: Int,
+}
+
+impl Printable for Item {
+    fun print(self) {}
+}
+
+impl Comparable for Item {
+    fun compare(self, other: Item) -> Int {
+        self.value - other.value
+    }
+}
+
+fun make_list(item: Item) -> SortedList<Item> {
+    SortedList { items: [item] }
+}

@@ -1,0 +1,20 @@
+// Negative: struct with inline bound; constructed with a type that does NOT
+// implement the required aspect. Expect T0012.
+
+aspect Printable {
+    fun print(self);
+}
+
+struct Wrapper<T: Printable> {
+    value: T,
+}
+
+struct Plain {
+    x: Int,
+}
+
+// Plain does not implement Printable.
+
+fun bad(p: Plain) -> Wrapper<Plain> {
+    Wrapper { value: p } // ERROR[T0012]
+}

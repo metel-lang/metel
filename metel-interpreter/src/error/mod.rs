@@ -31,6 +31,7 @@ pub enum TypeErrorCode {
     T0009, // Private item access
     T0010, // Unannotated pub declaration
     T0011, // Import name conflict
+    T0012, // Aspect bound not satisfied
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

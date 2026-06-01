@@ -1,0 +1,24 @@
+// Positive: struct with where clause bound; constructed with a satisfying type.
+
+aspect Serializable {
+    fun serialize(self) -> String;
+}
+
+struct Cache<K, V> where K: Serializable {
+    key: K,
+    value: V,
+}
+
+struct Key {
+    name: String,
+}
+
+impl Serializable for Key {
+    fun serialize(self) -> String {
+        self.name
+    }
+}
+
+fun make_cache(k: Key, v: Int) -> Cache<Key, Int> {
+    Cache { key: k, value: v }
+}

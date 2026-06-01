@@ -415,6 +415,7 @@ mod tests {
             visibility: Visibility::Public,
             name: (*n).into(),
             generics: vec![],
+            where_clause: None,
             params: vec![],
             return_type: None,
             body: Block { stmts: vec![], tail: None, span: span() },

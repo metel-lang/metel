@@ -1,0 +1,21 @@
+// Negative: struct with where clause bound; constructed with a type that does
+// NOT satisfy the where clause constraint. Expect T0012.
+
+aspect Serializable {
+    fun serialize(self) -> String;
+}
+
+struct Cache<K, V> where K: Serializable {
+    key: K,
+    value: V,
+}
+
+struct RawKey {
+    id: Int,
+}
+
+// RawKey does not implement Serializable.
+
+fun bad(k: RawKey, v: Int) -> Cache<RawKey, Int> {
+    Cache { key: k, value: v } // ERROR[T0012]
+}

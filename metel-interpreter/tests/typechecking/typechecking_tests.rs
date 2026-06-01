@@ -433,6 +433,24 @@ fun load() -> Result<Int, AppError> {
     #[test]
     fn stage11_neg_generic_struct_field_conflict() { check("generics/stage11_neg_01_generic_struct_field_conflict.mtl"); }
 
+    #[test]
+    fn stage13_inline_multi_bound() { check("generics/stage13_01_inline_multi_bound.mtl"); }
+
+    #[test]
+    fn stage13_where_clause_struct() { check("generics/stage13_02_where_clause_struct.mtl"); }
+
+    #[test]
+    fn stage13_inline_and_where_merged() { check("generics/stage13_03_inline_and_where_merged.mtl"); }
+
+    #[test]
+    fn stage13_neg_inline_bound_violated() { check("generics/stage13_neg_01_inline_bound_violated.mtl"); }
+
+    #[test]
+    fn stage13_neg_where_bound_violated() { check("generics/stage13_neg_02_where_bound_violated.mtl"); }
+
+    #[test]
+    fn stage13_neg_second_of_two_bounds_violated() { check("generics/stage13_neg_03_second_of_two_bounds_violated.mtl"); }
+
     // ── Aspects ───────────────────────────────────────────────────────────────
 
     #[test]

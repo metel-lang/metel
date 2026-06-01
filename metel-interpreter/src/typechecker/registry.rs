@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{AspectDecl, AspectMethod, Decl, Program, Span, TypeExpr};
+use crate::ast::{AspectDecl, AspectMethod, Decl, GenericParam, Program, Span, TypeExpr, WhereClause};
 use crate::typeinference::{
     EnumInfo, FieldEntry, InferContext, InferType, TypeDefinitionRegistry, TypeScheme, TypeVar,
     TypeVarGenerator, VariantInfo,
@@ -11,6 +11,31 @@ use super::conversions::{
     type_expr_to_infer_with_generics,
     type_expr_to_infer_with_self,
 };
+
+/// Collect merged aspect-name bounds per type param from inline bounds + where clause.
+/// Returns one Vec<String> per param (same order as `generics`), containing all
+/// required aspect names for that param (deduped).
+fn collect_type_param_bounds(
+    generics: &[GenericParam],
+    where_clause: Option<&WhereClause>,
+) -> Vec<Vec<String>> {
+    generics.iter().map(|gp| {
+        let mut names: Vec<String> = gp.bounds.iter()
+            .filter_map(|b| if let TypeExpr::Named(n, _) = b { Some(n.clone()) } else { None })
+            .collect();
+        if let Some(wc) = where_clause {
+            for (param_name, bounds) in &wc.constraints {
+                if param_name != &gp.name { continue; }
+                for b in bounds {
+                    if let TypeExpr::Named(n, _) = b {
+                        if !names.contains(n) { names.push(n.clone()); }
+                    }
+                }
+            }
+        }
+        names
+    }).collect()
+}
 
 fn dbg_scheme(t: TypeVar) -> TypeScheme {
     TypeScheme {
@@ -118,6 +143,10 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
                     .collect();
                 registry.register_struct_fields(sd.name.clone(), fields);
                 registry.register_struct_type_params(sd.name.clone(), type_params);
+                let bounds = collect_type_param_bounds(&sd.generics, sd.where_clause.as_ref());
+                if bounds.iter().any(|b| !b.is_empty()) {
+                    registry.register_type_param_bounds(sd.name.clone(), bounds);
+                }
             }
             Decl::Enum(ed) => {
                 let mut gen_map: HashMap<String, TypeVar> = HashMap::new();
@@ -133,10 +162,14 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
                         .map(|f| (f.name.clone(), type_expr_to_infer_with_generics(&f.type_ann, &gen_map), f.span.clone()))
                         .collect(),
                 }).collect();
+                let bounds = collect_type_param_bounds(&ed.generics, ed.where_clause.as_ref());
                 registry.register_enum(ed.name.clone(), EnumInfo {
                     type_params,
                     variants,
                 });
+                if bounds.iter().any(|b| !b.is_empty()) {
+                    registry.register_type_param_bounds(ed.name.clone(), bounds);
+                }
             }
             Decl::Aspect(ad) => {
                 register_aspect_decl(ad, &mut registry);

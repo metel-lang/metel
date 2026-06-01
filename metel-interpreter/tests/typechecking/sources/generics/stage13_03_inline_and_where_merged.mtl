@@ -1,0 +1,32 @@
+// Positive: inline bound + additional where clause bound on the same param,
+// both satisfied.
+
+aspect Printable {
+    fun print(self);
+}
+
+aspect Comparable {
+    fun compare(self, other: Self) -> Int;
+}
+
+struct SortedCache<T: Printable> where T: Comparable {
+    items: T[],
+}
+
+struct Entry {
+    value: Int,
+}
+
+impl Printable for Entry {
+    fun print(self) {}
+}
+
+impl Comparable for Entry {
+    fun compare(self, other: Entry) -> Int {
+        self.value - other.value
+    }
+}
+
+fun make(e: Entry) -> SortedCache<Entry> {
+    SortedCache { items: [e] }
+}

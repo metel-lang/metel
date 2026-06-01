@@ -700,6 +700,31 @@ fn construct_expr(
                             infer_type_to_type(&ctx.subst.apply(&it), span)
                         })
                         .collect::<Result<_, _>>()?;
+                    // T0012: check each resolved type arg satisfies the declared bounds.
+                    if let Some(param_bounds) = ctx.registry.type_param_bounds_for(type_name) {
+                        for (i, bounds) in param_bounds.iter().enumerate() {
+                            if bounds.is_empty() { continue; }
+                            let arg = match type_args.get(i) {
+                                Some(a) => a,
+                                None => continue,
+                            };
+                            let type_arg_name = match arg {
+                                Type::Named(n, _) => n.clone(),
+                                _ => continue,
+                            };
+                            for aspect in bounds {
+                                let has_impl = ctx.registry
+                                    .impl_aspect_env_has(&type_arg_name, aspect);
+                                if !has_impl {
+                                    return Err(MetelError::type_error(
+                                        TypeErrorCode::T0012,
+                                        format!("`{type_arg_name}` does not implement `{aspect}` (required by `{type_name}`)"),
+                                        span,
+                                    ));
+                                }
+                            }
+                        }
+                    }
                     Type::Named(type_name.clone(), type_args)
                 } else {
                     Type::Named(type_name.clone(), vec![])

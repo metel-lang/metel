@@ -214,21 +214,23 @@ fn parse_fun_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<F
     } else {
         (Visibility::Private, first.as_str().to_string())
     };
-    let mut generics    = vec![];
-    let mut params      = vec![];
-    let mut return_type = None;
-    let mut body        = None;
+    let mut generics     = vec![];
+    let mut where_clause = None;
+    let mut params       = vec![];
+    let mut return_type  = None;
+    let mut body         = None;
     for p in inner {
         match p.as_rule() {
-            Rule::generic_params => generics = parse_generic_params(p, filename)?,
-            Rule::param_list     => params   = parse_param_list(p, filename)?,
-            Rule::type_expr      => return_type = Some(parse_type_expr(p, filename)?),
-            Rule::block          => body = Some(parse_block(p, filename)?),
+            Rule::generic_params => generics     = parse_generic_params(p, filename)?,
+            Rule::where_clause   => where_clause = Some(parse_where_clause(p, filename)?),
+            Rule::param_list     => params        = parse_param_list(p, filename)?,
+            Rule::type_expr      => return_type  = Some(parse_type_expr(p, filename)?),
+            Rule::block          => body          = Some(parse_block(p, filename)?),
             _ => {}
         }
     }
     Ok(FunDecl {
-        visibility, name, generics, params, return_type,
+        visibility, name, generics, where_clause, params, return_type,
         body: body.ok_or_else(|| MetelError::internal("fun_decl: missing body block"))?,
         span,
     })
@@ -247,16 +249,18 @@ fn parse_struct_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resul
     } else {
         (Visibility::Private, first.as_str().to_string())
     };
-    let mut generics = vec![];
-    let mut fields   = vec![];
+    let mut generics     = vec![];
+    let mut where_clause = None;
+    let mut fields       = vec![];
     for p in inner {
         match p.as_rule() {
-            Rule::generic_params => generics = parse_generic_params(p, filename)?,
-            Rule::struct_fields  => fields   = parse_struct_fields(p, filename)?,
+            Rule::generic_params => generics     = parse_generic_params(p, filename)?,
+            Rule::where_clause   => where_clause = Some(parse_where_clause(p, filename)?),
+            Rule::struct_fields  => fields        = parse_struct_fields(p, filename)?,
             _ => {}
         }
     }
-    Ok(StructDecl { visibility, name, generics, fields, span })
+    Ok(StructDecl { visibility, name, generics, where_clause, fields, span })
 }
 
 fn parse_enum_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<EnumDecl, MetelError> {
@@ -272,11 +276,13 @@ fn parse_enum_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<
     } else {
         (Visibility::Private, first.as_str().to_string())
     };
-    let mut generics = vec![];
-    let mut variants = vec![];
+    let mut generics     = vec![];
+    let mut where_clause = None;
+    let mut variants     = vec![];
     for p in inner {
         match p.as_rule() {
-            Rule::generic_params => generics = parse_generic_params(p, filename)?,
+            Rule::generic_params => generics     = parse_generic_params(p, filename)?,
+            Rule::where_clause   => where_clause = Some(parse_where_clause(p, filename)?),
             Rule::enum_variants  => {
                 for v in p.into_inner() {
                     if v.as_rule() == Rule::enum_variant {
@@ -287,7 +293,7 @@ fn parse_enum_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<
             _ => {}
         }
     }
-    Ok(EnumDecl { visibility, name, generics, variants, span })
+    Ok(EnumDecl { visibility, name, generics, where_clause, variants, span })
 }
 
 fn parse_impl_block(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<ImplBlock, MetelError> {
@@ -1692,6 +1698,31 @@ fn parse_block(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Bloc
     Ok(Block { stmts, tail, span })
 }
 
+fn parse_bound_list(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Vec<TypeExpr>, MetelError> {
+    pair.into_inner()
+        .filter(|p| p.as_rule() == Rule::type_expr)
+        .map(|p| parse_type_expr(p, filename))
+        .collect()
+}
+
+fn parse_where_clause(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<WhereClause, MetelError> {
+    let mut constraints = vec![];
+    for p in pair.into_inner() {
+        if p.as_rule() == Rule::where_constraint {
+            let mut it = p.into_inner();
+            let name = it.next()
+                .ok_or_else(|| MetelError::internal("where_constraint: expected param name"))?
+                .as_str().to_string();
+            let bounds = it.next()
+                .map(|bl| parse_bound_list(bl, filename))
+                .transpose()?
+                .unwrap_or_default();
+            constraints.push((name, bounds));
+        }
+    }
+    Ok(WhereClause { constraints })
+}
+
 fn parse_generic_params(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Vec<GenericParam>, MetelError> {
     let mut params = vec![];
     for p in pair.into_inner() {
@@ -1700,8 +1731,11 @@ fn parse_generic_params(pair: pest::iterators::Pair<Rule>, filename: &str) -> Re
             let name = it.next()
                 .ok_or_else(|| MetelError::internal("generic_param: expected name"))?
                 .as_str().to_string();
-            let bound = it.next().map(|p| parse_type_expr(p, filename)).transpose()?;
-            params.push(GenericParam { name, bound });
+            let bounds = it.next()
+                .map(|bl| parse_bound_list(bl, filename))
+                .transpose()?
+                .unwrap_or_default();
+            params.push(GenericParam { name, bounds });
         }
     }
     Ok(params)

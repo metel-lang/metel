@@ -441,6 +441,10 @@ pub struct TypeDefinitionRegistry {
     struct_env:         HashMap<String, Vec<FieldEntry>>,
     /// Ordered type-parameter TypeVars per generic struct (absent for non-generic structs).
     struct_type_params: HashMap<String, Vec<TypeVar>>,
+    /// Per-type-param aspect bounds for generic structs and enums.
+    /// Key: type name. Value: one Vec<String> per type param (same order as struct_type_params),
+    /// each containing the aspect names that param must satisfy.
+    type_param_bounds: HashMap<String, Vec<Vec<String>>>,
     /// Tracks which struct names were registered in each lexical scope so they
     /// can be removed on scope exit. Empty when outside any scoped block.
     struct_scope_stack: Vec<Vec<String>>,
@@ -461,6 +465,7 @@ impl TypeDefinitionRegistry {
         Self {
             struct_env:         HashMap::new(),
             struct_type_params: HashMap::new(),
+            type_param_bounds:  HashMap::new(),
             struct_scope_stack: Vec::new(),
             method_env:         HashMap::new(),
             enum_env:           HashMap::new(),
@@ -495,6 +500,19 @@ impl TypeDefinitionRegistry {
 
     pub fn register_struct_type_params(&mut self, name: String, type_params: Vec<TypeVar>) {
         self.struct_type_params.insert(name, type_params);
+    }
+
+    pub fn register_type_param_bounds(&mut self, name: String, bounds: Vec<Vec<String>>) {
+        self.type_param_bounds.insert(name, bounds);
+    }
+
+    pub fn type_param_bounds_for(&self, name: &str) -> Option<&Vec<Vec<String>>> {
+        self.type_param_bounds.get(name)
+    }
+
+    /// Returns true if `type_name` has a registered `impl AspectName` in the env.
+    pub fn impl_aspect_env_has(&self, type_name: &str, aspect_name: &str) -> bool {
+        self.impl_aspect_env.contains_key(&(type_name.to_string(), aspect_name.to_string()))
     }
 
     pub fn register_enum(&mut self, name: String, info: EnumInfo) {
@@ -581,6 +599,9 @@ impl TypeDefinitionRegistry {
         }
         for (k, v) in &other.struct_type_params {
             self.struct_type_params.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+        for (k, v) in &other.type_param_bounds {
+            self.type_param_bounds.entry(k.clone()).or_insert_with(|| v.clone());
         }
         for (k, v) in &other.method_env {
             self.method_env.entry(k.clone()).or_insert_with(|| v.clone());
