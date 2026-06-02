@@ -1,11 +1,11 @@
 // Returns a closure that closes over a counter, incrementing on each call.
-fun make_counter(start: Int) -> fun() -> Int {
+fun make_counter(start: Int) -> () -> Int {
     mut n = start;
-    fun() -> Int { n += 1; n }
+    () -> Int { n += 1; n }
 }
 // Closure that captures two variables from different outer scopes.
-fun make_between(lo: Int, hi: Int) -> fun(Int) -> Bool {
-    fun(x: Int) -> Bool { (x >= lo) && (x <= hi) }
+fun make_between(lo: Int, hi: Int) -> (Int) -> Bool {
+    (x: Int) -> Bool { (x >= lo) && (x <= hi) }
 }
 
 fun main() {
@@ -30,6 +30,6 @@ fun main() {
     assert(out == false);
     // Inline closure passed directly without binding.
     let results = [1, 2, 3];
-    let sum_fn = fun(a: Int, b: Int) -> Int { a + b };
+    let sum_fn = (a: Int, b: Int) -> Int { a + b };
     assert(sum_fn(results[0], results[2]) == 4);
 }

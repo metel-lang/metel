@@ -8,7 +8,7 @@ enum Either<L, R> {
     Right { val: R },
 }
 
-fun either_map_left<L, R, M>(e: Either<L, R>, f: fun(L) -> M) -> Either<M, R> {
+fun either_map_left<L, R, M>(e: Either<L, R>, f: (L) -> M) -> Either<M, R> {
     match e {
         Either::Left  { val } => Either::Left  { val: f(val) },
         Either::Right { val } => Either::Right { val: val },
@@ -52,12 +52,12 @@ fun main() {
     assert(either_right_or(r, "") == "hello");
 
     // map_left: Left(42) → Left(84)
-    let doubled = either_map_left(l, fun(x: Int) -> Int { x * 2 });
+    let doubled = either_map_left(l, (x: Int) -> Int { x * 2 });
     assert(either_is_left(doubled));
     assert(either_left_or(doubled, 0) == 84);
 
     // map_left on Right: Right passes through unchanged
-    let pass = either_map_left(r, fun(x: Int) -> Int { x + 1 });
+    let pass = either_map_left(r, (x: Int) -> Int { x + 1 });
     assert(!either_is_left(pass));
 
     // Type inference from if-else arms in a function with return annotation

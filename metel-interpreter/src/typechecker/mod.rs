@@ -185,7 +185,13 @@ pub fn check_graph(
         check_pub_annotations(loaded, names)?;
         let imported_schemes = build_import_schemes(loaded, names, &global_exports, &graph)?;
         let (typed_decls, scheme_env, next_registry) =
-            check_impl(&loaded.program, &imported_schemes, &type_registry, &std_prelude)?;
+            check_impl(
+                &loaded.program,
+                &imported_schemes,
+                &type_registry,
+                &std_prelude,
+                &loaded.module_path,
+            )?;
         type_registry = next_registry;
 
         // Export pub names from this module's scheme_env, plus re-exported names
@@ -413,7 +419,13 @@ fn filter_pub_schemes(
 
 /// Run the type checker over an untyped AST, producing a fully typed AST.
 pub fn check(program: Program) -> Result<TypedProgram, MetelError> {
-    let (decls, _, _) = check_impl(&program, &HashMap::new(), &TypeDefinitionRegistry::new(), &StdPrelude::default())?;
+    let (decls, _, _) = check_impl(
+        &program,
+        &HashMap::new(),
+        &TypeDefinitionRegistry::new(),
+        &StdPrelude::default(),
+        &[],
+    )?;
     Ok(decls)
 }
 
@@ -432,16 +444,17 @@ fn check_impl(
     imported_schemes: &SchemeEnv,
     base_registry: &TypeDefinitionRegistry,
     std_prelude: &StdPrelude,
+    current_module_path: &[String],
 ) -> Result<(Vec<TypedDecl>, SchemeEnv, TypeDefinitionRegistry), MetelError> {
     // Lowering pass: desugar `impl Aspect` params to fresh anonymous type params.
     let program = inference::lower_impl_aspects_in_program(program.clone());
     let program = &program;
 
     let mut gen = TypeVarGenerator::new();
-    let mut reg = registry::build_registry(program, &mut gen);
+    let mut reg = registry::build_registry(program, &mut gen, current_module_path);
     // Merge dependency type definitions so cross-module struct/enum refs resolve.
     reg.merge_from(base_registry);
-    let mut ctx = InferContext::new(reg, gen, imported_schemes);
+    let mut ctx = InferContext::new(reg, gen, imported_schemes, current_module_path.to_vec());
 
     // Pre-pass: register built-in value bindings and hoist function names.
     registry::register_builtins(&mut ctx, std_prelude);
@@ -473,7 +486,12 @@ fn check_impl(
     // Pass 2: construct typed AST for the current module only.
     // The registry owns all type definitions; ConstructCtx derives concrete envs from it.
     let typed_decls = construction::construct_program(
-        program, &subst, &scheme_env, ctx.registry(), gen,
+        program,
+        &subst,
+        &scheme_env,
+        ctx.registry(),
+        gen,
+        current_module_path.to_vec(),
     )?;
 
     // Return only user-defined names. Builtins (from StdPrelude) are available to

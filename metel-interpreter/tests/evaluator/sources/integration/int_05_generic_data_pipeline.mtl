@@ -14,14 +14,14 @@ enum Maybe<T> {
     Nothing {},
 }
 
-fun maybe_map<T, U>(m: Maybe<T>, f: fun(T) -> U) -> Maybe<U> {
+fun maybe_map<T, U>(m: Maybe<T>, f: (T) -> U) -> Maybe<U> {
     match m {
         Maybe::Just { val } => Maybe::Just { val: f(val) },
         _                   => Maybe::Nothing,
     }
 }
 
-fun maybe_flat_map<T, U>(m: Maybe<T>, f: fun(T) -> Maybe<U>) -> Maybe<U> {
+fun maybe_flat_map<T, U>(m: Maybe<T>, f: (T) -> Maybe<U>) -> Maybe<U> {
     match m {
         Maybe::Just { val } => f(val),
         _                   => Maybe::Nothing,
@@ -49,7 +49,7 @@ struct Record<K, V> {
     value: V,
 }
 
-fun record_map_val<K, V, W>(r: Record<K, V>, f: fun(V) -> W) -> Record<K, W> {
+fun record_map_val<K, V, W>(r: Record<K, V>, f: (V) -> W) -> Record<K, W> {
     Record { key: r.key, value: f(r.value) }
 }
 
@@ -59,7 +59,7 @@ fun record_swap<K, V>(r: Record<K, V>) -> Record<V, K> {
 
 // ── Generic pipeline combinators ──────────────────────────────────────────────
 
-fun filter_array<T>(arr: T[], pred: fun(T) -> Bool) -> T[] {
+fun filter_array<T>(arr: T[], pred: (T) -> Bool) -> T[] {
     mut out: T[] = [];
     for (let x in arr) {
         if (pred(x)) { array_push(out, x); }
@@ -67,13 +67,13 @@ fun filter_array<T>(arr: T[], pred: fun(T) -> Bool) -> T[] {
     out
 }
 
-fun map_array<T, U>(arr: T[], f: fun(T) -> U) -> U[] {
+fun map_array<T, U>(arr: T[], f: (T) -> U) -> U[] {
     mut out: U[] = [];
     for (let x in arr) { array_push(out, f(x)); }
     out
 }
 
-fun zip_with<A, B, C>(a: A[], b: B[], f: fun(A, B) -> C) -> C[] {
+fun zip_with<A, B, C>(a: A[], b: B[], f: (A, B) -> C) -> C[] {
     mut out: C[] = [];
     let len = if (array_len(a) < array_len(b)) array_len(a) else array_len(b);
     mut i = 0;
@@ -84,14 +84,14 @@ fun zip_with<A, B, C>(a: A[], b: B[], f: fun(A, B) -> C) -> C[] {
     out
 }
 
-fun any<T>(arr: T[], pred: fun(T) -> Bool) -> Bool {
+fun any<T>(arr: T[], pred: (T) -> Bool) -> Bool {
     for (let x in arr) {
         if (pred(x)) { return true; }
     }
     false
 }
 
-fun all<T>(arr: T[], pred: fun(T) -> Bool) -> Bool {
+fun all<T>(arr: T[], pred: (T) -> Bool) -> Bool {
     for (let x in arr) {
         if (!pred(x)) { return false; }
     }
@@ -150,26 +150,26 @@ fun main() {
     assert(maybe_get_or(none_i, 99) == 99);
 
     // map
-    let j20 = maybe_map(j10, fun(x: Int) -> Int { x * 2 });
+    let j20 = maybe_map(j10, (x: Int) -> Int { x * 2 });
     assert(maybe_get_or(j20, 0) == 20);
 
-    let mapped_nothing = maybe_map(none_i, fun(x: Int) -> Int { x * 2 });
+    let mapped_nothing = maybe_map(none_i, (x: Int) -> Int { x * 2 });
     assert(!maybe_is_just(mapped_nothing));
 
     // flat_map
-    let flat = maybe_flat_map(j10, fun(x: Int) -> Maybe<Int> {
+    let flat = maybe_flat_map(j10, (x: Int) -> Maybe<Int> {
         if (x > 5) Maybe::Just { val: x - 5 } else Maybe::Nothing
     });
     assert(maybe_get_or(flat, 0) == 5);
 
-    let flat_miss = maybe_flat_map(j10, fun(x: Int) -> Maybe<Int> {
+    let flat_miss = maybe_flat_map(j10, (x: Int) -> Maybe<Int> {
         if (x > 100) Maybe::Just { val: x } else Maybe::Nothing
     });
     assert(!maybe_is_just(flat_miss));
 
     // ── Maybe<String> ─────────────────────────────────────────────────────────
     let j_str: Maybe<String> = Maybe::Just { val: "hello" };
-    let len_m = maybe_map(j_str, fun(s: String) -> Int { string_len(s) });
+    let len_m = maybe_map(j_str, (s: String) -> Int { string_len(s) });
     assert(maybe_get_or(len_m, 0) == 5);
 
     // ── Record<String, Int> ───────────────────────────────────────────────────
@@ -178,7 +178,7 @@ fun main() {
     assert(r1.value == 75);
 
     // map_val: bump score by 10
-    let r2 = record_map_val(r1, fun(v: Int) -> Int { v + 10 });
+    let r2 = record_map_val(r1, (v: Int) -> Int { v + 10 });
     assert(r2.key   == "score");
     assert(r2.value == 85);
 
@@ -189,56 +189,56 @@ fun main() {
 
     // ── Record<String, Bool> ──────────────────────────────────────────────────
     let flag_rec: Record<String, Bool> = Record { key: "enabled", value: true };
-    let toggled = record_map_val(flag_rec, fun(b: Bool) -> Bool { !b });
+    let toggled = record_map_val(flag_rec, (b: Bool) -> Bool { !b });
     assert(!toggled.value);
 
     // ── filter_array ──────────────────────────────────────────────────────────
     let nums: Int[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-    let evens = filter_array(nums, fun(x: Int) -> Bool { x % 2 == 0 });
+    let evens = filter_array(nums, (x: Int) -> Bool { x % 2 == 0 });
     assert(array_len(evens) == 5);
     assert(evens[0] == 2);
     assert(evens[4] == 10);
 
-    let big = filter_array(nums, fun(x: Int) -> Bool { x > 7 });
+    let big = filter_array(nums, (x: Int) -> Bool { x > 7 });
     assert(array_len(big) == 3);
 
     // ── map_array ─────────────────────────────────────────────────────────────
-    let squares = map_array(nums, fun(x: Int) -> Int { x * x });
+    let squares = map_array(nums, (x: Int) -> Int { x * x });
     assert(array_len(squares) == 10);
     assert(squares[0] == 1);
     assert(squares[9] == 100);
 
-    let is_even: Bool[] = map_array(nums, fun(x: Int) -> Bool { x % 2 == 0 });
+    let is_even: Bool[] = map_array(nums, (x: Int) -> Bool { x % 2 == 0 });
     assert(!is_even[0]);
     assert(is_even[1]);
 
     // ── zip_with ─────────────────────────────────────────────────────────────
     let a: Int[] = [1, 2, 3, 4];
     let b: Int[] = [10, 20, 30, 40];
-    let sums = zip_with(a, b, fun(x: Int, y: Int) -> Int { x + y });
+    let sums = zip_with(a, b, (x: Int, y: Int) -> Int { x + y });
     assert(array_len(sums) == 4);
     assert(sums[0] == 11);
     assert(sums[3] == 44);
 
     // zip shorter arrays
     let c: Int[] = [100, 200];
-    let partial = zip_with(a, c, fun(x: Int, y: Int) -> Int { x * y });
+    let partial = zip_with(a, c, (x: Int, y: Int) -> Int { x * y });
     assert(array_len(partial) == 2);
     assert(partial[1] == 400);
 
     // zip with Bool→String
     let flags: Bool[] = [true, false, true];
-    let labels = zip_with(flags, a, fun(b: Bool, n: Int) -> String {
+    let labels = zip_with(flags, a, (b: Bool, n: Int) -> String {
         if (b) "yes" else "no"
     });
     assert(labels[0] == "yes");
     assert(labels[1] == "no");
 
     // ── any / all ─────────────────────────────────────────────────────────────
-    assert(any(nums, fun(x: Int) -> Bool { x > 9 }));
-    assert(!any(nums, fun(x: Int) -> Bool { x > 100 }));
-    assert(all(nums, fun(x: Int) -> Bool { x > 0 }));
-    assert(!all(nums, fun(x: Int) -> Bool { x > 5 }));
+    assert(any(nums, (x: Int) -> Bool { x > 9 }));
+    assert(!any(nums, (x: Int) -> Bool { x > 100 }));
+    assert(all(nums, (x: Int) -> Bool { x > 0 }));
+    assert(!all(nums, (x: Int) -> Bool { x > 5 }));
 
     // ── take / drop ───────────────────────────────────────────────────────────
     let first3 = take(nums, 3);
@@ -262,24 +262,24 @@ fun main() {
         Student { name: "Eve",     grade: 45 },
     ];
 
-    let passing = filter_array(students, fun(s: Student) -> Bool { student_passing(s) });
+    let passing = filter_array(students, (s: Student) -> Bool { student_passing(s) });
     assert(array_len(passing) == 3);
 
-    let letters = map_array(students, fun(s: Student) -> String { student_grade_letter(s) });
+    let letters = map_array(students, (s: Student) -> String { student_grade_letter(s) });
     assert(letters[0] == "A");
     assert(letters[1] == "F");
     assert(letters[2] == "C");
     assert(letters[3] == "B");
 
     // count A-grades
-    let a_grades = filter_array(letters, fun(l: String) -> Bool { l == "A" });
+    let a_grades = filter_array(letters, (l: String) -> Bool { l == "A" });
     assert(array_len(a_grades) == 1);
 
-    assert(any(students, fun(s: Student) -> Bool { s.grade >= 90 }));
-    assert(!all(students, fun(s: Student) -> Bool { student_passing(s) }));
+    assert(any(students, (s: Student) -> Bool { s.grade >= 90 }));
+    assert(!all(students, (s: Student) -> Bool { student_passing(s) }));
 
     // ── Let-polymorphism: identity at Record<String,Int> and Student ──────────
-    let id = fun(x) { x };
+    let id = (x) -> { x };
     let same_r = id(r1);
     assert(same_r.value == 75);
 
@@ -288,6 +288,6 @@ fun main() {
 
     // ── Compose: nested Maybe over Records ────────────────────────────────────
     let maybe_rec: Maybe<Record<String, Int>> = Maybe::Just { val: Record { key: "x", value: 7 } };
-    let val_m = maybe_map(maybe_rec, fun(r: Record<String, Int>) -> Int { r.value });
+    let val_m = maybe_map(maybe_rec, (r: Record<String, Int>) -> Int { r.value });
     assert(maybe_get_or(val_m, 0) == 7);
 }

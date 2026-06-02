@@ -3,7 +3,7 @@
 //! Implements Hindley-Milner type inference with let-polymorphism.
 //! See `docs/internal/typechecker.md` for theory background and implementation notes.
 
-use crate::ast::{AspectMethod, Span};
+use crate::ast::{AspectMethod, Span, Visibility};
 use crate::types::Type;
 use crate::error::MetelError;
 use std::collections::{HashMap, HashSet};
@@ -113,7 +113,7 @@ impl std::fmt::Display for InferType {
             InferType::Var(v) => write!(f, "{}", v),
             InferType::Never => write!(f, "!"),
             InferType::Fun(params, ret) => {
-                write!(f, "fun(")?;
+                write!(f, "(")?;
                 for (i, p) in params.iter().enumerate() {
                     if i > 0 { write!(f, ", ")?; }
                     write!(f, "{}", p)?;
@@ -427,8 +427,14 @@ pub fn instantiate_with_renaming(
 
 // ── Enum environment ─────────────────────────────────────────────────────────
 
-/// A single field entry in a struct or enum variant, carrying its declaration span.
-pub type FieldEntry = (String, InferType, Span);
+/// A single field entry in a struct or enum variant, carrying its declaration metadata.
+#[derive(Debug, Clone)]
+pub struct FieldEntry {
+    pub name: String,
+    pub ty: InferType,
+    pub span: Span,
+    pub visibility: Visibility,
+}
 
 #[derive(Debug, Clone)]
 pub struct VariantInfo {
@@ -455,6 +461,8 @@ pub struct EnumInfo {
 pub struct TypeDefinitionRegistry {
     /// struct name → fields with declaration spans.
     struct_env:         HashMap<String, Vec<FieldEntry>>,
+    /// struct name → declaring module path.
+    struct_decl_modules: HashMap<String, Vec<String>>,
     /// Ordered type-parameter TypeVars per generic struct (absent for non-generic structs).
     struct_type_params: HashMap<String, Vec<TypeVar>>,
     /// Ordered type-parameter names per generic struct/enum. Parallel to struct_type_params.
@@ -476,6 +484,8 @@ pub struct TypeDefinitionRegistry {
     struct_scope_stack: Vec<Vec<String>>,
     method_env:  HashMap<String, HashMap<String, InferType>>,
     enum_env:    HashMap<String, EnumInfo>,
+    /// enum name → declaring module path.
+    enum_decl_modules: HashMap<String, Vec<String>>,
     /// aspect name → ordered list of method names the aspect declares.
     /// Used to verify impl blocks are complete.
     aspect_env:  HashMap<String, Vec<String>>,
@@ -490,6 +500,7 @@ impl TypeDefinitionRegistry {
     pub fn new() -> Self {
         Self {
             struct_env:          HashMap::new(),
+            struct_decl_modules: HashMap::new(),
             struct_type_params:  HashMap::new(),
             struct_generic_names: HashMap::new(),
             method_scheme_env:   HashMap::new(),
@@ -498,14 +509,16 @@ impl TypeDefinitionRegistry {
             struct_scope_stack:  Vec::new(),
             method_env:         HashMap::new(),
             enum_env:           HashMap::new(),
+            enum_decl_modules:  HashMap::new(),
             aspect_env:         HashMap::new(),
             aspect_method_defs: HashMap::new(),
             impl_aspect_env:    HashMap::new(),
         }
     }
 
-    pub fn register_struct_fields(&mut self, name: String, fields: Vec<FieldEntry>) {
+    pub fn register_struct_fields(&mut self, name: String, fields: Vec<FieldEntry>, declaring_module: Vec<String>) {
         self.struct_env.insert(name.clone(), fields);
+        self.struct_decl_modules.insert(name.clone(), declaring_module);
         if let Some(scope) = self.struct_scope_stack.last_mut() {
             scope.push(name);
         }
@@ -519,6 +532,7 @@ impl TypeDefinitionRegistry {
         if let Some(names) = self.struct_scope_stack.pop() {
             for name in names {
                 self.struct_env.remove(&name);
+                self.struct_decl_modules.remove(&name);
             }
         }
     }
@@ -583,8 +597,9 @@ impl TypeDefinitionRegistry {
         self.fun_bounds.get(name)
     }
 
-    pub fn register_enum(&mut self, name: String, info: EnumInfo) {
-        self.enum_env.insert(name, info);
+    pub fn register_enum(&mut self, name: String, info: EnumInfo, declaring_module: Vec<String>) {
+        self.enum_env.insert(name.clone(), info);
+        self.enum_decl_modules.insert(name, declaring_module);
     }
 
     pub fn struct_fields(&self, name: &str) -> Option<&Vec<FieldEntry>> {
@@ -601,6 +616,14 @@ impl TypeDefinitionRegistry {
 
     pub fn enum_info(&self, name: &str) -> Option<&EnumInfo> {
         self.enum_env.get(name)
+    }
+
+    pub fn struct_declaring_module(&self, name: &str) -> Option<&Vec<String>> {
+        self.struct_decl_modules.get(name)
+    }
+
+    pub fn enum_declaring_module(&self, name: &str) -> Option<&Vec<String>> {
+        self.enum_decl_modules.get(name)
     }
 
     pub fn register_aspect(&mut self, name: String, methods: Vec<String>) {
@@ -665,6 +688,9 @@ impl TypeDefinitionRegistry {
         for (k, v) in &other.struct_env {
             self.struct_env.entry(k.clone()).or_insert_with(|| v.clone());
         }
+        for (k, v) in &other.struct_decl_modules {
+            self.struct_decl_modules.entry(k.clone()).or_insert_with(|| v.clone());
+        }
         for (k, v) in &other.struct_type_params {
             self.struct_type_params.entry(k.clone()).or_insert_with(|| v.clone());
         }
@@ -685,6 +711,9 @@ impl TypeDefinitionRegistry {
         }
         for (k, v) in &other.enum_env {
             self.enum_env.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+        for (k, v) in &other.enum_decl_modules {
+            self.enum_decl_modules.entry(k.clone()).or_insert_with(|| v.clone());
         }
         for (k, v) in &other.aspect_env {
             self.aspect_env.entry(k.clone()).or_insert_with(|| v.clone());
@@ -726,6 +755,7 @@ pub struct InferContext {
     /// TypeVar → aspect names for the current generic function's bounded type params.
     /// Parallel to current_type_params; swapped in/out alongside it.
     current_type_param_bounds: HashMap<TypeVar, Vec<String>>,
+    current_module_path: Vec<String>,
 }
 
 impl InferContext {
@@ -737,6 +767,7 @@ impl InferContext {
         registry: TypeDefinitionRegistry,
         gen: TypeVarGenerator,
         imported_schemes: &HashMap<String, TypeScheme>,
+        current_module_path: Vec<String>,
     ) -> Self {
         let mut ctx = Self {
             var_gen: gen,
@@ -748,6 +779,7 @@ impl InferContext {
             registry,
             current_type_params: HashMap::new(),
             current_type_param_bounds: HashMap::new(),
+            current_module_path,
         };
         for (name, scheme) in imported_schemes {
             ctx.bind_poly(name, scheme.clone());
@@ -756,7 +788,7 @@ impl InferContext {
     }
 
     pub fn register_struct_fields(&mut self, name: String, fields: Vec<crate::typeinference::FieldEntry>) {
-        self.registry.register_struct_fields(name, fields);
+        self.registry.register_struct_fields(name, fields, self.current_module_path.clone());
     }
 
     pub fn get_struct_type_params(&self, name: &str) -> Option<&Vec<TypeVar>> {
@@ -779,7 +811,7 @@ impl InferContext {
     }
 
     pub fn register_enum(&mut self, name: String, info: EnumInfo) {
-        self.registry.register_enum(name, info);
+        self.registry.register_enum(name, info, self.current_module_path.clone());
     }
 
     pub fn get_enum(&self, name: &str) -> Option<&EnumInfo> {
@@ -804,6 +836,10 @@ impl InferContext {
 
     pub fn registry(&self) -> &TypeDefinitionRegistry {
         &self.registry
+    }
+
+    pub fn current_module_path(&self) -> &[String] {
+        &self.current_module_path
     }
 
     pub fn registry_mut(&mut self) -> &mut TypeDefinitionRegistry {
@@ -1011,6 +1047,11 @@ impl InferContext {
 
 impl Default for InferContext {
     fn default() -> Self {
-        Self::new(TypeDefinitionRegistry::new(), TypeVarGenerator::new(), &HashMap::new())
+        Self::new(
+            TypeDefinitionRegistry::new(),
+            TypeVarGenerator::new(),
+            &HashMap::new(),
+            vec![],
+        )
     }
 }

@@ -37,7 +37,7 @@ impl std::fmt::Display for Type {
             }
             Type::Array(t) => write!(f, "{}[]", t),
             Type::Fun(params, ret) => {
-                write!(f, "fun(")?;
+                write!(f, "(")?;
                 for (i, t) in params.iter().enumerate() {
                     if i > 0 { write!(f, ", ")?; }
                     write!(f, "{}", t)?;

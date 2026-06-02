@@ -101,7 +101,7 @@ fun main() -> Int {
 }
 "#,
     );
-    write(&dir.join("point.mtl"), "pub struct Point { x: Int, y: Int }\n");
+    write(&dir.join("point.mtl"), "pub struct Point { pub x: Int, pub y: Int }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -352,6 +352,90 @@ fn importing_pub_item_is_accepted() {
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
 
+#[test]
+fn private_struct_field_access_across_modules_is_t0009() {
+    let dir = fixture_dir("t0009_private_struct_field_access");
+    let main = dir.join("main.mtl");
+    write(
+        &main,
+        "import token::make;\nfun main() -> Int { return make().offset; }\n",
+    );
+    write(
+        &dir.join("token.mtl"),
+        "pub struct Token { pub kind: Int, offset: Int }\npub fun make() -> Token { return Token { kind: 1, offset: 7 }; }\n",
+    );
+
+    let err = run_graph(&main).expect_err("expected T0009");
+    let msg = format!("{err}");
+    assert!(msg.contains("T0009"), "expected T0009, got: {msg}");
+}
+
+#[test]
+fn private_struct_field_construction_across_modules_is_t0009() {
+    let dir = fixture_dir("t0009_private_struct_field_construction");
+    let main = dir.join("main.mtl");
+    write(
+        &main,
+        "import token::Token;\nfun main() { let t = Token { kind: 1, offset: 7 }; print(t.kind); }\n",
+    );
+    write(
+        &dir.join("token.mtl"),
+        "pub struct Token { pub kind: Int, offset: Int }\n",
+    );
+
+    let err = run_graph(&main).expect_err("expected T0009");
+    let msg = format!("{err}");
+    assert!(msg.contains("T0009"), "expected T0009, got: {msg}");
+}
+
+#[test]
+fn private_struct_field_assignment_across_modules_is_t0009() {
+    let dir = fixture_dir("t0009_private_struct_field_assign");
+    let main = dir.join("main.mtl");
+    write(
+        &main,
+        "import token::make;\nfun main() -> Int { mut t = make(); t.offset = 9; return t.kind; }\n",
+    );
+    write(
+        &dir.join("token.mtl"),
+        "pub struct Token { pub kind: Int, offset: Int }\npub fun make() -> Token { return Token { kind: 1, offset: 7 }; }\n",
+    );
+
+    let err = run_graph(&main).expect_err("expected T0009");
+    let msg = format!("{err}");
+    assert!(msg.contains("T0009"), "expected T0009, got: {msg}");
+}
+
+#[test]
+fn mixed_visibility_struct_allows_public_field_access_across_modules() {
+    let dir = fixture_dir("mixed_visibility_public_field_ok");
+    let main = dir.join("main.mtl");
+    write(
+        &main,
+        "import token::make;\nfun main() -> Int { let t = make(); return t.kind; }\n",
+    );
+    write(
+        &dir.join("token.mtl"),
+        "pub struct Token { pub kind: Int, offset: Int }\npub fun make() -> Token { return Token { kind: 11, offset: 7 }; }\n",
+    );
+
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn private_struct_fields_remain_accessible_inside_declaring_module() {
+    let dir = fixture_dir("private_struct_field_same_module_ok");
+    let main = dir.join("main.mtl");
+    write(
+        &main,
+        "pub struct Token { pub kind: Int, offset: Int }\n\
+         fun offset_of(t: Token) -> Int { return t.offset; }\n\
+         fun main() -> Int { let t = Token { kind: 3, offset: 9 }; return offset_of(t); }\n",
+    );
+
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
 // ── T0010: pub declarations require explicit annotations ──────────────────────
 
 #[test]
@@ -531,7 +615,7 @@ fn t0010_pub_struct_requires_field_type_annotations() {
         &main,
         "import point::Point;\nfun main() -> Int { let p = Point { x: 5, y: 3 }; return p.x; }\n",
     );
-    write(&dir.join("point.mtl"), "pub struct Point { x: Int, y: Int }\n");
+    write(&dir.join("point.mtl"), "pub struct Point { pub x: Int, pub y: Int }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -683,8 +767,8 @@ fn cross_module_closure_captures_imported_function() {
     write(
         &dir.join("builder.mtl"),
         "import math::add;\
-         \npub fun make_adder(n: Int) -> fun(Int) -> Int {\
-         \n    return fun(x: Int) -> Int { return add(x, n); };\
+         \npub fun make_adder(n: Int) -> (Int) -> Int {\
+         \n    return (x: Int) -> Int { return add(x, n); };\
          \n}\n",
     );
     write(
@@ -738,8 +822,8 @@ fn two_same_tier_imports_both_captured_in_closure() {
         &main,
         "import left::left_val;\
          \nimport right::right_val;\
-         \nfun make_combiner() -> fun() -> Int {\
-         \n    return fun() -> Int { return left_val() + right_val(); };\
+         \nfun make_combiner() -> () -> Int {\
+         \n    return () -> Int { return left_val() + right_val(); };\
          \n}\
          \nfun main() {\
          \n    let f = make_combiner();\
@@ -798,8 +882,8 @@ fn complex_multi_module_task_system() {
         r#"
 pub enum Priority { High, Medium, Low }
 pub enum Status { Open, InProgress, Done }
-pub struct Task { title: String, priority: Priority, status: Status, effort: Int }
-pub struct ValidationError { message: String }
+pub struct Task { pub title: String, pub priority: Priority, pub status: Status, pub effort: Int }
+pub struct ValidationError { pub message: String }
 "#,
     );
 
@@ -807,7 +891,7 @@ pub struct ValidationError { message: String }
     write(
         &dir.join("utils.mtl"),
         r#"
-pub fun filter_array<T>(arr: T[], pred: fun(T) -> Bool) -> T[] {
+pub fun filter_array<T>(arr: T[], pred: (T) -> Bool) -> T[] {
     mut out: T[] = [];
     for (let x in arr) {
         if (pred(x)) { array_push(out, x); }
@@ -815,13 +899,13 @@ pub fun filter_array<T>(arr: T[], pred: fun(T) -> Bool) -> T[] {
     out
 }
 
-pub fun map_array<T, U>(arr: T[], f: fun(T) -> U) -> U[] {
+pub fun map_array<T, U>(arr: T[], f: (T) -> U) -> U[] {
     mut out: U[] = [];
     for (let x in arr) { array_push(out, f(x)); }
     out
 }
 
-pub fun fold_left<T, A>(arr: T[], init: A, f: fun(A, T) -> A) -> A {
+pub fun fold_left<T, A>(arr: T[], init: A, f: (A, T) -> A) -> A {
     mut acc = init;
     for (let x in arr) {
         acc = f(acc, x);
@@ -829,7 +913,7 @@ pub fun fold_left<T, A>(arr: T[], init: A, f: fun(A, T) -> A) -> A {
     acc
 }
 
-pub fun find_first<T>(arr: T[], pred: fun(T) -> Bool) -> Perhaps<T> {
+pub fun find_first<T>(arr: T[], pred: (T) -> Bool) -> Perhaps<T> {
     for (let x in arr) {
         if (pred(x)) { return Perhaps::Some { value: x }; }
     }
@@ -862,7 +946,7 @@ pub fun validate_task(title: String, priority: Priority, status: Status, effort:
 }
 
 pub fun total_effort(tasks: Task[]) -> Int {
-    fold_left(tasks, 0, fun(acc: Int, t: Task) -> Int { acc + t.effort })
+    fold_left(tasks, 0, (acc: Int, t: Task) -> Int { acc + t.effort })
 }
 
 pub fun open_task_count(tasks: Task[]) -> Int {
@@ -894,11 +978,11 @@ pub fun is_done(t: Task) -> Bool {
 }
 
 pub fun task_titles(tasks: Task[]) -> String[] {
-    map_array(tasks, fun(t: Task) -> String { t.title })
+    map_array(tasks, (t: Task) -> String { t.title })
 }
 
 pub fun find_by_title(tasks: Task[], title: String) -> Perhaps<Task> {
-    find_first(tasks, fun(t: Task) -> Bool { t.title == title })
+    find_first(tasks, (t: Task) -> Bool { t.title == title })
 }
 
 pub fun compute_completion_pct(tasks: Task[]) -> Int {
@@ -972,14 +1056,14 @@ fun main() {
     assert(open_task_count(tasks) == 4);
 
     // 6. Generic filter_array with cross-module predicates
-    let high = filter_array(tasks, fun(t: Task) -> Bool { is_high_priority(t) });
+    let high = filter_array(tasks, (t: Task) -> Bool { is_high_priority(t) });
     assert(array_len(high) == 3);
 
-    let done_list = filter_array(tasks, fun(t: Task) -> Bool { is_done(t) });
+    let done_list = filter_array(tasks, (t: Task) -> Bool { is_done(t) });
     assert(array_len(done_list) == 1);
 
     // 7. map_array: extract efforts, sum via sum_ints
-    let efforts = map_array(tasks, fun(t: Task) -> Int { t.effort });
+    let efforts = map_array(tasks, (t: Task) -> Int { t.effort });
     assert(sum_ints(efforts) == 15);
     assert(efforts[0] == 5);
     assert(efforts[4] == 1);
@@ -1011,11 +1095,11 @@ fun main() {
 
     // 12. fold_left directly: product of [1,2,3,4] = 24
     let small: Int[] = [1, 2, 3, 4];
-    let product = fold_left(small, 1, fun(acc: Int, x: Int) -> Int { acc * x });
+    let product = fold_left(small, 1, (acc: Int, x: Int) -> Int { acc * x });
     assert(product == 24);
 
     // 13. find_first: locate the Done task (Deploy, effort=2)
-    let first_done = find_first(tasks, fun(t: Task) -> Bool { is_done(t) });
+    let first_done = find_first(tasks, (t: Task) -> Bool { is_done(t) });
     match first_done {
         Perhaps::Some { value } => assert(value.title == "Deploy"),
         None                    => assert(false),
@@ -1023,7 +1107,7 @@ fun main() {
 
     // 14. Closure capturing outer variable (min_effort threshold)
     let min_effort = 3;
-    let heavy = filter_array(tasks, fun(t: Task) -> Bool { t.effort >= min_effort });
+    let heavy = filter_array(tasks, (t: Task) -> Bool { t.effort >= min_effort });
     assert(array_len(heavy) == 3);
 
     // 15. C-style for: manual effort accumulation
@@ -1060,12 +1144,12 @@ fun main() {
 
     // 20. Chained map + filter across modules
     // doubled efforts: [10,6,4,8,2]; filter > 5: [10,6,8] = 3 items
-    let doubled = map_array(efforts, fun(x: Int) -> Int { x * 2 });
-    let big = filter_array(doubled, fun(x: Int) -> Bool { x > 5 });
+    let doubled = map_array(efforts, (x: Int) -> Int { x * 2 });
+    let big = filter_array(doubled, (x: Int) -> Bool { x > 5 });
     assert(array_len(big) == 3);
 
     // 21. Let-polymorphism: identity closure used at two different types
-    let id = fun(x) { x };
+    let id = (x) -> { x };
     assert(id(tasks[0]).effort == 5);
     assert(id(42) == 42);
 }
@@ -1087,14 +1171,14 @@ fn cross_module_struct_field_type_from_indirect_dependency() {
     // Module C: defines Coords
     write(
         &dir.join("coords.mtl"),
-        "pub struct Coords { x: Int, y: Int }\n",
+        "pub struct Coords { pub x: Int, pub y: Int }\n",
     );
 
     // Module A: defines Shape whose field type comes from C
     write(
         &dir.join("shape.mtl"),
         r#"import coords::Coords;
-pub struct Shape { origin: Coords, size: Int }
+pub struct Shape { pub origin: Coords, pub size: Int }
 pub fun make_shape(x: Int, y: Int, s: Int) -> Shape {
     return Shape { origin: Coords { x: x, y: y }, size: s };
 }

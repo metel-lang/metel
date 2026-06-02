@@ -2,7 +2,7 @@
 //
 // Functions with fully annotated parameters and return types. The typechecker
 // must:
-//   1. Register the function's type as fun(param_types...) -> return_type
+//   1. Register the function's type as (param_types...) -> return_type
 //   2. Infer the body and unify it against the declared return type
 //   3. At each call site, unify the argument types with the parameter types
 //      and use the return type as the call expression's type

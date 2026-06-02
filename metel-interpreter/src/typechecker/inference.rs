@@ -398,7 +398,12 @@ fn infer_block(
         match decl {
             Decl::Struct(sd) => {
                 let fields = sd.fields.iter()
-                    .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann), f.span.clone()))
+                    .map(|f| FieldEntry {
+                        name: f.name.clone(),
+                        ty: type_expr_to_infer(&f.type_ann),
+                        span: f.span.clone(),
+                        visibility: f.visibility.clone(),
+                    })
                     .collect();
                 ctx.register_struct_fields(sd.name.clone(), fields);
             }
@@ -406,7 +411,12 @@ fn infer_block(
                 let variants = ed.variants.iter().map(|v| VariantInfo {
                     name: v.name.clone(),
                     fields: v.fields.iter()
-                        .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann), f.span.clone()))
+                        .map(|f| FieldEntry {
+                            name: f.name.clone(),
+                            ty: type_expr_to_infer(&f.type_ann),
+                            span: f.span.clone(),
+                            visibility: f.visibility.clone(),
+                        })
                         .collect(),
                 }).collect();
                 ctx.register_enum(ed.name.clone(), EnumInfo { type_params: vec![], variants });
@@ -659,14 +669,22 @@ fn infer_expr(
                     span,
                 ))?
                 .clone();
-            let raw_ty = fields.iter()
-                .find(|(n, _, _)| n == field)
-                .map(|(_, ty, _)| ty.clone())
+            let field_entry = fields.iter()
+                .find(|entry| entry.name == *field)
                 .ok_or_else(|| MetelError::type_error(
                     TypeErrorCode::T0003,
                     format!("no field `{field}` on `{struct_name}`"),
                     span,
                 ))?;
+            check_field_visibility(
+                field_entry,
+                &struct_name,
+                ctx.current_module_path(),
+                ctx.registry().struct_declaring_module(&struct_name),
+                span,
+                "access",
+            )?;
+            let raw_ty = field_entry.ty.clone();
             // For generic structs, substitute declared type params with the resolved args.
             if let Some(type_params) = ctx.get_struct_type_params(&struct_name).cloned() {
                 let mut remap = Substitution::new();
@@ -1149,6 +1167,31 @@ fn infer_unaryop(
     }
 }
 
+fn is_same_declaring_module(
+    current_module_path: &[String],
+    declaring_module: Option<&Vec<String>>,
+) -> bool {
+    declaring_module.is_some_and(|module| module.as_slice() == current_module_path)
+}
+
+fn check_field_visibility(
+    field: &FieldEntry,
+    type_name: &str,
+    current_module_path: &[String],
+    declaring_module: Option<&Vec<String>>,
+    span: &Span,
+    action: &str,
+) -> Result<(), MetelError> {
+    if field.visibility == Visibility::Public || is_same_declaring_module(current_module_path, declaring_module) {
+        return Ok(());
+    }
+    Err(MetelError::type_error(
+        TypeErrorCode::T0009,
+        format!("visibility error: cannot {action} private field `{}` of `{type_name}` from outside its declaring module", field.name),
+        span,
+    ))
+}
+
 fn infer_enum_variant_literal(
     enum_name: &str,
     variant_name: &str,
@@ -1157,6 +1200,7 @@ fn infer_enum_variant_literal(
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
 ) -> Result<InferType, MetelError> {
+    let enum_decl_module = ctx.registry().enum_declaring_module(enum_name).cloned();
     let enum_info = ctx.get_enum(enum_name)
         .ok_or_else(|| MetelError::type_error(
             TypeErrorCode::T0003,
@@ -1177,16 +1221,23 @@ fn infer_enum_variant_literal(
         remap.insert(tp, ctx.fresh_var());
     }
     for (fname, expr) in fields {
-        let raw_ty = variant.fields.iter()
-            .find(|(n, _, _)| n == fname)
-            .map(|(_, ty, _)| ty)
+        let field = variant.fields.iter()
+            .find(|field| field.name == *fname)
             .ok_or_else(|| MetelError::type_error(
                 TypeErrorCode::T0003,
                 format!("no field `{fname}` on `{enum_name}::{variant_name}`"),
                 span,
             ))?;
-        let decl_ty = match raw_ty {
-            InferType::Var(v) => remap.get(v).cloned().unwrap_or_else(|| raw_ty.clone()),
+        check_field_visibility(
+            field,
+            &format!("{enum_name}::{variant_name}"),
+            ctx.current_module_path(),
+            enum_decl_module.as_ref(),
+            span,
+            "construct",
+        )?;
+        let decl_ty = match &field.ty {
+            InferType::Var(v) => remap.get(v).cloned().unwrap_or_else(|| field.ty.clone()),
             other => other.clone(),
         };
         let expr_ty = infer_expr(expr, ctx, fun_generalizations)?;
@@ -1205,6 +1256,7 @@ fn infer_struct_literal(
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
 ) -> Result<InferType, MetelError> {
+    let struct_decl_module = ctx.registry().struct_declaring_module(&struct_name).cloned();
     let expected_fields = ctx.get_struct_fields(&struct_name)
         .ok_or_else(|| MetelError::type_error(
             TypeErrorCode::T0003,
@@ -1228,23 +1280,30 @@ fn infer_struct_literal(
         }
     };
     for (name, expr) in fields {
-        let raw_ty = expected_fields.iter()
-            .find(|(n, _, _)| n == name)
-            .map(|(_, ty, _)| ty)
+        let field = expected_fields.iter()
+            .find(|field| field.name == *name)
             .ok_or_else(|| MetelError::type_error(
                 TypeErrorCode::T0003,
                 format!("no field `{name}` on `{struct_name}`"),
                 span,
             ))?;
-        let decl_ty = apply_remap(raw_ty);
+        check_field_visibility(
+            field,
+            &struct_name,
+            ctx.current_module_path(),
+            struct_decl_module.as_ref(),
+            span,
+            "construct",
+        )?;
+        let decl_ty = apply_remap(&field.ty);
         let expr_ty = infer_expr(expr, ctx, fun_generalizations)?;
         ctx.add_constraint(expr_ty, decl_ty, span.clone());
     }
-    for (decl_name, _, _) in &expected_fields {
-        if !fields.iter().any(|(n, _)| n == decl_name) {
+    for field in &expected_fields {
+        if !fields.iter().any(|(n, _)| n == &field.name) {
             return Err(MetelError::type_error(
                 TypeErrorCode::T0003,
-                format!("missing field `{decl_name}` in `{struct_name}`"),
+                format!("missing field `{}` in `{struct_name}`", field.name),
                 span,
             ));
         }
@@ -1278,14 +1337,22 @@ fn infer_field_assign_type(
             target_span,
         ))?
         .clone();
-    let raw_ty = fields.iter()
-        .find(|(n, _, _)| n == field)
-        .map(|(_, ty, _)| ty.clone())
+    let field_entry = fields.iter()
+        .find(|entry| entry.name == field)
         .ok_or_else(|| MetelError::type_error(
             TypeErrorCode::T0003,
             format!("no field `{field}` on `{struct_name}`"),
             target_span,
         ))?;
+    check_field_visibility(
+        field_entry,
+        &struct_name,
+        ctx.current_module_path(),
+        ctx.registry().struct_declaring_module(&struct_name),
+        target_span,
+        "assign to",
+    )?;
+    let raw_ty = field_entry.ty.clone();
     if let Some(type_params) = ctx.get_struct_type_params(&struct_name).cloned() {
         let mut remap = Substitution::new();
         for (&tp, arg) in type_params.iter().zip(type_args.iter()) {
@@ -1305,6 +1372,7 @@ fn infer_enum_variant_pattern(
     pat_span: &Span,
     ctx: &mut InferContext,
 ) -> Result<(), MetelError> {
+    let enum_decl_module = ctx.registry().enum_declaring_module(enum_name).cloned();
     let enum_info = ctx.get_enum(enum_name)
         .ok_or_else(|| MetelError::type_error(
             TypeErrorCode::T0003,
@@ -1333,16 +1401,23 @@ fn infer_enum_variant_pattern(
         pat_span.clone(),
     );
     for field_name in fields {
-        let raw_ty = variant.fields.iter()
-            .find(|(n, _, _)| n == field_name)
-            .map(|(_, ty, _)| ty)
+        let field = variant.fields.iter()
+            .find(|field| field.name == *field_name)
             .ok_or_else(|| MetelError::type_error(
                 TypeErrorCode::T0003,
                 format!("no field `{field_name}` on `{enum_name}::{variant_name}`"),
                 pat_span,
             ))?;
-        let field_ty = match raw_ty {
-            InferType::Var(v) => remap.get(v).cloned().unwrap_or_else(|| raw_ty.clone()),
+        check_field_visibility(
+            field,
+            &format!("{enum_name}::{variant_name}"),
+            ctx.current_module_path(),
+            enum_decl_module.as_ref(),
+            pat_span,
+            "pattern-match on",
+        )?;
+        let field_ty = match &field.ty {
+            InferType::Var(v) => remap.get(v).cloned().unwrap_or_else(|| field.ty.clone()),
             other => other.clone(),
         };
         ctx.bind_mono(field_name, field_ty, false);

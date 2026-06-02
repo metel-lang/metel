@@ -174,7 +174,7 @@ fun best_attacker_idx(party: Fighter[]) -> Perhaps<Int> {
 fun simulate_rounds(
     f1_init:   Fighter,
     f2_init:   Fighter,
-    action_fn: fun(Fighter, Fighter) -> Action,
+    action_fn: (Fighter, Fighter) -> Action,
     n:         Int
 ) -> (Fighter, Fighter) {
     mut f1 = f1_init;
@@ -197,9 +197,9 @@ fun simulate_rounds(
 // Uses RFC-0019: `return Perhaps::Some { value: ... }` and `return None`.
 fun battle(
     f1_init:    Fighter,
-    s1:         fun(Fighter, Fighter) -> Action,
+    s1:         (Fighter, Fighter) -> Action,
     f2_init:    Fighter,
-    s2:         fun(Fighter, Fighter) -> Action,
+    s2:         (Fighter, Fighter) -> Action,
     max_rounds: Int
 ) -> Perhaps<String> {
     mut f1    = f1_init;
@@ -349,7 +349,7 @@ fun main() {
     //   Healer falls behind eventually and Mage wins within 20 rounds.
     let result2 = battle(
         mage,
-        fun(a: Fighter, t: Fighter) -> Action { Action::Attack },
+        (a: Fighter, t: Fighter) -> Action { Action::Attack },
         healer,
         smart_healer,
         20
@@ -361,7 +361,7 @@ fun main() {
 
     // 17. Closure capturing an outer variable (hp threshold for heal decision).
     let hp_threshold = 25;
-    let threshold_healer = fun(actor: Fighter, target: Fighter) -> Action {
+    let threshold_healer = (actor: Fighter, target: Fighter) -> Action {
         if (actor.hp < hp_threshold) {
             Action::Heal { amount: 10 }
         } else {

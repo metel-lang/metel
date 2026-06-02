@@ -25,8 +25,12 @@ pub(super) fn build_concrete_struct_env(
         .filter(|(name, _)| !registry.raw_struct_type_params().contains_key(name.as_str()))
         .map(|(name, fields)| {
             let concrete = fields.iter()
-                .map(|(fname, fty, fspan)| {
-                    Ok((fname.clone(), infer_type_to_type(&subst.apply(fty), fspan)?, fspan.clone()))
+                .map(|field| {
+                    Ok((
+                        field.name.clone(),
+                        infer_type_to_type(&subst.apply(&field.ty), &field.span)?,
+                        field.span.clone(),
+                    ))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             Ok((name.clone(), concrete))
@@ -77,6 +81,7 @@ struct ConstructCtx<'a> {
     current_return_ty: Option<Type>,
     /// Break value type of the innermost enclosing `loop` (None = no loop or bare break).
     current_break_ty:  Option<Type>,
+    current_module_path: Vec<String>,
 }
 
 impl<'a> ConstructCtx<'a> {
@@ -85,6 +90,7 @@ impl<'a> ConstructCtx<'a> {
         scheme_env: &'a SchemeEnv,
         registry:   &'a TypeDefinitionRegistry,
         gen:        TypeVarGenerator,
+        current_module_path: Vec<String>,
     ) -> Result<Self, MetelError> {
         let concrete_struct_env = build_concrete_struct_env(registry, subst)?;
         let method_env = build_concrete_method_env(registry, subst)?;
@@ -96,6 +102,7 @@ impl<'a> ConstructCtx<'a> {
             method_env, gen,
             current_return_ty: None,
             current_break_ty:  None,
+            current_module_path,
         };
         // Derive concrete types for all monomorphic entries in scheme_env.
         // Both builtins and user functions are populated here — no second registration site.
@@ -153,8 +160,9 @@ pub(super) fn construct_program(
     scheme_env: &SchemeEnv,
     registry:   &TypeDefinitionRegistry,
     gen:        TypeVarGenerator,
+    current_module_path: Vec<String>,
 ) -> Result<TypedProgram, MetelError> {
-    let mut ctx = ConstructCtx::new(subst, scheme_env, registry, gen)?;
+    let mut ctx = ConstructCtx::new(subst, scheme_env, registry, gen, current_module_path)?;
 
     let mut out = vec![];
     for decl in &program.decls {
@@ -637,8 +645,8 @@ fn construct_expr(
                 let raw_fields = ctx.registry.raw_struct_env().get(&struct_name)
                     .ok_or_else(|| MetelError::internal(format!("missing raw fields for `{struct_name}`")))?;
                 let raw_ty = raw_fields.iter()
-                    .find(|(n, _, _)| n == field)
-                    .map(|(_, ty, _)| ty.clone())
+                    .find(|entry| entry.name == *field)
+                    .map(|entry| entry.ty.clone())
                     .ok_or_else(|| MetelError::internal(format!("no field `{field}` on `{struct_name}`")))?;
                 let mut remap = Substitution::new();
                 for (&tp, arg) in type_params.iter().zip(type_args.iter()) {
@@ -647,7 +655,7 @@ fn construct_expr(
                 infer_type_to_type(&remap.apply(&raw_ty), span)?
             } else {
                 ctx.get_struct_fields(&struct_name)
-                    .and_then(|fs| fs.iter().find(|(n, _, _)| n == field))
+                    .and_then(|fs| fs.iter().find(|(name, _, _)| name == field))
                     .map(|(_, ty, _)| ty.clone())
                     .ok_or_else(|| MetelError::internal(
                         format!("no field `{field}` on `{struct_name}`")
@@ -731,9 +739,11 @@ fn construct_expr(
                     }
                     // Match each field value type to its raw InferType param; resolve via subst.
                     for (fname, fexpr) in &typed_fields {
-                        if let Some((_, InferType::Var(v), _)) = raw_fields.iter().find(|(n, _, _)| n == fname) {
-                            if type_params.contains(v) {
-                                remap.insert(*v, type_to_infer(fexpr.ty()));
+                        if let Some(field) = raw_fields.iter().find(|entry| entry.name == *fname) {
+                            if let InferType::Var(v) = &field.ty {
+                                if type_params.contains(v) {
+                                    remap.insert(*v, type_to_infer(fexpr.ty()));
+                                }
                             }
                         }
                     }
@@ -798,7 +808,7 @@ fn construct_expr(
                             Type::Named(type_name.clone(), vec![])
                         } else {
                             let field_types: Vec<Type> = variant.fields.iter()
-                                .map(|(_, t, _)| infer_type_to_type(t, span))
+                                .map(|field| infer_type_to_type(&field.ty, span))
                                 .collect::<Result<_, _>>()?;
                             Type::Fun(field_types, Box::new(Type::Named(type_name.clone(), vec![])))
                         };
@@ -827,7 +837,7 @@ fn construct_expr(
                 ctx.bind(&p.name, ty.clone());
             }
             // Without this, unmentioned type params in variant literals (e.g. the
-            // E in Result::Ok inside a fun()->Result<T,E>) have no hint and fail T0002.
+            // E in Result::Ok inside a ()->Result<T,E>) have no hint and fail T0002.
             let body_expected = return_type.as_ref().map(|_| &ret_ty);
             let typed_body = construct_block(body, body_expected, ctx)?;
             ctx.pop_scope();
@@ -1103,10 +1113,10 @@ fn construct_enum_literal_ty(
     // to solve for the fresh variables.
     let mut local_subst = Substitution::new();
     for (field_name, typed_expr) in typed_fields {
-        if let Some((_, field_decl_ty, _)) = variant.fields.iter()
-            .find(|(n, _, _)| n == field_name)
+        if let Some(field_entry) = variant.fields.iter()
+            .find(|entry| &entry.name == field_name)
         {
-            let instantiated = init_subst.apply(field_decl_ty);
+            let instantiated = init_subst.apply(&field_entry.ty);
             let actual = type_to_infer(typed_expr.ty());
             if let Ok(s) = unify(&local_subst.apply(&instantiated), &local_subst.apply(&actual)) {
                 local_subst = local_subst.compose(&s);
@@ -1196,8 +1206,8 @@ fn bind_enum_variant_fields(
     }
     for field_name in fields {
         let (template_ty, field_span) = variant.fields.iter()
-            .find(|(n, _, _)| n == field_name)
-            .map(|(_, ty, span)| (ty.clone(), span.clone()))
+            .find(|entry| entry.name == *field_name)
+            .map(|entry| (entry.ty.clone(), entry.span.clone()))
             .ok_or_else(|| MetelError::internal(
                 format!("no field `{field_name}` on variant `{variant_name}`")
             ))?;

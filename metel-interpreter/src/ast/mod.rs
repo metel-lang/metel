@@ -201,6 +201,7 @@ pub struct Param {
 
 #[derive(Debug, Clone)]
 pub struct FieldDef {
+    pub visibility: Visibility,
     pub name:     String,
     pub type_ann: TypeExpr,
     /// Reserved for span propagation through the type registry (v0.4.3, #133).

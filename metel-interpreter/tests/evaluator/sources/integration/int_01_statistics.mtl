@@ -174,7 +174,7 @@ fun sum_floats(data: Float[]) -> Float {
     acc
 }
 
-fun count_if(data: Float[], pred: fun(Float) -> Bool) -> Int {
+fun count_if(data: Float[], pred: (Float) -> Bool) -> Int {
     mut cnt = 0;
     for (let x in data) {
         if (pred(x)) { cnt += 1; }
@@ -182,13 +182,13 @@ fun count_if(data: Float[], pred: fun(Float) -> Bool) -> Int {
     cnt
 }
 
-fun map_floats(data: Float[], f: fun(Float) -> Float) -> Float[] {
+fun map_floats(data: Float[], f: (Float) -> Float) -> Float[] {
     mut out: Float[] = [];
     for (let x in data) { array_push(out, f(x)); }
     out
 }
 
-fun filter_floats(data: Float[], pred: fun(Float) -> Bool) -> Float[] {
+fun filter_floats(data: Float[], pred: (Float) -> Bool) -> Float[] {
     mut out: Float[] = [];
     for (let x in data) {
         if (pred(x)) { array_push(out, x); }
@@ -307,15 +307,15 @@ fun main() {
 
     assert(sum_floats(d8) == 36.0);
 
-    let above4 = count_if(d8, fun(x: Float) -> Bool { x > 4.0 });
+    let above4 = count_if(d8, (x: Float) -> Bool { x > 4.0 });
     assert(above4 == 4);
 
-    let squares = map_floats(d8, fun(x: Float) -> Float { x * x });
+    let squares = map_floats(d8, (x: Float) -> Float { x * x });
     assert(squares[0]  == 1.0);
     assert(squares[3]  == 16.0);
     assert(squares[7]  == 64.0);
 
-    let big = filter_floats(d8, fun(x: Float) -> Bool { x > 5.0 });
+    let big = filter_floats(d8, (x: Float) -> Bool { x > 5.0 });
     assert(array_len(big) == 3);
     assert(big[0] == 6.0);
     assert(big[2] == 8.0);
@@ -327,7 +327,7 @@ fun main() {
     assert(rsums[7] == 36.0);
 
     // 8. Composing higher-order functions: sum of squares.
-    let sq_sum = sum_floats(map_floats(d5, fun(x: Float) -> Float { x * x }));
+    let sq_sum = sum_floats(map_floats(d5, (x: Float) -> Float { x * x }));
     // 1 + 4 + 9 + 16 + 25 = 55
     assert(sq_sum == 55.0);
 
@@ -363,7 +363,7 @@ fun main() {
 
     // 13. Closure capturing an outer variable.
     let threshold = 3.0;
-    let above_threshold = count_if(d5, fun(x: Float) -> Bool { x > threshold });
+    let above_threshold = count_if(d5, (x: Float) -> Bool { x > threshold });
     assert(above_threshold == 2);
 
     // 14. Stats description as string (exercises to_str method).

@@ -95,7 +95,11 @@ fn register_builtin_aspect_impls(registry: &mut TypeDefinitionRegistry) {
 /// Build the `TypeDefinitionRegistry` from the program's declarations and built-in types.
 /// Allocates TypeVars from `gen`; the caller must pass the same `gen` to
 /// `InferContext::new` so that all TypeVar IDs are globally unique.
-pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> TypeDefinitionRegistry {
+pub(super) fn build_registry(
+    program: &Program,
+    gen: &mut TypeVarGenerator,
+    current_module_path: &[String],
+) -> TypeDefinitionRegistry {
     let mut registry = TypeDefinitionRegistry::new();
     register_builtin_aspect_impls(&mut registry);
 
@@ -107,28 +111,48 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
     registry.register_enum("Perhaps".into(), EnumInfo {
         type_params: vec![t],
         variants: vec![
-            VariantInfo { name: "Some".into(), fields: vec![("value".into(), InferType::Var(t), builtin_span.clone())] },
+            VariantInfo { name: "Some".into(), fields: vec![FieldEntry {
+                name: "value".into(),
+                ty: InferType::Var(t),
+                span: builtin_span.clone(),
+                visibility: crate::ast::Visibility::Public,
+            }] },
             VariantInfo { name: "None".into(), fields: vec![] },
         ],
-    });
+    }, vec!["std".into(), "core".into()]);
     let t = gen.fresh();
     let e = gen.fresh();
     registry.register_enum("Result".into(), EnumInfo {
         type_params: vec![t, e],
         variants: vec![
-            VariantInfo { name: "Ok".into(),  fields: vec![("value".into(), InferType::Var(t), builtin_span.clone())] },
-            VariantInfo { name: "Err".into(), fields: vec![("error".into(), InferType::Var(e), builtin_span.clone())] },
+            VariantInfo { name: "Ok".into(),  fields: vec![FieldEntry {
+                name: "value".into(),
+                ty: InferType::Var(t),
+                span: builtin_span.clone(),
+                visibility: crate::ast::Visibility::Public,
+            }] },
+            VariantInfo { name: "Err".into(), fields: vec![FieldEntry {
+                name: "error".into(),
+                ty: InferType::Var(e),
+                span: builtin_span.clone(),
+                visibility: crate::ast::Visibility::Public,
+            }] },
         ],
-    });
+    }, vec!["std".into(), "core".into()]);
 
     // Pass 1: register user-defined structs, enums, and aspects.
     for decl in &program.decls {
         match decl {
             Decl::Struct(sd) if sd.generics.is_empty() => {
                 let fields: Vec<FieldEntry> = sd.fields.iter()
-                    .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann), f.span.clone()))
+                    .map(|f| FieldEntry {
+                        name: f.name.clone(),
+                        ty: type_expr_to_infer(&f.type_ann),
+                        span: f.span.clone(),
+                        visibility: f.visibility.clone(),
+                    })
                     .collect();
-                registry.register_struct_fields(sd.name.clone(), fields);
+                registry.register_struct_fields(sd.name.clone(), fields, current_module_path.to_vec());
             }
             Decl::Struct(sd) => {
                 let mut gen_map: HashMap<String, TypeVar> = HashMap::new();
@@ -139,9 +163,14 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
                     type_params.push(tv);
                 }
                 let fields: Vec<FieldEntry> = sd.fields.iter()
-                    .map(|f| (f.name.clone(), type_expr_to_infer_with_generics(&f.type_ann, &gen_map), f.span.clone()))
+                    .map(|f| FieldEntry {
+                        name: f.name.clone(),
+                        ty: type_expr_to_infer_with_generics(&f.type_ann, &gen_map),
+                        span: f.span.clone(),
+                        visibility: f.visibility.clone(),
+                    })
                     .collect();
-                registry.register_struct_fields(sd.name.clone(), fields);
+                registry.register_struct_fields(sd.name.clone(), fields, current_module_path.to_vec());
                 registry.register_struct_type_params(sd.name.clone(), type_params);
                 registry.register_struct_generic_names(
                     sd.name.clone(),
@@ -163,7 +192,12 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
                 let variants = ed.variants.iter().map(|v| VariantInfo {
                     name: v.name.clone(),
                     fields: v.fields.iter()
-                        .map(|f| (f.name.clone(), type_expr_to_infer_with_generics(&f.type_ann, &gen_map), f.span.clone()))
+                        .map(|f| FieldEntry {
+                            name: f.name.clone(),
+                            ty: type_expr_to_infer_with_generics(&f.type_ann, &gen_map),
+                            span: f.span.clone(),
+                            visibility: f.visibility.clone(),
+                        })
                         .collect(),
                 }).collect();
                 registry.register_struct_generic_names(
@@ -174,7 +208,7 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
                 registry.register_enum(ed.name.clone(), EnumInfo {
                     type_params,
                     variants,
-                });
+                }, current_module_path.to_vec());
                 if bounds.iter().any(|b| !b.is_empty()) {
                     registry.register_type_param_bounds(ed.name.clone(), bounds);
                 }

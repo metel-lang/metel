@@ -1,10 +1,10 @@
 // Closure returning a closure (currying).
-fun add_n(n: Int) -> fun(Int) -> Int {
-    fun(x: Int) -> Int { n + x }
+fun add_n(n: Int) -> (Int) -> Int {
+    (x: Int) -> Int { n + x }
 }
-fun scale_then_add(factor: Int) -> fun(Int) -> fun(Int) -> Int {
-    fun(base: Int) -> fun(Int) -> Int {
-        fun(x: Int) -> Int { factor * base + x }
+fun scale_then_add(factor: Int) -> (Int) -> (Int) -> Int {
+    (base: Int) -> (Int) -> Int {
+        (x: Int) -> Int { factor * base + x }
     }
 }
 

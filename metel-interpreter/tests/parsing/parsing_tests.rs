@@ -207,3 +207,47 @@ fn rejects_mod_after_declaration() {
     let msg = parse_error_message("neg_06_mod_after_decl.mtl");
     assert!(msg.contains("P0001"), "expected parse error, got: {msg}");
 }
+
+#[test]
+fn rejects_old_fun_closure_syntax_in_expression_position() {
+    let source = r#"
+fun main() {
+    let f = fun(x: Int) -> Int { return x + 1; };
+}
+"#;
+
+    let err = parser::parse(source, "old_fun_closure.mtl")
+        .expect_err("expected parse error for old closure syntax");
+    let msg = format!("{err}");
+    assert!(msg.contains("P0001"), "expected parse error, got: {msg}");
+}
+
+#[test]
+fn rejects_closure_without_arrow() {
+    let source = r#"
+fun main() {
+    let f = (x: Int) { return x + 1; };
+}
+"#;
+
+    let err = parser::parse(source, "no_arrow_closure.mtl")
+        .expect_err("expected parse error for arrowless closure");
+    let msg = format!("{err}");
+    assert!(msg.contains("P0001"), "expected parse error, got: {msg}");
+}
+
+#[test]
+fn parses_zero_arg_function_type_and_zero_arg_closure_together() {
+    let source = r#"
+fun takes_zero(f: () -> Int) -> Int {
+    return f();
+}
+
+fun main() -> Int {
+    return takes_zero(() -> Int { return 42; });
+}
+"#;
+
+    parser::parse(source, "zero_arg_closure_and_type.mtl")
+        .unwrap_or_else(|e| panic!("{e}"));
+}

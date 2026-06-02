@@ -61,7 +61,7 @@ fun_decl    = { pub_kw? ~ "fun" ~ ident ~ generic_params? ~ "(" ~ param_list? ~ 
 
 struct_decl = { pub_kw? ~ "struct" ~ ident ~ generic_params? ~ where_clause? ~ "{" ~ struct_fields ~ "}" }
 struct_fields = { (struct_field ~ ",")* ~ struct_field? }
-struct_field  = { ident ~ ":" ~ type_expr }
+struct_field  = { pub_kw? ~ ident ~ ":" ~ type_expr }
 
 enum_decl   = { pub_kw? ~ "enum" ~ ident ~ generic_params? ~ where_clause? ~ "{" ~ enum_variants ~ "}" }
 enum_variants = { (enum_variant ~ ",")* ~ enum_variant? }
@@ -157,13 +157,13 @@ primary_expr = {
   | string_lit
   | bool_lit
   | none_lit
+  | closure_expr
   | unit_lit
   | tuple_or_paren
   | array_lit
   | match_expr
   | if_expr
   | loop_expr
-  | closure_expr
   | struct_literal
   | path_expr
 }
@@ -179,7 +179,7 @@ break_arm   = { "break" ~ expr? }
 if_expr     = { "if" ~ "(" ~ expr ~ ")" ~ (block | expr) ~ ("else" ~ (if_expr | block | expr))? }
 loop_expr   = { "loop" ~ block }
 
-closure_expr = { "fun" ~ "(" ~ param_list? ~ ")" ~ ("->" ~ type_expr)? ~ block }
+closure_expr = { "(" ~ param_list? ~ ")" ~ "->" ~ type_expr? ~ block }
 
 struct_literal = { type_path ~ "{" ~ field_init ~ ("," ~ field_init)* ~ ","? ~ "}" }
 field_init     = { ident ~ (":" ~ expr)? }
@@ -206,9 +206,9 @@ bind_pattern    = { ident }
 // ── Type expressions ──────────────────────────────────────────────────────────
 
 type_expr = {
-    unit_type
+    fun_type
+  | unit_type
   | tuple_type
-  | fun_type
   | array_type
   | impl_type
   | named_type
@@ -218,7 +218,7 @@ impl_type = { "impl" ~ type_expr }
 
 unit_type  = { "()" }
 tuple_type = { "(" ~ type_expr ~ ("," ~ type_expr)+ ~ ")" }
-fun_type   = { "fun" ~ "(" ~ type_list? ~ ")" ~ ("->" ~ type_expr)? }
+fun_type   = { "(" ~ type_list? ~ ")" ~ "->" ~ type_expr }
 array_type = { named_type ~ "[]" }
 named_type = { type_path ~ ("<" ~ type_args ~ ">")? }
 type_args  = { type_expr ~ ("," ~ type_expr)* }

@@ -1,10 +1,10 @@
 // Positive: let-bound closures without type annotations are generalized into type schemes.
 //
-// Top-level `fun` declarations are generalized (∀α. fun(α) -> α); unannotated
+// Top-level `fun` declarations are generalized (∀α. (α) -> α); unannotated
 // `let`-bound closures now receive the same treatment.  Each call site gets a
 // fresh instantiation so the same binding can be used at multiple types.
 
-let identity = fun(x) { x };
+let identity = (x) -> { x };
 
 let a = identity(42);
 let b = identity(true);

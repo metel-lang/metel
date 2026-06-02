@@ -54,7 +54,7 @@ fn multi_file_program_loads_declared_modules() {
     let dir = fixture_dir("multi");
     let main = dir.join("main.mtl");
     write(&main, "import parser::Token;\nfun main() { }\n");
-    write(&dir.join("parser.mtl"), "pub struct Token { value: Int }\n");
+    write(&dir.join("parser.mtl"), "pub struct Token { pub value: Int }\n");
 
     let graph = module_loader::load_root(&main).unwrap_or_else(|e| panic!("{e}"));
 
@@ -80,7 +80,7 @@ fn facade_module_alongside_directory() {
     // parser.mtl is the facade; parser/ is the namespace — both can coexist
     write(&dir.join("parser.mtl"), "struct Token { value: Int }\n");
     fs::create_dir_all(dir.join("parser")).unwrap();
-    write(&dir.join("parser").join("ast.mtl"), "pub struct Ast { value: Int }\n");
+    write(&dir.join("parser").join("ast.mtl"), "pub struct Ast { pub value: Int }\n");
 
     let graph = module_loader::load_root(&main).unwrap_or_else(|e| panic!("{e}"));
 
@@ -168,7 +168,7 @@ fn qualified_type_in_return_signature_typechecks() {
     let main = dir.join("main.mtl");
     // Import Token from helper and use the bare name in the return annotation.
     write(&main, "import helper::*;\nfun wrap(v: Int) -> Token { return Token { value: v }; }\nfun main() -> Int { let t = wrap(7); return t.value; }\n");
-    write(&dir.join("helper.mtl"), "pub struct Token { value: Int }\n");
+    write(&dir.join("helper.mtl"), "pub struct Token { pub value: Int }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -296,7 +296,7 @@ fun main() -> Int {
 }
 "#,
     );
-    write(&dir.join("point.mtl"), "pub struct Point { x: Int, y: Int }\n");
+    write(&dir.join("point.mtl"), "pub struct Point { pub x: Int, pub y: Int }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }

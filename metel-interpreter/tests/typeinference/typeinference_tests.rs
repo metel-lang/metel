@@ -117,13 +117,13 @@ mod phase_2_infer_types {
             vec![InferType::int(), InferType::bool()],
             Box::new(InferType::str()),
         );
-        assert_eq!(format!("{}", ty), "fun(Int, Bool) -> String");
+        assert_eq!(format!("{}", ty), "(Int, Bool) -> String");
     }
 
     #[test]
     fn test_display_fun_no_params() {
         let ty = InferType::Fun(vec![], Box::new(InferType::unit()));
-        assert_eq!(format!("{}", ty), "fun() -> ()");
+        assert_eq!(format!("{}", ty), "() -> ()");
     }
 
     #[test]
@@ -156,17 +156,17 @@ mod phase_2_infer_types {
             vec![InferType::var(TypeVar(0))],
             Box::new(InferType::var(TypeVar(0))),
         );
-        assert_eq!(format!("{}", ty), "fun(?t0) -> ?t0");
+        assert_eq!(format!("{}", ty), "(?t0) -> ?t0");
     }
 
     #[test]
     fn test_nested_types() {
-        // Array of functions: fun(Int) -> Bool []
+        // Array of functions: (Int) -> Bool []
         let ty = InferType::Array(Box::new(InferType::Fun(
             vec![InferType::int()],
             Box::new(InferType::bool()),
         )));
-        assert_eq!(format!("{}", ty), "fun(Int) -> Bool[]");
+        assert_eq!(format!("{}", ty), "(Int) -> Bool[]");
     }
 
     #[test]
@@ -230,7 +230,7 @@ mod phase_3_substitution {
 
     #[test]
     fn test_apply_nested_fun() {
-        // fun(?t0) -> ?t1  with { ?t0→Bool, ?t1→Int }  ⟹  fun(Bool) -> Int
+        // (?t0) -> ?t1  with { ?t0→Bool, ?t1→Int }  ⟹  (Bool) -> Int
         let mut s = Substitution::new();
         s.bind(TypeVar(0), InferType::bool());
         s.bind(TypeVar(1), InferType::int());
@@ -342,7 +342,7 @@ mod phase_4_unification {
 
     #[test]
     fn test_unify_function_types() {
-        // fun(?t0) -> ?t0  with  fun(Int) -> Int  => ?t0 = Int
+        // (?t0) -> ?t0  with  (Int) -> Int  => ?t0 = Int
         let a = InferType::Fun(
             vec![InferType::var(TypeVar(0))],
             Box::new(InferType::var(TypeVar(0))),
@@ -364,7 +364,7 @@ mod phase_4_unification {
 
     #[test]
     fn test_unify_function_return_type() {
-        // fun(Int) -> ?t0  with  fun(Int) -> Bool  => ?t0 = Bool
+        // (Int) -> ?t0  with  (Int) -> Bool  => ?t0 = Bool
         let a = InferType::Fun(vec![InferType::int()], Box::new(InferType::var(TypeVar(0))));
         let b = InferType::Fun(vec![InferType::int()], Box::new(InferType::bool()));
         let s = unify(&a, &b).unwrap();
@@ -444,7 +444,7 @@ mod phase_4_unification {
 
     #[test]
     fn test_occurs_check_function() {
-        // ?t0 = fun(?t0) -> Int  — should fail
+        // ?t0 = (?t0) -> Int  — should fail
         let a = InferType::var(TypeVar(0));
         let b = InferType::Fun(vec![InferType::var(TypeVar(0))], Box::new(InferType::int()));
         assert!(unify(&a, &b).is_err());
@@ -452,7 +452,7 @@ mod phase_4_unification {
 
     #[test]
     fn test_unify_multi_var_function() {
-        // fun(?t0, ?t1) -> ?t0  with  fun(Int, Bool) -> Int  => ?t0=Int, ?t1=Bool
+        // (?t0, ?t1) -> ?t0  with  (Int, Bool) -> Int  => ?t0=Int, ?t1=Bool
         let a = InferType::Fun(
             vec![InferType::var(TypeVar(0)), InferType::var(TypeVar(1))],
             Box::new(InferType::var(TypeVar(0))),
@@ -536,7 +536,7 @@ mod phase_5_constraints {
 
     #[test]
     fn test_constraint_with_function_type() {
-        // ?t0 = fun(Int) -> Bool
+        // ?t0 = (Int) -> Bool
         let fun_ty = InferType::Fun(vec![InferType::int()], Box::new(InferType::bool()));
         let cs = vec![Constraint::new(InferType::var(TypeVar(0)), fun_ty.clone(), span())];
         let s = solve_constraints(cs).unwrap();
@@ -545,7 +545,7 @@ mod phase_5_constraints {
 
     #[test]
     fn test_earlier_bindings_propagate() {
-        // ?t0 = Int, fun(?t0) -> Bool = fun(?t1) -> Bool  =>  ?t1 = Int
+        // ?t0 = Int, (?t0) -> Bool = (?t1) -> Bool  =>  ?t1 = Int
         let cs = vec![
             Constraint::new(InferType::var(TypeVar(0)), InferType::int(), span()),
             Constraint::new(
@@ -580,7 +580,7 @@ mod phase_6_type_schemes {
 
     #[test]
     fn test_free_vars_fun() {
-        // fun(?t0, Int) -> ?t1  =>  { ?t0, ?t1 }
+        // (?t0, Int) -> ?t1  =>  { ?t0, ?t1 }
         let ty = InferType::Fun(
             vec![InferType::var(TypeVar(0)), InferType::int()],
             Box::new(InferType::var(TypeVar(1))),
@@ -597,7 +597,7 @@ mod phase_6_type_schemes {
 
     #[test]
     fn test_generalize_no_env() {
-        // generalize(fun(?t0) -> ?t0, {})  =>  ∀?t0. fun(?t0) -> ?t0
+        // generalize((?t0) -> ?t0, {})  =>  ∀?t0. (?t0) -> ?t0
         let ty = InferType::Fun(
             vec![InferType::var(TypeVar(0))],
             Box::new(InferType::var(TypeVar(0))),
@@ -621,7 +621,7 @@ mod phase_6_type_schemes {
 
     #[test]
     fn test_generalize_partial_capture() {
-        // fun(?t0, ?t1) -> ?t0, env has ?t1  =>  only ?t0 is quantified
+        // (?t0, ?t1) -> ?t0, env has ?t1  =>  only ?t0 is quantified
         let ty = InferType::Fun(
             vec![InferType::var(TypeVar(0)), InferType::var(TypeVar(1))],
             Box::new(InferType::var(TypeVar(0))),
@@ -640,8 +640,8 @@ mod phase_6_type_schemes {
 
     #[test]
     fn test_instantiate_produces_fresh_vars() {
-        // ∀?t0. fun(?t0) -> ?t0  instantiated with generator at 5
-        // => fun(?t5) -> ?t5
+        // ∀?t0. (?t0) -> ?t0  instantiated with generator at 5
+        // => (?t5) -> ?t5
         let scheme = TypeScheme {
             quantified_vars: vec![TypeVar(0)],
             ty: InferType::Fun(
@@ -698,7 +698,7 @@ mod phase_6_type_schemes {
                 Box::new(InferType::var(TypeVar(0))),
             ),
         };
-        assert_eq!(format!("{}", scheme), "∀?t0. fun(?t0) -> ?t0");
+        assert_eq!(format!("{}", scheme), "∀?t0. (?t0) -> ?t0");
     }
 
     #[test]
@@ -710,7 +710,7 @@ mod phase_6_type_schemes {
                 Box::new(InferType::var(TypeVar(1))),
             ),
         };
-        assert_eq!(format!("{}", scheme), "∀?t0, ?t1. fun(?t0) -> ?t1");
+        assert_eq!(format!("{}", scheme), "∀?t0, ?t1. (?t0) -> ?t1");
     }
 }
 
@@ -751,7 +751,7 @@ mod phase_7_infer_context {
     #[test]
     fn test_bind_poly_auto_instantiates() {
         let mut ctx = InferContext::default();
-        // Manually build ∀?t0. fun(?t0) -> ?t0
+        // Manually build ∀?t0. (?t0) -> ?t0
         // Use fresh_var so the generator counter is ahead of the quantified var
         let v = ctx.fresh_var(); // TypeVar(0)
         let scheme = TypeScheme {
@@ -816,22 +816,22 @@ mod phase_7_infer_context {
 
     #[test]
     fn test_full_inference_scenario() {
-        // Simulates: let id = fun(x) { x }; id(42)
-        // Step 1: infer fun(x) { x } — give x a fresh var ?t0, body is also ?t0
+        // Simulates: let id = (x) { x }; id(42)
+        // Step 1: infer (x) { x } — give x a fresh var ?t0, body is also ?t0
         let mut ctx = InferContext::default();
         let x_ty = ctx.fresh_var();           // ?t0
         ctx.bind_mono("x", x_ty.clone(), false);
         let body_ty = ctx.lookup("x").unwrap(); // ?t0
 
-        // fun type is fun(?t0) -> ?t0
+        // fun type is (?t0) -> ?t0
         let fun_ty = InferType::Fun(vec![x_ty.clone()], Box::new(body_ty));
 
         // Step 2: generalize and store as poly
         let scheme = generalize(fun_ty, &HashSet::new());
         ctx.bind_poly("id", scheme);
 
-        // Step 3: call id(42) — instantiate id, unify with fun(Int) -> ?ret
-        let id_ty = ctx.lookup("id").unwrap();  // fun(?t1) -> ?t1
+        // Step 3: call id(42) — instantiate id, unify with (Int) -> ?ret
+        let id_ty = ctx.lookup("id").unwrap();  // (?t1) -> ?t1
         let ret_ty = ctx.fresh_var();           // ?t2
         let call_ty = InferType::Fun(vec![InferType::int()], Box::new(ret_ty.clone()));
         ctx.add_constraint(id_ty, call_ty, span());
@@ -943,7 +943,7 @@ mod phase_7_infer_context {
         let _v1 = ctx.fresh_var(); // ?t1 — free in ty only
         ctx.bind_mono("x", InferType::Var(TypeVar(0)), false);
 
-        // fun(?t0, ?t1) -> ?t1 — only ?t1 should be quantified
+        // (?t0, ?t1) -> ?t1 — only ?t1 should be quantified
         let ty = InferType::Fun(
             vec![InferType::Var(TypeVar(0)), InferType::Var(TypeVar(1))],
             Box::new(InferType::Var(TypeVar(1))),
@@ -977,10 +977,10 @@ mod phase_8_known_limitations {
     #[test]
     fn test_rank1_fn_arg_monotype_conflicts() {
         // fun apply_both(f, x: Int, y: Bool) { f(x); f(y) }
-        //   f(x) emits: ?t0 = fun(Int) -> ?t1
-        //   f(y) emits: ?t0 = fun(Bool) -> ?t2
-        // After binding ?t0 = fun(Int) -> ?t1, the second constraint becomes
-        // fun(Int) -> ?t1 = fun(Bool) -> ?t2 → Int ≠ Bool → error
+        //   f(x) emits: ?t0 = (Int) -> ?t1
+        //   f(y) emits: ?t0 = (Bool) -> ?t2
+        // After binding ?t0 = (Int) -> ?t1, the second constraint becomes
+        // (Int) -> ?t1 = (Bool) -> ?t2 → Int ≠ Bool → error
         let cs = vec![
             Constraint::new(
                 InferType::var(TypeVar(0)),
@@ -998,7 +998,7 @@ mod phase_8_known_limitations {
 
     /// Let-bound closures are NOT generalized into type schemes.
     ///
-    /// `let id = fun(x) { x }` binds `id` as a monomorphic InferType::Fun.
+    /// `let id = (x) { x }` binds `id` as a monomorphic InferType::Fun.
     /// Its type variable is unified at the first call site and cannot change.
     /// A second call at a different type produces the same constraint conflict
     /// as the rank-1 case above — the root cause is identical: no `∀` was
@@ -1007,7 +1007,7 @@ mod phase_8_known_limitations {
     /// See: typechecker.md § "Extension Points — Epic 003 — let_polymorphism"
     #[test]
     fn test_let_closure_monomorphic_conflicts_at_two_types() {
-        // let identity = fun(x) { x }  →  identity : Fun([?t0], ?t0)
+        // let identity = (x) { x }  →  identity : Fun([?t0], ?t0)
         // identity(42)   emits: Fun([?t0], ?t0) = Fun([Int], ?t1)  → ?t0 = Int
         // identity(true) emits: Fun([?t0], ?t0) = Fun([Bool], ?t2) → Int ≠ Bool → error
         let cs = vec![
@@ -1028,12 +1028,12 @@ mod phase_8_known_limitations {
     /// Contrast: a properly generalized scheme CAN be used at two types.
     ///
     /// This is what `fun id(x) { x }` (top-level declaration) produces today,
-    /// and what `let id = fun(x) { x }` would produce once let-polymorphism
-    /// is fully implemented. The scheme ∀?t0. fun(?t0) -> ?t0 is instantiated
+    /// and what `let id = (x) { x }` would produce once let-polymorphism
+    /// is fully implemented. The scheme ∀?t0. (?t0) -> ?t0 is instantiated
     /// with fresh variables at each use site so the two calls are independent.
     #[test]
     fn test_poly_scheme_succeeds_at_two_types() {
-        // ∀?t0. fun(?t0) -> ?t0, instantiated twice with fresh variables
+        // ∀?t0. (?t0) -> ?t0, instantiated twice with fresh variables
         let scheme = TypeScheme {
             quantified_vars: vec![TypeVar(0)],
             ty: InferType::Fun(
@@ -1044,8 +1044,8 @@ mod phase_8_known_limitations {
         let mut var_gen = TypeVarGenerator::new();
         var_gen.fresh(); // burn TypeVar(0) — already used in the scheme
 
-        let inst1 = instantiate(&scheme, &mut var_gen); // fun(?t1) -> ?t1
-        let inst2 = instantiate(&scheme, &mut var_gen); // fun(?t2) -> ?t2
+        let inst1 = instantiate(&scheme, &mut var_gen); // (?t1) -> ?t1
+        let inst2 = instantiate(&scheme, &mut var_gen); // (?t2) -> ?t2
         let ret1 = InferType::Var(var_gen.fresh());     // ?t3
         let ret2 = InferType::Var(var_gen.fresh());     // ?t4
 

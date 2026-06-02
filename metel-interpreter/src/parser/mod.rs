@@ -388,14 +388,22 @@ fn parse_struct_fields(pair: pest::iterators::Pair<Rule>, filename: &str) -> Res
         if p.as_rule() == Rule::struct_field {
             let span = Span::of(&p, filename);
             let mut it = p.into_inner();
-            let name = it.next()
-                .ok_or_else(|| MetelError::internal("struct_field: expected name"))?
-                .as_str().to_string();
+            let first = it.next()
+                .ok_or_else(|| MetelError::internal("struct_field: expected field head"))?;
+            let (visibility, name_pair) = if first.as_rule() == Rule::pub_kw {
+                (
+                    Visibility::Public,
+                    it.next().ok_or_else(|| MetelError::internal("struct_field: expected name after pub"))?,
+                )
+            } else {
+                (Visibility::Private, first)
+            };
+            let name = name_pair.as_str().to_string();
             let type_ann = parse_type_expr(
                 it.next().ok_or_else(|| MetelError::internal("struct_field: expected type"))?,
                 filename,
             )?;
-            fields.push(FieldDef { name, type_ann, span });
+            fields.push(FieldDef { visibility, name, type_ann, span });
         }
     }
     Ok(fields)

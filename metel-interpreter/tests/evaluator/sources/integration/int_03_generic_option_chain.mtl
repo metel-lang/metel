@@ -17,14 +17,14 @@ enum Option<T> {
 
 // ── Generic Option combinators ────────────────────────────────────────────────
 
-fun option_map<T, U>(opt: Option<T>, f: fun(T) -> U) -> Option<U> {
+fun option_map<T, U>(opt: Option<T>, f: (T) -> U) -> Option<U> {
     match opt {
         Option::Some { value } => Option::Some { value: f(value) },
         _                      => Option::None,
     }
 }
 
-fun option_and_then<T, U>(opt: Option<T>, f: fun(T) -> Option<U>) -> Option<U> {
+fun option_and_then<T, U>(opt: Option<T>, f: (T) -> Option<U>) -> Option<U> {
     match opt {
         Option::Some { value } => f(value),
         _                      => Option::None,
@@ -38,7 +38,7 @@ fun option_or<T>(opt: Option<T>, fallback: T) -> T {
     }
 }
 
-fun option_filter<T>(opt: Option<T>, pred: fun(T) -> Bool) -> Option<T> {
+fun option_filter<T>(opt: Option<T>, pred: (T) -> Bool) -> Option<T> {
     match opt {
         Option::Some { value } => if (pred(value)) Option::Some { value: value } else Option::None,
         _                      => Option::None,
@@ -59,11 +59,11 @@ struct Pair<A, B> {
     second: B,
 }
 
-fun pair_map_first<A, B, C>(p: Pair<A, B>, f: fun(A) -> C) -> Pair<C, B> {
+fun pair_map_first<A, B, C>(p: Pair<A, B>, f: (A) -> C) -> Pair<C, B> {
     Pair { first: f(p.first), second: p.second }
 }
 
-fun pair_map_second<A, B, C>(p: Pair<A, B>, f: fun(B) -> C) -> Pair<A, C> {
+fun pair_map_second<A, B, C>(p: Pair<A, B>, f: (B) -> C) -> Pair<A, C> {
     Pair { first: p.first, second: f(p.second) }
 }
 
@@ -73,7 +73,7 @@ fun pair_swap<A, B>(p: Pair<A, B>) -> Pair<B, A> {
 
 // ── Generic array utilities ───────────────────────────────────────────────────
 
-fun find_first<T>(arr: T[], pred: fun(T) -> Bool) -> Option<T> {
+fun find_first<T>(arr: T[], pred: (T) -> Bool) -> Option<T> {
     mut i = 0;
     while (i < array_len(arr)) {
         if (pred(arr[i])) { return Option::Some { value: arr[i] }; }
@@ -82,7 +82,7 @@ fun find_first<T>(arr: T[], pred: fun(T) -> Bool) -> Option<T> {
     Option::None
 }
 
-fun count_where<T>(arr: T[], pred: fun(T) -> Bool) -> Int {
+fun count_where<T>(arr: T[], pred: (T) -> Bool) -> Int {
     mut cnt = 0;
     for (let x in arr) {
         if (pred(x)) { cnt += 1; }
@@ -90,7 +90,7 @@ fun count_where<T>(arr: T[], pred: fun(T) -> Bool) -> Int {
     cnt
 }
 
-fun map_array<T, U>(arr: T[], f: fun(T) -> U) -> U[] {
+fun map_array<T, U>(arr: T[], f: (T) -> U) -> U[] {
     mut out: U[] = [];
     for (let x in arr) { array_push(out, f(x)); }
     out
@@ -112,15 +112,15 @@ fun safe_get_int(arr: Int[], i: Int) -> Option<Int> {
 // ── String lookup in a Pair<String,Int>[] "map" ───────────────────────────────
 
 fun table_get(table: Pair<String, Int>[], key: String) -> Option<Int> {
-    let entry = find_first(table, fun(p: Pair<String, Int>) -> Bool { p.first == key });
-    option_map(entry, fun(p: Pair<String, Int>) -> Int { p.second })
+    let entry = find_first(table, (p: Pair<String, Int>) -> Bool { p.first == key });
+    option_map(entry, (p: Pair<String, Int>) -> Int { p.second })
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 fun main() {
     // ── Let-polymorphism: id used at Int, Bool, String ─────────────────────────
-    let id = fun(x) { x };
+    let id = (x) -> { x };
     assert(id(42) == 42);
     assert(id(true));
     assert(id("hello") == "hello");
@@ -130,11 +130,11 @@ fun main() {
     let none_i: Option<Int>  = Option::None;
 
     // map: Some(10) → Some(20)
-    let doubled = option_map(some10, fun(x: Int) -> Int { x * 2 });
+    let doubled = option_map(some10, (x: Int) -> Int { x * 2 });
     assert(option_or(doubled, 0) == 20);
 
     // map over None → None
-    let mapped_none = option_map(none_i, fun(x: Int) -> Int { x * 2 });
+    let mapped_none = option_map(none_i, (x: Int) -> Int { x * 2 });
     assert(!option_is_some(mapped_none));
 
     // or: Some(10) → 10, None → 99
@@ -142,18 +142,18 @@ fun main() {
     assert(option_or(none_i,  99) == 99);
 
     // filter: keeps if predicate holds
-    let keep   = option_filter(some10, fun(x: Int) -> Bool { x > 5  });
-    let remove = option_filter(some10, fun(x: Int) -> Bool { x > 50 });
+    let keep   = option_filter(some10, (x: Int) -> Bool { x > 5  });
+    let remove = option_filter(some10, (x: Int) -> Bool { x > 50 });
     assert(option_is_some(keep));
     assert(!option_is_some(remove));
 
     // and_then (flatMap): chain two operations
-    let chained = option_and_then(some10, fun(x: Int) -> Option<Int> {
+    let chained = option_and_then(some10, (x: Int) -> Option<Int> {
         if (x > 5) Option::Some { value: x + 1 } else Option::None
     });
     assert(option_or(chained, 0) == 11);
 
-    let chained_none = option_and_then(none_i, fun(x: Int) -> Option<Int> {
+    let chained_none = option_and_then(none_i, (x: Int) -> Option<Int> {
         Option::Some { value: x + 1 }
     });
     assert(!option_is_some(chained_none));
@@ -165,14 +165,14 @@ fun main() {
     assert(option_or(some_true,  false));
     assert(!option_or(some_false, true));
 
-    let negated = option_map(some_true, fun(b: Bool) -> Bool { !b });
+    let negated = option_map(some_true, (b: Bool) -> Bool { !b });
     assert(!option_or(negated, true));
 
     // ── Option<String> ────────────────────────────────────────────────────────
     let some_str: Option<String> = Option::Some { value: "hello" };
     let none_str: Option<String> = Option::None;
 
-    let upper_len = option_map(some_str, fun(s: String) -> Int { string_len(s) });
+    let upper_len = option_map(some_str, (s: String) -> Int { string_len(s) });
     assert(option_or(upper_len, 0) == 5);
     assert(option_or(none_str, "default") == "default");
 
@@ -183,13 +183,13 @@ fun main() {
     assert(!option_is_some(r2));
 
     // Chain: 100 / 5 / 4 = 5
-    let chain_div = option_and_then(safe_div(100, 5), fun(x: Int) -> Option<Int> {
+    let chain_div = option_and_then(safe_div(100, 5), (x: Int) -> Option<Int> {
         safe_div(x, 4)
     });
     assert(option_or(chain_div, -1) == 5);
 
     // Chain where second step divides by zero → None
-    let chain_zero = option_and_then(safe_div(100, 5), fun(x: Int) -> Option<Int> {
+    let chain_zero = option_and_then(safe_div(100, 5), (x: Int) -> Option<Int> {
         safe_div(x, 0)
     });
     assert(!option_is_some(chain_zero));
@@ -202,7 +202,7 @@ fun main() {
     assert(!option_is_some(safe_get_int(arr, -1)));
 
     // Chain: get element then double it
-    let doubled_elem = option_map(safe_get_int(arr, 2), fun(x: Int) -> Int { x * 2 });
+    let doubled_elem = option_map(safe_get_int(arr, 2), (x: Int) -> Int { x * 2 });
     assert(option_or(doubled_elem, -1) == 60);
 
     // ── Pair<A,B> operations ──────────────────────────────────────────────────
@@ -211,12 +211,12 @@ fun main() {
     assert(p1.second);
 
     // map_first: double the Int
-    let p2 = pair_map_first(p1, fun(x: Int) -> Int { x * 2 });
+    let p2 = pair_map_first(p1, (x: Int) -> Int { x * 2 });
     assert(p2.first == 14);
     assert(p2.second);
 
     // map_second: negate the Bool
-    let p3 = pair_map_second(p1, fun(b: Bool) -> Bool { !b });
+    let p3 = pair_map_second(p1, (b: Bool) -> Bool { !b });
     assert(p3.first  == 7);
     assert(!p3.second);
 
@@ -229,7 +229,7 @@ fun main() {
     let score = Pair { first: "Alice", second: 95 };
     assert(score.first == "Alice");
     assert(score.second == 95);
-    let bumped = pair_map_second(score, fun(n: Int) -> Int { n + 5 });
+    let bumped = pair_map_second(score, (n: Int) -> Int { n + 5 });
     assert(bumped.second == 100);
 
     // ── table_get: Pair<String,Int>[] as a lookup table ───────────────────────
@@ -246,49 +246,49 @@ fun main() {
 
     // Compute total of found items using and_then
     let bananas = table_get(table, "bananas");
-    let total = option_and_then(apples, fun(a: Int) -> Option<Int> {
-        option_map(bananas, fun(b: Int) -> Int { a + b })
+    let total = option_and_then(apples, (a: Int) -> Option<Int> {
+        option_map(bananas, (b: Int) -> Int { a + b })
     });
     assert(option_or(total, 0) == 10);
 
     // ── find_first and count_where on Int[] ──────────────────────────────────
     let nums: Int[] = [3, 1, 4, 1, 5, 9, 2, 6];
 
-    let first_big = find_first(nums, fun(x: Int) -> Bool { x > 4 });
+    let first_big = find_first(nums, (x: Int) -> Bool { x > 4 });
     assert(option_or(first_big, 0) == 5);
 
-    let first_huge = find_first(nums, fun(x: Int) -> Bool { x > 100 });
+    let first_huge = find_first(nums, (x: Int) -> Bool { x > 100 });
     assert(!option_is_some(first_huge));
 
-    let evens_count = count_where(nums, fun(x: Int) -> Bool { x % 2 == 0 });
+    let evens_count = count_where(nums, (x: Int) -> Bool { x % 2 == 0 });
     assert(evens_count == 3);   // 4, 2, 6
 
     // ── map_array<Int, Int> and map_array<Int, Bool> ──────────────────────────
-    let doubled_arr = map_array(nums, fun(x: Int) -> Int { x * 2 });
+    let doubled_arr = map_array(nums, (x: Int) -> Int { x * 2 });
     assert(array_len(doubled_arr) == 8);
     assert(doubled_arr[0] == 6);
     assert(doubled_arr[4] == 10);
 
-    let above_mean: Bool[] = map_array(nums, fun(x: Int) -> Bool { x > 4 });
+    let above_mean: Bool[] = map_array(nums, (x: Int) -> Bool { x > 4 });
     assert(!above_mean[0]);   // 3 <= 4
     assert(above_mean[5]);    // 9 > 4
 
     // ── Composing combinators ─────────────────────────────────────────────────
     // find_first in an array of Pairs: locate entry with value > 5
-    let rich_entry = find_first(table, fun(p: Pair<String, Int>) -> Bool { p.second > 5 });
+    let rich_entry = find_first(table, (p: Pair<String, Int>) -> Bool { p.second > 5 });
     assert(option_is_some(rich_entry));
-    let rich_name = option_map(rich_entry, fun(p: Pair<String, Int>) -> String { p.first });
+    let rich_name = option_map(rich_entry, (p: Pair<String, Int>) -> String { p.first });
     assert(option_or(rich_name, "") == "bananas");
 
     // ── braceless if throughout (re-asserted inline) ──────────────────────────
-    let sign = fun(x: Int) -> Int { if (x > 0) 1 else if (x < 0) -1 else 0 };
+    let sign = (x: Int) -> Int { if (x > 0) 1 else if (x < 0) -1 else 0 };
     assert(sign(42) ==  1);
     assert(sign(-5) == -1);
     assert(sign(0)  ==  0);
 
     // ── id used again at Float via map_array ──────────────────────────────────
     let floats: Float[] = [1.0, 2.0, 3.0];
-    let same = map_array(floats, fun(x: Float) -> Float { id(x) });
+    let same = map_array(floats, (x: Float) -> Float { id(x) });
     assert(same[0] == 1.0);
     assert(same[2] == 3.0);
 }

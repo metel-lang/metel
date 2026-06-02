@@ -15,7 +15,7 @@ fun clamp(
 }
 
 // Trailing comma in closure parameter list.
-fun apply(f: fun(Int, Int) -> Int, a: Int, b: Int,) -> Int {
+fun apply(f: (Int, Int) -> Int, a: Int, b: Int,) -> Int {
     f(a, b)
 }
 
@@ -30,6 +30,6 @@ fun main() {
     assert(clamp(11, 0, 10,) == 10);
 
     // Trailing comma in closure definition and call argument list.
-    let result = apply(fun(x: Int, y: Int,) -> Int { x * y }, 3, 4,);
+    let result = apply((x: Int, y: Int,) -> Int { x * y }, 3, 4,);
     assert(result == 12);
 }
