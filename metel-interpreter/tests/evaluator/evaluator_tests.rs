@@ -335,6 +335,9 @@ mod tests {
     fn nested_field_mut_receiver() { check("structs/69_nested_field_mut_receiver.mtl"); }
 
     #[test]
+    fn address_of_lvalue_paths() { check("structs/70_address_of_lvalue_paths.mtl"); }
+
+    #[test]
     fn neg_ref_mut_through_shared_ptr() { check("structs/neg_24_ref_mut_method_through_shared_ptr.mtl"); }
 
     #[test]

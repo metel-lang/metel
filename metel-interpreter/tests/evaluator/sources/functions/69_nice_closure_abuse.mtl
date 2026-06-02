@@ -57,10 +57,7 @@ fun main() {
     // Structure: closure_sets.0 = first_closure_set, closure_sets.1 = second_closure_set
     let closure_sets = get_closure_sets(&mut shared_value);
 
-    // For now only addressable lvalues be &, so &closure_sets.1.0 is not valid.
-    let closure_1 = closure_sets.1.0;
-    let closure_2 = closure_sets.0.1;
-    apply_functions([&closure_1, &closure_2]);
+    apply_functions([&closure_sets.1.0, &closure_sets.0.1]);
 
     // Verify that both closure sets see the same updated value (4)
     // The third closure from each set returns the current value of shared_value

@@ -1,0 +1,104 @@
+// Tests that & can be applied to arbitrary lvalue paths:
+// field access, tuple element access, array index, and chained paths.
+
+// ── Field access ──────────────────────────────────────────────────────────────
+
+struct Point {
+    x: Int,
+    y: Int,
+}
+
+fun test_field_address_of() {
+    let p = Point { x: 3, y: 7 };
+    let px: *Int = &p.x;
+    let py: *Int = &p.y;
+    assert(*px == 3);
+    assert(*py == 7);
+}
+
+// ── Tuple element access ──────────────────────────────────────────────────────
+
+fun test_tuple_address_of() {
+    let t = (10, 20, 30);
+    let p0: *Int = &t.0;
+    let p1: *Int = &t.1;
+    let p2: *Int = &t.2;
+    assert(*p0 == 10);
+    assert(*p1 == 20);
+    assert(*p2 == 30);
+}
+
+// ── Array index ───────────────────────────────────────────────────────────────
+
+fun test_array_index_address_of() {
+    let arr = [1, 2, 3, 4, 5];
+    let p: *Int = &arr[2];
+    assert(*p == 3);
+}
+
+// ── Chained path: field of a field ───────────────────────────────────────────
+
+struct Pair {
+    a: Point,
+    b: Point,
+}
+
+fun test_chained_field_address_of() {
+    let pair = Pair {
+        a: Point { x: 1, y: 2 },
+        b: Point { x: 10, y: 20 },
+    };
+    let pax: *Int = &pair.a.x;
+    let pby: *Int = &pair.b.y;
+    assert(*pax == 1);
+    assert(*pby == 20);
+}
+
+// ── Tuple of tuples ───────────────────────────────────────────────────────────
+
+fun test_nested_tuple_address_of() {
+    let t = ((1, 2), (3, 4));
+    let p: *Int = &t.1.0;
+    assert(*p == 3);
+}
+
+// ── Function pointer from tuple element ──────────────────────────────────────
+
+fun apply_fns(fns: Array<*() -> ()>) {
+    for (let f in fns) {
+        f();
+    }
+}
+
+fun test_fn_ptr_from_tuple() {
+    let mut counter = 0;
+    let ptr = &mut counter;
+    let inc = () -> () { *ptr += 1; };
+    let get = () -> () { };
+
+    let ops = (inc, get);
+    apply_fns([&ops.0, &ops.1]);
+    assert(counter == 1);
+}
+
+// ── &T passed to function ─────────────────────────────────────────────────────
+
+fun sum_pair(a: *Int, b: *Int) -> Int {
+    *a + *b
+}
+
+fun test_field_ptr_as_arg() {
+    let p = Point { x: 5, y: 8 };
+    let result = sum_pair(&p.x, &p.y);
+    assert(result == 13);
+}
+
+fun main() {
+    test_field_address_of();
+    test_tuple_address_of();
+    test_array_index_address_of();
+    test_chained_field_address_of();
+    test_nested_tuple_address_of();
+    test_fn_ptr_from_tuple();
+    test_field_ptr_as_arg();
+}

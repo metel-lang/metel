@@ -161,6 +161,28 @@ fn lvalue_field_cell(
     Some((struct_cell, path, leaf_cell))
 }
 
+fn is_lvalue_path_typed(expr: &crate::typed_ast::TypedExpr) -> bool {
+    use crate::typed_ast::TypedExpr;
+    match expr {
+        TypedExpr::Ident(..) => true,
+        TypedExpr::FieldAccess { object, .. }
+        | TypedExpr::TupleAccess { object, .. }
+        | TypedExpr::Index { object, .. } => is_lvalue_path_typed(object),
+        _ => false,
+    }
+}
+
+fn is_lvalue_path_untyped(expr: &crate::ast::Expr) -> bool {
+    use crate::ast::Expr;
+    match expr {
+        Expr::Ident(..) => true,
+        Expr::FieldAccess { object, .. }
+        | Expr::TupleAccess { object, .. }
+        | Expr::Index { object, .. } => is_lvalue_path_untyped(object),
+        _ => false,
+    }
+}
+
 // ── Control flow signals ──────────────────────────────────────────────────────
 
 /// Returned by evaluation functions to handle non-local control flow.
@@ -964,27 +986,35 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Metel
         }
 
         Expr::UnaryOp(op, operand, span) => {
+            match op {
+                UnaryOp::Ref => return match &**operand {
+                    Expr::Ident(name, _) => env.get_rc(name)
+                        .map(|rc| Signal::Value(Value::Pointer(rc)))
+                        .ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span)),
+                    other if is_lvalue_path_untyped(other) => {
+                        let v = eval_untyped_expr(operand, env)?.into_value();
+                        Ok(Signal::Value(Value::Pointer(Rc::new(RefCell::new(v)))))
+                    }
+                    _ => Err(MetelError::internal("address-of requires an addressable lvalue (identifier, field access, tuple access, or array index)")),
+                },
+                UnaryOp::RefMut => return match &**operand {
+                    Expr::Ident(name, _) => env.get_rc(name)
+                        .map(|rc| Signal::Value(Value::MutPointer(rc)))
+                        .ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span)),
+                    _ => Err(MetelError::internal("mutable address-of currently requires an identifier operand")),
+                },
+                _ => {}
+            }
             let v = eval_untyped_expr(operand, env)?.into_value();
             let result = match (op, v) {
                 (UnaryOp::Neg, Value::Int(n))   => Value::Int(-n),
                 (UnaryOp::Neg, Value::Float(f)) => Value::Float(-f),
                 (UnaryOp::Not, Value::Bool(b))  => Value::Bool(!b),
-                (UnaryOp::Ref, _) => match &**operand {
-                    Expr::Ident(name, _) => env.get_rc(name)
-                        .map(Value::Pointer)
-                        .ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span))?,
-                    _ => return Err(MetelError::internal("address-of currently requires an identifier operand")),
-                },
-                (UnaryOp::RefMut, _) => match &**operand {
-                    Expr::Ident(name, _) => env.get_rc(name)
-                        .map(Value::MutPointer)
-                        .ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span))?,
-                    _ => return Err(MetelError::internal("mutable address-of currently requires an identifier operand")),
-                },
                 (UnaryOp::Deref, Value::Pointer(rc)) | (UnaryOp::Deref, Value::MutPointer(rc)) => rc.borrow().clone(),
                 (UnaryOp::Neg, _) => return Err(MetelError::internal("unary `-`: expected Int or Float")),
                 (UnaryOp::Not, _) => return Err(MetelError::internal("unary `!`: expected Bool")),
                 (UnaryOp::Deref, _) => return Err(MetelError::internal("unary `*`: expected pointer")),
+                _ => unreachable!("Ref/RefMut handled above"),
             };
             Ok(Signal::Value(result))
         }
@@ -1351,27 +1381,35 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
         }
 
         TypedExpr::UnaryOp(op, operand, _, span) => {
+            match op {
+                UnaryOp::Ref => return match &**operand {
+                    TypedExpr::Ident(name, _, _) => env.get_rc(name)
+                        .map(|rc| Signal::Value(Value::Pointer(rc)))
+                        .ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span)),
+                    other if is_lvalue_path_typed(other) => {
+                        let v = eval_expr(operand, env)?.into_value();
+                        Ok(Signal::Value(Value::Pointer(Rc::new(RefCell::new(v)))))
+                    }
+                    _ => Err(MetelError::internal("address-of requires an addressable lvalue (identifier, field access, tuple access, or array index)")),
+                },
+                UnaryOp::RefMut => return match &**operand {
+                    TypedExpr::Ident(name, _, _) => env.get_rc(name)
+                        .map(|rc| Signal::Value(Value::MutPointer(rc)))
+                        .ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span)),
+                    _ => Err(MetelError::internal("mutable address-of currently requires an identifier operand")),
+                },
+                _ => {}
+            }
             let v = eval_expr(operand, env)?.into_value();
             let result = match (op, v) {
                 (UnaryOp::Neg, Value::Int(n))   => Value::Int(-n),
                 (UnaryOp::Neg, Value::Float(f)) => Value::Float(-f),
                 (UnaryOp::Not, Value::Bool(b))  => Value::Bool(!b),
-                (UnaryOp::Ref, _) => match &**operand {
-                    TypedExpr::Ident(name, _, _) => env.get_rc(name)
-                        .map(Value::Pointer)
-                        .ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span))?,
-                    _ => return Err(MetelError::internal("address-of currently requires an identifier operand")),
-                },
-                (UnaryOp::RefMut, _) => match &**operand {
-                    TypedExpr::Ident(name, _, _) => env.get_rc(name)
-                        .map(Value::MutPointer)
-                        .ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span))?,
-                    _ => return Err(MetelError::internal("mutable address-of currently requires an identifier operand")),
-                },
                 (UnaryOp::Deref, Value::Pointer(rc)) | (UnaryOp::Deref, Value::MutPointer(rc)) => rc.borrow().clone(),
                 (UnaryOp::Neg, _) => return Err(MetelError::internal("unary `-`: expected Int or Float (typechecker should have caught this)")),
                 (UnaryOp::Not, _) => return Err(MetelError::internal("unary `!`: expected Bool (typechecker should have caught this)")),
                 (UnaryOp::Deref, _) => return Err(MetelError::internal("unary `*`: expected pointer (typechecker should have caught this)")),
+                _ => unreachable!("Ref/RefMut handled above"),
             };
             Ok(Signal::Value(result))
         }
