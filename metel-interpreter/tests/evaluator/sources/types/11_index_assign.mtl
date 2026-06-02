@@ -1,0 +1,33 @@
+// Regression (METEL-106): computed index expressions in assignment targets must work.
+
+fun main() {
+    struct S { data: Int[] }
+
+    // Computed index assignment.
+    let mut arr = [10, 20, 30, 40, 50];
+    let i = 1;
+    arr[i + 1] = 99;
+    assert(arr[2] == 99);
+
+    // Compound assignment with computed index.
+    arr[i + 1] += 1;
+    assert(arr[2] == 100);
+
+    arr[i + 1] -= 10;
+    assert(arr[2] == 90);
+
+    arr[i * 2] *= 2;
+    assert(arr[2] == 180);
+
+    // Simple variable index.
+    let j = 0;
+    arr[j] = 7;
+    assert(arr[0] == 7);
+
+    // Field chain then computed index assignment.
+    let mut s = S { data: [1, 2, 3] };
+    s.data[i] = 42;
+    assert(s.data[1] == 42);
+    s.data[i + 1] = 55;
+    assert(s.data[2] == 55);
+}

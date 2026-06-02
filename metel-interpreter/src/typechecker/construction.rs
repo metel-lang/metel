@@ -634,8 +634,9 @@ fn construct_expr(
         }
         Expr::Assign { target, op, value, span } => {
             let typed_value = construct_expr(value, None, ctx)?;
+            let typed_place = assign_target_to_typed_place(target, ctx)?;
             Ok(TypedExpr::Assign {
-                target: target.clone(),
+                target: typed_place,
                 op: op.clone(),
                 value: Box::new(typed_value),
                 ty: Type::Unit,
@@ -1658,4 +1659,58 @@ fn construct_unaryop(
         },
     };
     Ok(TypedExpr::UnaryOp(op.clone(), Box::new(operand), ty, span.clone()))
+}
+
+// ── Typed place construction ──────────────────────────────────────────────────
+
+fn assign_target_to_typed_place(
+    target: &AssignTarget,
+    ctx: &mut ConstructCtx<'_>,
+) -> Result<TypedPlace, MetelError> {
+    match target {
+        AssignTarget::Ident(name, span) =>
+            Ok(TypedPlace::Ident(name.clone(), span.clone())),
+        AssignTarget::Deref { object, span } =>
+            Ok(TypedPlace::Deref {
+                object: Box::new(construct_expr(object, None, ctx)?),
+                span: span.clone(),
+            }),
+        AssignTarget::FieldAccess { object, field, span } =>
+            Ok(TypedPlace::Field {
+                object: Box::new(expr_to_typed_place(object, ctx)?),
+                field: field.clone(),
+                span: span.clone(),
+            }),
+        AssignTarget::Index { object, index, span } =>
+            Ok(TypedPlace::Index {
+                object: Box::new(expr_to_typed_place(object, ctx)?),
+                index:  Box::new(construct_expr(index, None, ctx)?),
+                span: span.clone(),
+            }),
+    }
+}
+
+fn expr_to_typed_place(expr: &Expr, ctx: &mut ConstructCtx<'_>) -> Result<TypedPlace, MetelError> {
+    match expr {
+        Expr::Ident(name, span) =>
+            Ok(TypedPlace::Ident(name.clone(), span.clone())),
+        Expr::FieldAccess { object, field, span } =>
+            Ok(TypedPlace::Field {
+                object: Box::new(expr_to_typed_place(object, ctx)?),
+                field: field.clone(),
+                span: span.clone(),
+            }),
+        Expr::Index { object, index, span } =>
+            Ok(TypedPlace::Index {
+                object: Box::new(expr_to_typed_place(object, ctx)?),
+                index:  Box::new(construct_expr(index, None, ctx)?),
+                span: span.clone(),
+            }),
+        Expr::UnaryOp(UnaryOp::Deref, inner, span) =>
+            Ok(TypedPlace::Deref {
+                object: Box::new(construct_expr(inner, None, ctx)?),
+                span: span.clone(),
+            }),
+        _ => Err(MetelError::internal("invalid sub-expression in assignment target")),
+    }
 }

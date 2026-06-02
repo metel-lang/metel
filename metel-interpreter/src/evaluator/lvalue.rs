@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use crate::ast::{BinOp, Literal, Span};
 use crate::error::{MetelError, RuntimeErrorCode};
+use crate::typed_ast::TypedPlace;
 
-use super::{Environment, Signal, Value};
+use super::{eval_expr, Environment, Signal, Value};
 
 pub(super) fn eval_untyped_index(
     expr: &crate::ast::Expr,
@@ -77,6 +78,88 @@ pub(super) fn extract_lvalue_path<'a>(
     let mut path = Vec::new();
     let root = walk(expr, &mut path, span)?;
     Ok((root, path))
+}
+
+/// Walk a `TypedPlace::Field` chain down to its root identifier, collecting the
+/// field names in order (including `final_field`).
+/// Returns an error if any intermediate step is not a plain field or identifier
+/// (e.g. an index step), which is not yet supported for field-chain mutation.
+pub(super) fn extract_typed_place_field_path<'a>(
+    place: &'a TypedPlace,
+    final_field: &'a str,
+    span: &Span,
+) -> Result<(&'a str, Vec<&'a str>), MetelError> {
+    fn walk<'a>(place: &'a TypedPlace, path: &mut Vec<&'a str>, span: &Span) -> Result<&'a str, MetelError> {
+        match place {
+            TypedPlace::Ident(name, _) => Ok(name.as_str()),
+            TypedPlace::Field { object, field, .. } => {
+                let root = walk(object, path, span)?;
+                path.push(field.as_str());
+                Ok(root)
+            }
+            _ => Err(MetelError::panic(
+                RuntimeErrorCode::R0003,
+                "field assign: receiver must be a variable or field-access chain",
+                span,
+            )),
+        }
+    }
+    let mut path = Vec::new();
+    let root = walk(place, &mut path, span)?;
+    path.push(final_field);
+    Ok((root, path))
+}
+
+/// Evaluate a `TypedPlace` to the `Value` it currently holds.
+/// For arrays the returned `Value::Array(rc)` shares the same `Rc` as the binding,
+/// so callers can mutate through it without a round-trip through the environment.
+pub(super) fn eval_typed_place_value(
+    place: &TypedPlace,
+    env: &mut Environment,
+    span: &Span,
+) -> Result<Value, MetelError> {
+    match place {
+        TypedPlace::Ident(name, _) =>
+            env.get(name).ok_or_else(|| {
+                MetelError::panic(RuntimeErrorCode::R0003, format!("assign: `{name}` not found"), span)
+            }),
+        TypedPlace::Deref { object, span: tspan } => {
+            let ptr = eval_expr(object, env)?.into_value();
+            match ptr {
+                Value::Pointer(rc) | Value::MutPointer(rc) => Ok(rc.borrow().clone()),
+                _ => Err(MetelError::panic(RuntimeErrorCode::R0003, "assign: not a pointer", tspan)),
+            }
+        }
+        TypedPlace::Field { object, field, span: tspan } => {
+            let parent = eval_typed_place_value(object, env, tspan)?;
+            match parent {
+                Value::Struct { fields, .. } | Value::Enum { fields, .. } =>
+                    fields.get(field).cloned().ok_or_else(|| {
+                        MetelError::panic(RuntimeErrorCode::R0008, format!("field access: no field `{field}`"), tspan)
+                    }),
+                _ => Err(MetelError::internal(format!("field `{field}`: receiver is not a struct/enum"))),
+            }
+        }
+        TypedPlace::Index { object, index, span: tspan } => {
+            let arr = eval_typed_place_value(object, env, tspan)?;
+            let idx = eval_expr(index, env)?.into_value();
+            let i = match idx {
+                Value::Int(n) => n,
+                _ => return Err(MetelError::internal("index expression must be an integer")),
+            };
+            match arr {
+                Value::Array(rc) => {
+                    let len = rc.borrow().len() as i64;
+                    if i < 0 || i >= len {
+                        return Err(MetelError::panic(RuntimeErrorCode::R0004,
+                            format!("index {i} out of bounds (len {len})"), tspan));
+                    }
+                    Ok(rc.borrow()[i as usize].clone())
+                }
+                _ => Err(MetelError::internal("index: receiver is not an Array")),
+            }
+        }
+    }
 }
 
 pub(super) fn apply_assign_op(

@@ -3,7 +3,7 @@
 // Generic declarations do not appear here — they are monomorphised by the type checker.
 
 use crate::ast::{
-    Literal, BinOp, UnaryOp, AssignTarget, AssignOp, Pattern, Span,
+    Literal, BinOp, UnaryOp, AssignOp, Pattern, Span,
     Param, TypeExpr, FieldDef, GenericParam, AspectMethod, VariantDef, Block,
 };
 use crate::types::Type;
@@ -212,6 +212,19 @@ pub struct TypedBlock {
     pub span:  Span,
 }
 
+// ── Typed lvalue places ───────────────────────────────────────────────────────
+
+/// A typed assignment target.  Unlike `ast::AssignTarget`, every sub-expression
+/// (including index expressions) is fully typed so the evaluator can use
+/// `eval_expr` instead of falling back to the untyped evaluator.
+#[derive(Debug, Clone)]
+pub enum TypedPlace {
+    Ident(String, Span),
+    Deref { object: Box<TypedExpr>, span: Span },
+    Field { object: Box<TypedPlace>, field: String, span: Span },
+    Index { object: Box<TypedPlace>, index: Box<TypedExpr>, span: Span },
+}
+
 // ── Typed Expressions ─────────────────────────────────────────────────────────
 
 /// Mirrors `ast::Expr` but every variant includes a `Type` field.
@@ -226,7 +239,7 @@ pub enum TypedExpr {
     BinOp(Box<TypedExpr>, BinOp, Box<TypedExpr>, Type, Span),
     UnaryOp(UnaryOp, Box<TypedExpr>, Type, Span),
     Assign {
-        target: AssignTarget,
+        target: TypedPlace,
         op: AssignOp,
         value: Box<TypedExpr>,
         ty: Type,

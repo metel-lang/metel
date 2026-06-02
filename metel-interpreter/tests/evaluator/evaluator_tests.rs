@@ -138,6 +138,9 @@ mod tests {
     fn array() { check("types/10_array.mtl"); }
 
     #[test]
+    fn index_assign() { check("types/11_index_assign.mtl"); }
+
+    #[test]
     fn from_cast() { check("types/60_from_cast.mtl"); }
 
     #[test]

@@ -1528,10 +1528,11 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
         }
 
         TypedExpr::Assign { target, op, value, span, .. } => {
-            use crate::ast::{AssignOp, AssignTarget};
+            use crate::ast::AssignOp;
+            use crate::typed_ast::TypedPlace;
             let rhs = eval_expr(value, env)?.into_value();
             match target {
-                AssignTarget::Ident(name, _) => {
+                TypedPlace::Ident(name, _) => {
                     let new_val = if matches!(op, AssignOp::Assign) {
                         rhs
                     } else {
@@ -1548,8 +1549,8 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                     Ok(Signal::Value(Value::Unit))
                 }
 
-                AssignTarget::Deref { object, span: tspan } => {
-                    let ptr = eval_untyped_expr(object, env)?.into_value();
+                TypedPlace::Deref { object, span: tspan } => {
+                    let ptr = eval_expr(object, env)?.into_value();
                     let rc = match ptr {
                         Value::Pointer(rc) | Value::MutPointer(rc) => rc,
                         _ => return Err(MetelError::panic(RuntimeErrorCode::R0003, "assign: dereference target is not a pointer", tspan)),
@@ -1564,9 +1565,13 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                     Ok(Signal::Value(Value::Unit))
                 }
 
-                AssignTarget::Index { object, index, span: tspan } => {
-                    let i = lvalue::eval_untyped_index(index, env, tspan)?;
-                    let arr_val = lvalue::eval_untyped_lvalue_value(object, env, tspan)?;
+                TypedPlace::Index { object, index, span: tspan } => {
+                    let arr_val = lvalue::eval_typed_place_value(object, env, tspan)?;
+                    let idx_val = eval_expr(index, env)?.into_value();
+                    let i = match idx_val {
+                        Value::Int(n) => n,
+                        _ => return Err(MetelError::internal("index expression must be an integer")),
+                    };
                     match arr_val {
                         Value::Array(rc) => {
                             let len = rc.borrow().len() as i64;
@@ -1590,15 +1595,15 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                     }
                 }
 
-                AssignTarget::FieldAccess { object, field, span: tspan } => {
-                    let (root, path) = lvalue::extract_lvalue_path(object, tspan)?;
+                TypedPlace::Field { object, field, span: tspan } => {
+                    let (root, path) = lvalue::extract_typed_place_field_path(object, field, tspan)?;
                     let rc = env.get_rc(root).ok_or_else(|| {
                         MetelError::panic(RuntimeErrorCode::R0003, format!("assign: `{root}` not found"), tspan)
                     })?;
                     let mut borrowed = rc.borrow_mut();
                     // Navigate intermediate path segments to reach the parent struct.
                     let mut cur: &mut Value = &mut borrowed;
-                    for segment in &path {
+                    for segment in &path[..path.len() - 1] {
                         cur = match cur {
                             Value::Struct { fields, .. } | Value::Enum { fields, .. } => {
                                 fields.get_mut(*segment).ok_or_else(|| {
@@ -1617,17 +1622,18 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                             "field assign: receiver is not a struct/enum (typechecker should have caught this)",
                         )),
                     };
+                    let leaf = path.last().expect("path is non-empty");
                     let new_val = if matches!(op, AssignOp::Assign) {
                         rhs
                     } else {
-                        let cur = fields.get(field).cloned().ok_or_else(|| {
+                        let cur = fields.get(*leaf).cloned().ok_or_else(|| {
                             MetelError::panic(
-                                RuntimeErrorCode::R0008, format!("field assign: no field `{field}`"), tspan,
+                                RuntimeErrorCode::R0008, format!("field assign: no field `{leaf}`"), tspan,
                             )
                         })?;
                         lvalue::apply_assign_op(op, cur, rhs, span)?
                     };
-                    fields.insert(field.clone(), new_val);
+                    fields.insert((*leaf).to_string(), new_val);
                     Ok(Signal::Value(Value::Unit))
                 }
             }
