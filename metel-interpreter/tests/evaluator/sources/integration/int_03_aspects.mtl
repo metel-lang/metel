@@ -25,7 +25,7 @@ aspect Describable {
 }
 
 aspect Iterable<T> {
-    fun next(mut self) -> Perhaps<T>;
+    fun next(&mut self) -> Perhaps<T>;
 }
 
 aspect From<T> {
@@ -89,7 +89,7 @@ impl AreaList {
 }
 
 impl Iterable<Float> for AreaList {
-    fun next(mut self) -> Perhaps<Float> {
+    fun next(&mut self) -> Perhaps<Float> {
         if (self.pos < array_len(self.data)) {
             let v = self.data[self.pos];
             self.pos = self.pos + 1;

@@ -22,7 +22,7 @@ aspect From<T> {
 }
 
 aspect Iterable<T> {
-    fun next(mut self) -> Perhaps<T>;
+    fun next(&mut self) -> Perhaps<T>;
 }
 
 // ── Wrapper types ──────────────────────────────────────────────────────────────
@@ -60,7 +60,7 @@ impl StringBag {
 }
 
 impl Iterable<String> for StringBag {
-    fun next(mut self) -> Perhaps<String> {
+    fun next(&mut self) -> Perhaps<String> {
         if (self.pos < array_len(self.items)) {
             let v = self.items[self.pos];
             self.pos = self.pos + 1;

@@ -12,6 +12,8 @@ pub enum Type {
     Never,
     Tuple(Vec<Type>),
     Array(Box<Type>),
+    Pointer(Box<Type>),
+    MutPointer(Box<Type>),
     Fun(Vec<Type>, Box<Type>),
     /// A named type (struct, enum) with concrete type arguments after monomorphisation.
     Named(String, Vec<Type>),
@@ -36,6 +38,8 @@ impl std::fmt::Display for Type {
                 write!(f, ")")
             }
             Type::Array(t) => write!(f, "{}[]", t),
+            Type::Pointer(t) => write!(f, "*{}", t),
+            Type::MutPointer(t) => write!(f, "*mut {}", t),
             Type::Fun(params, ret) => {
                 write!(f, "(")?;
                 for (i, t) in params.iter().enumerate() {

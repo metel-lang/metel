@@ -181,6 +181,35 @@ fun load() -> Result<Int, AppError> {
     fn stage4_neg_index_assign_type_mismatch() { check("functions/stage4_neg_04_index_assign_type_mismatch.mtl"); }
 
     #[test]
+    fn ref_mut_receiver_requires_mutable_binding() {
+        let source = r#"
+struct Counter {
+    value: Int,
+}
+
+impl Counter {
+    fun increment(&mut self) {
+        self.value += 1;
+    }
+}
+
+fun main() {
+    let counter = Counter { value: 0 };
+    counter.increment();
+}
+"#;
+        let program = parser::parse(source, "ref_mut_receiver_requires_mutable_binding.mtl")
+            .unwrap_or_else(|e| panic!("parse error: {e}"));
+        match typechecker::check(program) {
+            Err(MetelError::TypeError { code, .. }) => {
+                assert_eq!(format!("{code}"), "T0006");
+            }
+            Err(other) => panic!("expected TypeError, got: {other}"),
+            Ok(_) => panic!("expected immutable receiver call to fail"),
+        }
+    }
+
+    #[test]
     fn stage7_return_type_propagation() { check("functions/stage7_01_return_type_propagation.mtl"); }
 
     #[test]

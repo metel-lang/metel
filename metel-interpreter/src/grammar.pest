@@ -75,7 +75,7 @@ aspect_method = { "fun" ~ ident ~ generic_params? ~ "(" ~ param_list? ~ ")" ~ ("
 // ── Parameters ────────────────────────────────────────────────────────────────
 
 param_list = { param ~ ("," ~ param)* ~ ","? }
-param      = { ("mut" ~ "self") | "self" | (ident ~ (":" ~ type_expr)?) }
+param      = { ("&" ~ mut_kw? ~ "self") | "self" | (ident ~ (":" ~ type_expr)?) }
 
 generic_params   = { "<" ~ generic_param ~ ("," ~ generic_param)* ~ ">" }
 generic_param    = { ident ~ (":" ~ bound_list)? }
@@ -119,7 +119,7 @@ continue_stmt = { "continue" ~ ";" }
 
 expr             = { assign_expr }
 
-assign_expr      = { postfix_expr ~ assign_op ~ assign_expr | or_expr }
+assign_expr      = { unary_expr ~ assign_op ~ assign_expr | or_expr }
 assign_op        = { "+=" | "-=" | "*=" | "/=" | "%=" | ("=" ~ !"=") }
 
 or_expr          = { and_expr ~ (or_op ~ and_expr)* }
@@ -138,7 +138,7 @@ mul_expr         = { cast_expr ~ (mul_op ~ cast_expr)* }
 mul_op           = { "*" | "/" | "%" }
 cast_expr        = { asc_expr ~ ("as" ~ type_expr)* }
 asc_expr         = { unary_expr ~ (":" ~ type_expr)? }
-unary_expr       = { ("!" | "-") ~ unary_expr | postfix_expr }
+unary_expr       = { ("!" | "-" | "*" | "&" ~ mut_kw?) ~ unary_expr | postfix_expr }
 
 postfix_expr     = { primary_expr ~ postfix* }
 postfix          = {
@@ -209,6 +209,8 @@ type_expr = {
     fun_type
   | unit_type
   | tuple_type
+  | mut_pointer_type
+  | pointer_type
   | array_type
   | impl_type
   | named_type
@@ -219,6 +221,8 @@ impl_type = { "impl" ~ type_expr }
 unit_type  = { "()" }
 tuple_type = { "(" ~ type_expr ~ ("," ~ type_expr)+ ~ ")" }
 fun_type   = { "(" ~ type_list? ~ ")" ~ "->" ~ type_expr }
+pointer_type = { "*" ~ type_expr }
+mut_pointer_type = { "*" ~ mut_kw ~ type_expr }
 array_type = { named_type ~ "[]" }
 named_type = { type_path ~ ("<" ~ type_args ~ ">")? }
 type_args  = { type_expr ~ ("," ~ type_expr)* }

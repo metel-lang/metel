@@ -1,0 +1,184 @@
+// ── Struct used throughout ────────────────────────────────────────────────────
+
+struct Counter {
+    value: Int,
+    step:  Int,
+}
+
+impl Counter {
+    fun new(step: Int) -> Counter {
+        Counter { value: 0, step: step }
+    }
+
+    // value receiver: returns a new Counter, does not mutate in place
+    fun with_value(self, n: Int) -> Counter {
+        Counter { value: n, step: self.step }
+    }
+
+    // &self: read-only, non-consuming
+    fun get(&self) -> Int {
+        self.value
+    }
+
+    fun is_positive(&self) -> Bool {
+        self.value > 0
+    }
+
+    // &mut self: in-place mutation
+    fun tick(&mut self) {
+        self.value += self.step;
+    }
+
+    fun reset(&mut self) {
+        self.value = 0;
+    }
+
+    fun add(&mut self, n: Int) {
+        self.value += n;
+    }
+}
+
+// ── Value receiver does not mutate the original ───────────────────────────────
+
+fun test_value_receiver() {
+    let c = Counter::new(1);
+    let d = c.with_value(42);
+    // c is unchanged — value receiver copied it
+    assert(c.get() == 0);
+    assert(d.get() == 42);
+}
+
+// ── &self is non-consuming: can be called repeatedly ─────────────────────────
+
+fun test_ref_receiver_repeated() {
+    let mut c = Counter::new(1);
+    c.tick();
+    assert(c.is_positive() == true);
+    assert(c.get() == 1);
+    // calling &self methods does not consume c — still usable
+    assert(c.is_positive() == true);
+    assert(c.get() == 1);
+}
+
+// ── &mut self accumulates state across calls ──────────────────────────────────
+
+fun test_mut_receiver_accumulates() {
+    let mut c = Counter::new(3);
+    c.tick();          // 3
+    c.tick();          // 6
+    c.tick();          // 9
+    assert(c.get() == 9);
+    c.reset();
+    assert(c.get() == 0);
+    c.add(100);
+    assert(c.get() == 100);
+}
+
+// ── &self and &mut self interleaved ───────────────────────────────────────────
+
+fun test_interleaved_receivers() {
+    let mut c = Counter::new(10);
+    assert(c.get() == 0);
+    c.tick();
+    assert(c.get() == 10);
+    assert(c.is_positive() == true);
+    c.tick();
+    assert(c.get() == 20);
+    c.reset();
+    assert(c.get() == 0);
+    assert(c.is_positive() == false);
+}
+
+// ── Calling through a *T pointer (auto-deref, &self methods) ─────────────────
+
+fun test_ref_through_pointer() {
+    let mut c = Counter::new(1);
+    c.tick();
+    c.tick();
+    let p: *Counter = &c;
+    // &self method accessible through *T
+    assert(p.get() == 2);
+    assert(p.is_positive() == true);
+}
+
+// ── Calling through a *mut T pointer (auto-deref, &mut self methods) ─────────
+
+fun test_mut_ref_through_mut_pointer() {
+    let mut c = Counter::new(5);
+    let p: *mut Counter = &mut c;
+    p.tick();          // 5
+    p.tick();          // 10
+    assert(c.get() == 10);
+    p.add(3);
+    assert(c.get() == 13);
+}
+
+// ── Pointer and direct call see the same storage ─────────────────────────────
+
+fun test_pointer_and_direct_share_storage() {
+    let mut c = Counter::new(1);
+    let p: *mut Counter = &mut c;
+    p.tick();          // p increments through the pointer
+    c.tick();          // direct call increments same counter
+    assert(c.get() == 2);
+    assert(p.get() == 2);
+}
+
+// ── Builder pattern: chained value receivers ─────────────────────────────────
+
+struct Builder {
+    x: Int,
+    y: Int,
+    label: String,
+}
+
+impl Builder {
+    fun new() -> Builder {
+        Builder { x: 0, y: 0, label: "" }
+    }
+
+    fun set_x(self, x: Int) -> Builder {
+        Builder { x: x, y: self.y, label: self.label }
+    }
+
+    fun set_y(self, y: Int) -> Builder {
+        Builder { x: self.x, y: y, label: self.label }
+    }
+
+    fun sum(&self) -> Int {
+        self.x + self.y
+    }
+}
+
+fun test_builder_pattern() {
+    let b = Builder::new().set_x(3).set_y(7);
+    assert(b.sum() == 10);
+    assert(b.x == 3);
+    assert(b.y == 7);
+}
+
+// ── Multiple pointers to independent counters ────────────────────────────────
+
+fun test_independent_pointers() {
+    let mut a = Counter::new(1);
+    let mut b = Counter::new(10);
+    let pa: *mut Counter = &mut a;
+    let pb: *mut Counter = &mut b;
+    pa.tick();
+    pb.tick();
+    pb.tick();
+    assert(a.get() == 1);
+    assert(b.get() == 20);
+}
+
+fun main() {
+    test_value_receiver();
+    test_ref_receiver_repeated();
+    test_mut_receiver_accumulates();
+    test_interleaved_receivers();
+    test_ref_through_pointer();
+    test_mut_ref_through_mut_pointer();
+    test_pointer_and_direct_share_storage();
+    test_builder_pattern();
+    test_independent_pointers();
+}

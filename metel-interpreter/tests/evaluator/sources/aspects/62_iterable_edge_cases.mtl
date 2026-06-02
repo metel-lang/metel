@@ -10,7 +10,7 @@
 //   mutation of outer variable inside loop body.
 
 aspect Iterable<T> {
-    fun next(mut self) -> Perhaps<T>;
+    fun next(&mut self) -> Perhaps<T>;
 }
 
 // Generic counter: emits 0, 1, …, limit-1
@@ -21,7 +21,7 @@ impl Counter {
 }
 
 impl Iterable<Int> for Counter {
-    fun next(mut self) -> Perhaps<Int> {
+    fun next(&mut self) -> Perhaps<Int> {
         if (self.current < self.limit) {
             let v = self.current;
             self.current = self.current + 1;
@@ -40,7 +40,7 @@ impl Countdown {
 }
 
 impl Iterable<Int> for Countdown {
-    fun next(mut self) -> Perhaps<Int> {
+    fun next(&mut self) -> Perhaps<Int> {
         if (self.current > 0) {
             let v = self.current;
             self.current = self.current - 1;

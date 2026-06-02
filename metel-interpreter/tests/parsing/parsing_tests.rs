@@ -77,6 +77,35 @@ fun main() {
 }
 
 #[test]
+fn pointer_and_receiver_syntax_parses() {
+    let source = r#"
+struct Counter {
+    value: Int,
+}
+
+impl Counter {
+    fun increment(&mut self) {
+        self.value += 1;
+    }
+
+    fun current(&self) -> Int {
+        self.value
+    }
+}
+
+fun main() {
+    let mut value = 0;
+    let ptr: *mut Int = &mut value;
+    *ptr += 1;
+    let read_only: *Int = ptr;
+    let _snapshot = *read_only;
+}
+"#;
+    parser::parse(source, "pointer_and_receiver_syntax.mtl")
+        .unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
 fn module_ast_preserves_roots_aliases_groups_and_globs() {
     let source = r#"
 import std::math;

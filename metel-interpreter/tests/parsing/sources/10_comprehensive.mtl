@@ -15,11 +15,11 @@ impl Stack<Int> {
         return Stack { items: [] };
     }
 
-    fun push(mut self, value: Int) {
+    fun push(&mut self, value: Int) {
         array_push(self.items, value);
     }
 
-    fun pop(mut self) -> Perhaps<Int> {
+    fun pop(&mut self) -> Perhaps<Int> {
         let len = array_len(self.items);
         if (len == 0) {
             return nope;
@@ -94,7 +94,7 @@ impl Task {
         return Task { title: title, done: false, priority: priority };
     }
 
-    fun complete(mut self) {
+    fun complete(&mut self) {
         self.done = true;
     }
 

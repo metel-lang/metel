@@ -66,7 +66,7 @@ pub(super) fn format_value(val: &Value) -> String {
         }
         Value::Closure(_) => "<closure>".to_string(),
         Value::Builtin(name, _) => format!("<builtin:{}>", name),
-        // RFC-0001 (pointer syntax) placeholder variants — not constructed until that RFC is implemented.
-        Value::Pointer(_) | Value::MutPointer(_) => unreachable!("pointer values not constructed until RFC-0001 is implemented"),
+        Value::Pointer(rc) => format!("*{}", format_value(&rc.borrow())),
+        Value::MutPointer(rc) => format!("*mut {}", format_value(&rc.borrow())),
     }
 }

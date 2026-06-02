@@ -192,8 +192,16 @@ pub struct WhereClause {
 
 
 #[derive(Debug, Clone)]
+pub enum ReceiverKind {
+    Value,
+    Ref,
+    RefMut,
+}
+
+#[derive(Debug, Clone)]
 pub struct Param {
     pub mutable:  bool,
+    pub receiver: Option<ReceiverKind>,
     pub name:     String,
     pub type_ann: Option<TypeExpr>,
     pub span:     Span,
@@ -401,7 +409,7 @@ pub enum BinOp {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum UnaryOp { Neg, Not }
+pub enum UnaryOp { Neg, Not, Ref, RefMut, Deref }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AssignOp {
@@ -414,6 +422,7 @@ pub enum AssignOp {
 #[derive(Debug, Clone)]
 pub enum AssignTarget {
     Ident(String, Span),
+    Deref { object: Box<Expr>, span: Span },
     FieldAccess { object: Box<Expr>, field: String, span: Span },
     Index { object: Box<Expr>, index: Box<Expr>, span: Span },
 }
@@ -427,6 +436,8 @@ pub enum TypeExpr {
     Unit,
     Tuple(Vec<TypeExpr>),
     Array(Box<TypeExpr>),
+    Pointer(Box<TypeExpr>),
+    MutPointer(Box<TypeExpr>),
     Fun(Vec<TypeExpr>, Option<Box<TypeExpr>>),
     /// `impl Aspect` in parameter position. Lowered to a fresh anonymous type param before
     /// inference. Retained in the AST only until the lowering pass runs.

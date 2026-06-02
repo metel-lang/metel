@@ -292,6 +292,9 @@ fn register_impl_methods<'a>(
             method.name.clone(),
             InferType::Fun(param_types, Box::new(ret_ty)),
         );
+        if let Some(receiver) = method.params.first().and_then(|p| p.receiver.clone()) {
+            registry.register_method_receiver(target_name.to_string(), method.name.clone(), receiver);
+        }
     }
 }
 
@@ -339,6 +342,9 @@ fn register_default_aspect_method(
         method.name.clone(),
         InferType::Fun(param_types, Box::new(ret_ty)),
     );
+    if let Some(receiver) = method.params.first().and_then(|p| p.receiver.clone()) {
+        registry.register_method_receiver(target_name.to_string(), method.name.clone(), receiver);
+    }
 }
 
 /// Seed `ctx` with all built-in free-function bindings from `StdPrelude`,

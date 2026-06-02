@@ -1,6 +1,6 @@
 // 04 — Structs and impl blocks
 // Covers: struct definition, instantiation, field access, methods (self),
-//         mut self, associated functions (constructors), generic structs.
+//         &mut self, associated functions (constructors), generic structs.
 
 struct Point {
     x: Float,
@@ -16,7 +16,7 @@ impl Point {
         return "(" + float_to_string(self.x) + ", " + float_to_string(self.y) + ")";
     }
 
-    fun translate(mut self, dx: Float, dy: Float) {
+    fun translate(&mut self, dx: Float, dy: Float) {
         self.x = self.x + dx;
         self.y = self.y + dy;
     }
@@ -54,11 +54,11 @@ impl Counter {
         return Counter { value: 0 };
     }
 
-    fun increment(mut self) {
+    fun increment(&mut self) {
         self.value += 1;
     }
 
-    fun reset(mut self) {
+    fun reset(&mut self) {
         self.value = 0;
     }
 
@@ -73,7 +73,7 @@ fun main() {
     println(p.to_string());              // (3.0, 4.0)
     println(float_to_string(p.x));      // 3.0
 
-    // --- mut self method ---
+    // --- &mut self method ---
     let mut q = Point::new(0.0, 0.0);
     q.translate(5.0, 7.0);
     println(q.to_string());             // (5.0, 7.0)
@@ -86,7 +86,7 @@ fun main() {
     let pair = Pair::new(42, "hello");
     println(pair.describe());           // 42 -> hello
 
-    // --- counter with mut self ---
+    // --- counter with &mut self ---
     let mut ctr = Counter::new();
     ctr.increment();
     ctr.increment();

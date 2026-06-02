@@ -375,10 +375,31 @@ fn parse_param(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Para
     let span = Span::of(&pair, filename);
     let text = pair.as_str().trim();
     if text == "self" {
-        return Ok(Param { mutable: false, name: "self".into(), type_ann: None, span });
+        return Ok(Param {
+            mutable: false,
+            receiver: Some(ReceiverKind::Value),
+            name: "self".into(),
+            type_ann: None,
+            span,
+        });
     }
-    if text == "mut self" {
-        return Ok(Param { mutable: true, name: "self".into(), type_ann: None, span });
+    if text == "&self" {
+        return Ok(Param {
+            mutable: false,
+            receiver: Some(ReceiverKind::Ref),
+            name: "self".into(),
+            type_ann: None,
+            span,
+        });
+    }
+    if text == "&mut self" {
+        return Ok(Param {
+            mutable: false,
+            receiver: Some(ReceiverKind::RefMut),
+            name: "self".into(),
+            type_ann: None,
+            span,
+        });
     }
     // ident (":" type_expr)?
     let mut inner = pair.into_inner();
@@ -386,7 +407,7 @@ fn parse_param(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Para
         .ok_or_else(|| MetelError::internal("param: expected name"))?
         .as_str().to_string();
     let type_ann = inner.next().map(|p| parse_type_expr(p, filename)).transpose()?;
-    Ok(Param { mutable: false, name, type_ann, span })
+    Ok(Param { mutable: false, receiver: None, name, type_ann, span })
 }
 
 fn parse_struct_fields(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Vec<FieldDef>, MetelError> {
@@ -919,6 +940,10 @@ fn shift_expr_span(expr: &mut Expr, base_start: usize, base_line: u32, base_col:
 fn shift_assign_target_span(target: &mut AssignTarget, base_start: usize, base_line: u32, base_col: u32) {
     match target {
         AssignTarget::Ident(_, span) => shift_span(span, base_start, base_line, base_col),
+        AssignTarget::Deref { object, span } => {
+            shift_expr_span(object, base_start, base_line, base_col);
+            shift_span(span, base_start, base_line, base_col);
+        }
         AssignTarget::FieldAccess { object, span, .. } => {
             shift_expr_span(object, base_start, base_line, base_col);
             shift_span(span, base_start, base_line, base_col);
@@ -1260,12 +1285,12 @@ fn parse_assign_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resul
     let first = inner.next()
         .ok_or_else(|| MetelError::internal("assign_expr: expected first child"))?;
 
-    // assign_expr = { postfix_expr ~ assign_op ~ assign_expr | or_expr }
-    // If first child is postfix_expr and next is assign_op, it's an assignment.
+    // assign_expr = { unary_expr ~ assign_op ~ assign_expr | or_expr }
+    // If first child is unary_expr and next is assign_op, it's an assignment.
     // Otherwise it's an or_expr chain.
     match first.as_rule() {
-        Rule::postfix_expr => {
-            let lhs = parse_postfix_expr(first, filename)?;
+        Rule::unary_expr => {
+            let lhs = parse_unary_expr(first, filename)?;
             match inner.next() {
                 Some(op_pair) if op_pair.as_rule() == Rule::assign_op => {
                     let op     = parse_assign_op(op_pair.as_str());
@@ -1345,10 +1370,16 @@ fn parse_cast_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<
 fn parse_unary_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Expr, MetelError> {
     let span = Span::of(&pair, filename);
     let text = pair.as_str();
-    let child = pair.into_inner().next()
+    let child = pair.into_inner().last()
         .ok_or_else(|| MetelError::internal("unary_expr: expected operand"))?;
     if text.starts_with('!') {
         Ok(Expr::UnaryOp(UnaryOp::Not, Box::new(parse_expr(child, filename)?), span))
+    } else if text.starts_with("&mut") {
+        Ok(Expr::UnaryOp(UnaryOp::RefMut, Box::new(parse_expr(child, filename)?), span))
+    } else if text.starts_with('&') {
+        Ok(Expr::UnaryOp(UnaryOp::Ref, Box::new(parse_expr(child, filename)?), span))
+    } else if text.starts_with('*') {
+        Ok(Expr::UnaryOp(UnaryOp::Deref, Box::new(parse_expr(child, filename)?), span))
     } else if text.starts_with('-') {
         Ok(Expr::UnaryOp(UnaryOp::Neg, Box::new(parse_expr(child, filename)?), span))
     } else {
@@ -1598,6 +1629,8 @@ fn expr_to_assign_target(expr: Expr) -> Result<AssignTarget, MetelError> {
     match expr {
         Expr::Ident(name, span) =>
             Ok(AssignTarget::Ident(name, span)),
+        Expr::UnaryOp(UnaryOp::Deref, object, span) =>
+            Ok(AssignTarget::Deref { object, span }),
         Expr::FieldAccess { object, field, span } =>
             Ok(AssignTarget::FieldAccess { object, field, span }),
         Expr::Index { object, index, span } =>
@@ -1622,6 +1655,23 @@ fn parse_type_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<
                 .map(|p| parse_type_expr(p, filename))
                 .collect::<Result<_, _>>()?;
             Ok(TypeExpr::Tuple(elems))
+        }
+        Rule::pointer_type => {
+            let elem = parse_type_expr(
+                pair.into_inner().next()
+                    .ok_or_else(|| MetelError::internal("pointer_type: expected pointee type"))?,
+                filename,
+            )?;
+            Ok(TypeExpr::Pointer(Box::new(elem)))
+        }
+        Rule::mut_pointer_type => {
+            let elem = parse_type_expr(
+                pair.into_inner()
+                    .find(|p| p.as_rule() == Rule::type_expr)
+                    .ok_or_else(|| MetelError::internal("mut_pointer_type: expected pointee type"))?,
+                filename,
+            )?;
+            Ok(TypeExpr::MutPointer(Box::new(elem)))
         }
         Rule::array_type => {
             let elem = parse_type_expr(

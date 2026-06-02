@@ -98,6 +98,20 @@ fn deep_clone_value(v: Value) -> Value {
     }
 }
 
+fn read_pointer_value(value: &Value) -> Option<Value> {
+    match value {
+        Value::Pointer(rc) | Value::MutPointer(rc) => Some(rc.borrow().clone()),
+        _ => None,
+    }
+}
+
+fn receiver_cell_from_value(value: &Value) -> Option<Rc<RefCell<Value>>> {
+    match value {
+        Value::Pointer(rc) | Value::MutPointer(rc) => Some(Rc::clone(rc)),
+        _ => None,
+    }
+}
+
 // ── Control flow signals ──────────────────────────────────────────────────────
 
 /// Returned by evaluation functions to handle non-local control flow.
@@ -124,8 +138,9 @@ impl Signal {
 // ── Environment ───────────────────────────────────────────────────────────────
 
 /// Lexically-scoped environment — a stack of hashmaps.
-/// All values are Rc<RefCell<Value>> so that closures can share mutable bindings
-/// with their enclosing scope.
+/// Runtime storage stays cell-backed, but closure capture chooses whether to
+/// clone cells by value (`capture_clone`) or share them explicitly (`define_rc`,
+/// pointers, reference receivers).
 #[derive(Debug, Clone)]
 pub struct Environment {
     scopes: Vec<HashMap<String, Rc<RefCell<Value>>>>,
@@ -152,6 +167,10 @@ impl Environment {
     /// Arrays are deep-cloned so each binding has an independent copy.
     pub fn define(&mut self, name: &str, value: Value) {
         let cell = Rc::new(RefCell::new(deep_clone_value(value)));
+        self.scopes.last_mut().unwrap().insert(name.to_string(), cell);
+    }
+
+    pub fn define_rc(&mut self, name: &str, cell: Rc<RefCell<Value>>) {
         self.scopes.last_mut().unwrap().insert(name.to_string(), cell);
     }
 
@@ -185,6 +204,20 @@ impl Environment {
             }
         }
         None
+    }
+
+    pub fn capture_clone(&self) -> Self {
+        let scopes = self.scopes.iter()
+            .map(|scope| {
+                scope.iter()
+                    .map(|(name, cell)| {
+                        let cloned = deep_clone_value(cell.borrow().clone());
+                        (name.clone(), Rc::new(RefCell::new(cloned)))
+                    })
+                    .collect()
+            })
+            .collect();
+        Self { scopes }
     }
 }
 
@@ -586,11 +619,14 @@ fn eval_for_in(
             format!("for-in: `{type_name}` does not implement Iterable (no `next` method)"), span)
     })?;
 
-    let mut iter_val = iterable;
+    let iter_cell = Rc::new(RefCell::new(deep_clone_value(iterable)));
     loop {
-        let (result_sig, updated_self) = call::call_function_mut_self(next_fn.clone(), vec![iter_val.clone()], span)?;
-        iter_val = updated_self;
-        let result = result_sig.into_value();
+        let result = call::call_method_function(
+            next_fn.clone(),
+            call::ReceiverBinding::Shared(Rc::clone(&iter_cell)),
+            vec![],
+            span,
+        )?.into_value();
         let maybe_item: Option<Value> = match result {
             Value::Enum { name, variant, mut fields } if name == "Perhaps" => {
                 if variant == "None" { None } else { Some(fields.remove("value").unwrap_or(Value::Unit)) }
@@ -878,14 +914,28 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Metel
             lvalue::eval_binop(op, lv, rv, span)
         }
 
-        Expr::UnaryOp(op, operand, _) => {
+        Expr::UnaryOp(op, operand, span) => {
             let v = eval_untyped_expr(operand, env)?.into_value();
             let result = match (op, v) {
                 (UnaryOp::Neg, Value::Int(n))   => Value::Int(-n),
                 (UnaryOp::Neg, Value::Float(f)) => Value::Float(-f),
                 (UnaryOp::Not, Value::Bool(b))  => Value::Bool(!b),
+                (UnaryOp::Ref, _) => match &**operand {
+                    Expr::Ident(name, _) => env.get_rc(name)
+                        .map(Value::Pointer)
+                        .ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span))?,
+                    _ => return Err(MetelError::internal("address-of currently requires an identifier operand")),
+                },
+                (UnaryOp::RefMut, _) => match &**operand {
+                    Expr::Ident(name, _) => env.get_rc(name)
+                        .map(Value::MutPointer)
+                        .ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span))?,
+                    _ => return Err(MetelError::internal("mutable address-of currently requires an identifier operand")),
+                },
+                (UnaryOp::Deref, Value::Pointer(rc)) | (UnaryOp::Deref, Value::MutPointer(rc)) => rc.borrow().clone(),
                 (UnaryOp::Neg, _) => return Err(MetelError::internal("unary `-`: expected Int or Float")),
                 (UnaryOp::Not, _) => return Err(MetelError::internal("unary `!`: expected Bool")),
+                (UnaryOp::Deref, _) => return Err(MetelError::internal("unary `*`: expected pointer")),
             };
             Ok(Signal::Value(result))
         }
@@ -994,6 +1044,21 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Metel
                     }
                     Ok(Signal::Value(Value::Unit))
                 }
+                AssignTarget::Deref { object, span: tspan } => {
+                    let ptr = eval_untyped_expr(object, env)?.into_value();
+                    let rc = match ptr {
+                        Value::Pointer(rc) | Value::MutPointer(rc) => rc,
+                        _ => return Err(MetelError::panic(RuntimeErrorCode::R0003, "assign: dereference target is not a pointer", tspan)),
+                    };
+                    let new_val = if matches!(op, AssignOp::Assign) {
+                        rhs
+                    } else {
+                        let cur = rc.borrow().clone();
+                        lvalue::apply_assign_op(op, cur, rhs, span)?
+                    };
+                    *rc.borrow_mut() = new_val;
+                    Ok(Signal::Value(Value::Unit))
+                }
                 AssignTarget::Index { object, index, span: tspan } => {
                     let i = lvalue::eval_untyped_index(index, env, tspan)?;
                     let arr_val = lvalue::eval_untyped_lvalue_value(object, env, tspan)?;
@@ -1064,7 +1129,10 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Metel
         }
 
         Expr::FieldAccess { object, field, span } => {
-            let val = eval_untyped_expr(object, env)?.into_value();
+            let mut val = eval_untyped_expr(object, env)?.into_value();
+            if let Some(deref) = read_pointer_value(&val) {
+                val = deref;
+            }
             let fields = match &val {
                 Value::Struct { fields, .. } | Value::Enum { fields, .. } => fields,
                 _ => return Err(MetelError::internal("field access on non-struct/enum")),
@@ -1082,7 +1150,8 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Metel
             if let (Value::Str(s), "len") = (&recv_val, method.as_str()) {
                 return Ok(Signal::Value(Value::Int(s.chars().count() as i64)));
             }
-            let type_name = match &recv_val {
+            let recv_type_view = read_pointer_value(&recv_val).unwrap_or_else(|| recv_val.clone());
+            let type_name = match &recv_type_view {
                 Value::Struct { name, .. } | Value::Enum { name, .. } => name.clone(),
                 _ => return Err(MetelError::panic(RuntimeErrorCode::R0009, format!("method `{method}` not found on this value"), span)),
             };
@@ -1090,9 +1159,29 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Metel
             let func = env.get(&key).ok_or_else(|| {
                 MetelError::panic(RuntimeErrorCode::R0009, format!("no method `{method}` on `{type_name}`"), span)
             })?;
-            let mut all_args = vec![recv_val];
-            all_args.extend(arg_vals);
-            call::call_function(func, all_args, span)
+            match &func {
+                Value::Closure(rc)
+                    if matches!(
+                        rc.params.first().and_then(|p| p.receiver.clone()),
+                        Some(crate::ast::ReceiverKind::Ref) | Some(crate::ast::ReceiverKind::RefMut)
+                    ) =>
+                {
+                    let receiver_binding = if let Some(cell) = match receiver.as_ref() {
+                        Expr::Ident(name, _) => env.get_rc(name),
+                        _ => receiver_cell_from_value(&recv_val),
+                    } {
+                        call::ReceiverBinding::Shared(cell)
+                    } else {
+                        call::ReceiverBinding::Value(recv_type_view.clone())
+                    };
+                    call::call_method_function(func, receiver_binding, arg_vals, span)
+                }
+                _ => {
+                    let mut all_args = vec![recv_type_view];
+                    all_args.extend(arg_vals);
+                    call::call_function(func, all_args, span)
+                }
+            }
         }
 
         Expr::Call { callee, args, span } => {
@@ -1104,7 +1193,7 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Metel
         }
 
         Expr::Closure { params, body, .. } => {
-            let captured = env.clone();
+            let captured = env.capture_clone();
             Ok(Signal::Value(Value::Closure(Rc::new(ClosureValue {
                 name:     None,
                 params:   params.clone(),
@@ -1212,14 +1301,28 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
             lvalue::eval_binop(op, lv, rv, span)
         }
 
-        TypedExpr::UnaryOp(op, operand, _, _span) => {
+        TypedExpr::UnaryOp(op, operand, _, span) => {
             let v = eval_expr(operand, env)?.into_value();
             let result = match (op, v) {
                 (UnaryOp::Neg, Value::Int(n))   => Value::Int(-n),
                 (UnaryOp::Neg, Value::Float(f)) => Value::Float(-f),
                 (UnaryOp::Not, Value::Bool(b))  => Value::Bool(!b),
+                (UnaryOp::Ref, _) => match &**operand {
+                    TypedExpr::Ident(name, _, _) => env.get_rc(name)
+                        .map(Value::Pointer)
+                        .ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span))?,
+                    _ => return Err(MetelError::internal("address-of currently requires an identifier operand")),
+                },
+                (UnaryOp::RefMut, _) => match &**operand {
+                    TypedExpr::Ident(name, _, _) => env.get_rc(name)
+                        .map(Value::MutPointer)
+                        .ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span))?,
+                    _ => return Err(MetelError::internal("mutable address-of currently requires an identifier operand")),
+                },
+                (UnaryOp::Deref, Value::Pointer(rc)) | (UnaryOp::Deref, Value::MutPointer(rc)) => rc.borrow().clone(),
                 (UnaryOp::Neg, _) => return Err(MetelError::internal("unary `-`: expected Int or Float (typechecker should have caught this)")),
                 (UnaryOp::Not, _) => return Err(MetelError::internal("unary `!`: expected Bool (typechecker should have caught this)")),
+                (UnaryOp::Deref, _) => return Err(MetelError::internal("unary `*`: expected pointer (typechecker should have caught this)")),
             };
             Ok(Signal::Value(result))
         }
@@ -1358,6 +1461,22 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                     Ok(Signal::Value(Value::Unit))
                 }
 
+                AssignTarget::Deref { object, span: tspan } => {
+                    let ptr = eval_untyped_expr(object, env)?.into_value();
+                    let rc = match ptr {
+                        Value::Pointer(rc) | Value::MutPointer(rc) => rc,
+                        _ => return Err(MetelError::panic(RuntimeErrorCode::R0003, "assign: dereference target is not a pointer", tspan)),
+                    };
+                    let new_val = if matches!(op, AssignOp::Assign) {
+                        rhs
+                    } else {
+                        let cur = rc.borrow().clone();
+                        lvalue::apply_assign_op(op, cur, rhs, span)?
+                    };
+                    *rc.borrow_mut() = new_val;
+                    Ok(Signal::Value(Value::Unit))
+                }
+
                 AssignTarget::Index { object, index, span: tspan } => {
                     let i = lvalue::eval_untyped_index(index, env, tspan)?;
                     let arr_val = lvalue::eval_untyped_lvalue_value(object, env, tspan)?;
@@ -1447,7 +1566,10 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
         }
 
         TypedExpr::FieldAccess { object, field, span, .. } => {
-            let val = eval_expr(object, env)?.into_value();
+            let mut val = eval_expr(object, env)?.into_value();
+            if let Some(deref) = read_pointer_value(&val) {
+                val = deref;
+            }
             let fields = match &val {
                 Value::Struct { fields, .. } | Value::Enum { fields, .. } => fields,
                 _ => return Err(MetelError::internal("field access on non-struct/enum (typechecker should have caught this)")),
@@ -1469,7 +1591,8 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
             }
 
             // User-defined struct/enum methods — looked up by "TypeName::method".
-            let type_name = match &recv_val {
+            let recv_type_view = read_pointer_value(&recv_val).unwrap_or_else(|| recv_val.clone());
+            let type_name = match &recv_type_view {
                 Value::Struct { name, .. } | Value::Enum { name, .. } => name.clone(),
                 Value::Int(_)   => "Int".to_string(),
                 Value::Float(_) => "Float".to_string(),
@@ -1484,10 +1607,39 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
             let func = env.get(&key).ok_or_else(|| {
                 MetelError::panic(RuntimeErrorCode::R0009, format!("no method `{method}` on `{type_name}`"), span)
             })?;
-            // Prepend receiver as first argument (the `self` param).
-            let mut all_args = vec![recv_val];
-            all_args.extend(arg_vals);
-            call::call_function(func, all_args, span)
+            match &func {
+                Value::Closure(rc)
+                    if matches!(
+                        rc.params.first().and_then(|p| p.receiver.clone()),
+                        Some(crate::ast::ReceiverKind::Ref) | Some(crate::ast::ReceiverKind::RefMut)
+                    ) =>
+                {
+                    let receiver_binding = if let Some(cell) = match receiver.as_ref() {
+                        TypedExpr::Ident(name, _, _) => {
+                            env.get_rc(name).map(|cell| {
+                                // If the identifier holds a pointer, use the pointed-to cell
+                                // so &self / &mut self methods see the struct, not the pointer.
+                                let inner = match &*cell.borrow() {
+                                    Value::Pointer(inner) | Value::MutPointer(inner) => Some(Rc::clone(inner)),
+                                    _ => None,
+                                };
+                                inner.unwrap_or(cell)
+                            })
+                        }
+                        _ => receiver_cell_from_value(&recv_val),
+                    } {
+                        call::ReceiverBinding::Shared(cell)
+                    } else {
+                        call::ReceiverBinding::Value(recv_type_view.clone())
+                    };
+                    call::call_method_function(func, receiver_binding, arg_vals, span)
+                }
+                _ => {
+                    let mut all_args = vec![recv_type_view];
+                    all_args.extend(arg_vals);
+                    call::call_function(func, all_args, span)
+                }
+            }
         }
 
         TypedExpr::Call { callee, args, span, .. } => {
@@ -1499,7 +1651,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
         }
 
         TypedExpr::Closure { params, body, .. } => {
-            let captured = env.clone();
+            let captured = env.capture_clone();
             Ok(Signal::Value(Value::Closure(Rc::new(ClosureValue {
                 name:     None,
                 params:   params.clone(),
@@ -1509,7 +1661,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
         }
 
         TypedExpr::GenericClosure { params, body, .. } => {
-            let captured = env.clone();
+            let captured = env.capture_clone();
             Ok(Signal::Value(Value::Closure(Rc::new(ClosureValue {
                 name:     None,
                 params:   params.clone(),

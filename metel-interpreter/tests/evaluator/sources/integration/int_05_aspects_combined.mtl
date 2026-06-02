@@ -25,7 +25,7 @@ aspect From<T> {
 }
 
 aspect Iterable<T> {
-    fun next(mut self) -> Perhaps<T>;
+    fun next(&mut self) -> Perhaps<T>;
 }
 
 // ── Error types ────────────────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ impl Countdown {
 }
 
 impl Iterable<Int> for Countdown {
-    fun next(mut self) -> Perhaps<Int> {
+    fun next(&mut self) -> Perhaps<Int> {
         if (self.current > 0) {
             let v = self.current;
             self.current = self.current - 1;

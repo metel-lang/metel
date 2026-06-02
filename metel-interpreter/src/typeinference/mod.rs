@@ -3,7 +3,7 @@
 //! Implements Hindley-Milner type inference with let-polymorphism.
 //! See `docs/internal/typechecker.md` for theory background and implementation notes.
 
-use crate::ast::{AspectMethod, Span, Visibility};
+use crate::ast::{AspectMethod, ReceiverKind, Span, Visibility};
 use crate::types::Type;
 use crate::error::MetelError;
 use std::collections::{HashMap, HashSet};
@@ -91,6 +91,10 @@ pub enum InferType {
     Tuple(Vec<InferType>),
     /// A homogeneous array type.
     Array(Box<InferType>),
+    /// A shared pointer type.
+    Pointer(Box<InferType>),
+    /// A mutable pointer type.
+    MutPointer(Box<InferType>),
     /// A named type (struct, enum) with type arguments.
     Named(String, Vec<InferType>),
 }
@@ -129,6 +133,8 @@ impl std::fmt::Display for InferType {
                 write!(f, ")")
             }
             InferType::Array(t) => write!(f, "{}[]", t),
+            InferType::Pointer(t) => write!(f, "*{}", t),
+            InferType::MutPointer(t) => write!(f, "*mut {}", t),
             InferType::Named(name, args) => {
                 write!(f, "{}", name)?;
                 if !args.is_empty() {
@@ -183,6 +189,8 @@ impl Substitution {
             ),
             InferType::Tuple(ts) => InferType::Tuple(ts.iter().map(|t| self.apply(t)).collect()),
             InferType::Array(t) => InferType::Array(Box::new(self.apply(t))),
+            InferType::Pointer(t) => InferType::Pointer(Box::new(self.apply(t))),
+            InferType::MutPointer(t) => InferType::MutPointer(Box::new(self.apply(t))),
             InferType::Named(name, args) => {
                 InferType::Named(name.clone(), args.iter().map(|a| self.apply(a)).collect())
             }
@@ -222,6 +230,7 @@ fn occurs_in(var: TypeVar, ty: &InferType) -> bool {
         }
         InferType::Tuple(ts) => ts.iter().any(|t| occurs_in(var, t)),
         InferType::Array(t) => occurs_in(var, t),
+        InferType::Pointer(t) | InferType::MutPointer(t) => occurs_in(var, t),
         InferType::Named(_, args) => args.iter().any(|a| occurs_in(var, a)),
     }
 }
@@ -285,6 +294,10 @@ pub fn unify(a: &InferType, b: &InferType) -> Result<Substitution, MetelError> {
             Ok(subst)
         }
         (InferType::Array(t1), InferType::Array(t2)) => unify(t1, t2),
+        (InferType::Pointer(t1), InferType::Pointer(t2))
+        | (InferType::MutPointer(t1), InferType::MutPointer(t2))
+        | (InferType::Pointer(t1), InferType::MutPointer(t2))
+        | (InferType::MutPointer(t1), InferType::Pointer(t2)) => unify(t1, t2),
         (InferType::Named(n1, args1), InferType::Named(n2, args2)) => {
             if n1 != n2 || args1.len() != args2.len() {
                 return Err(MetelError::internal(format!("cannot unify {} with {}", a, b)));
@@ -349,6 +362,7 @@ pub fn free_vars(ty: &InferType) -> HashSet<TypeVar> {
         }
         InferType::Tuple(ts) => ts.iter().flat_map(free_vars).collect(),
         InferType::Array(t) => free_vars(t),
+        InferType::Pointer(t) | InferType::MutPointer(t) => free_vars(t),
         InferType::Named(_, args) => args.iter().flat_map(free_vars).collect(),
     }
 }
@@ -483,6 +497,7 @@ pub struct TypeDefinitionRegistry {
     /// can be removed on scope exit. Empty when outside any scoped block.
     struct_scope_stack: Vec<Vec<String>>,
     method_env:  HashMap<String, HashMap<String, InferType>>,
+    method_receiver_env: HashMap<String, HashMap<String, ReceiverKind>>,
     enum_env:    HashMap<String, EnumInfo>,
     /// enum name → declaring module path.
     enum_decl_modules: HashMap<String, Vec<String>>,
@@ -508,6 +523,7 @@ impl TypeDefinitionRegistry {
             fun_bounds:          HashMap::new(),
             struct_scope_stack:  Vec::new(),
             method_env:         HashMap::new(),
+            method_receiver_env: HashMap::new(),
             enum_env:           HashMap::new(),
             enum_decl_modules:  HashMap::new(),
             aspect_env:         HashMap::new(),
@@ -539,6 +555,18 @@ impl TypeDefinitionRegistry {
 
     pub fn register_method(&mut self, type_name: String, method_name: String, fun_ty: InferType) {
         self.method_env.entry(type_name).or_default().insert(method_name, fun_ty);
+    }
+
+    pub fn register_method_receiver(
+        &mut self,
+        type_name: String,
+        method_name: String,
+        receiver_kind: ReceiverKind,
+    ) {
+        self.method_receiver_env
+            .entry(type_name)
+            .or_default()
+            .insert(method_name, receiver_kind);
     }
 
     pub fn register_struct_type_params(&mut self, name: String, type_params: Vec<TypeVar>) {
@@ -614,6 +642,10 @@ impl TypeDefinitionRegistry {
         self.method_env.get(type_name)?.get(method_name)
     }
 
+    pub fn method_receiver_kind(&self, type_name: &str, method_name: &str) -> Option<&ReceiverKind> {
+        self.method_receiver_env.get(type_name)?.get(method_name)
+    }
+
     pub fn enum_info(&self, name: &str) -> Option<&EnumInfo> {
         self.enum_env.get(name)
     }
@@ -681,6 +713,10 @@ impl TypeDefinitionRegistry {
         &self.method_env
     }
 
+    pub(crate) fn raw_method_receiver_env(&self) -> &HashMap<String, HashMap<String, ReceiverKind>> {
+        &self.method_receiver_env
+    }
+
     /// Copy all entries from `other` into `self`, without overwriting existing entries.
     /// Used by `check_impl` to seed a module's registry with type definitions from
     /// already-checked dependency modules. See ADR-0032.
@@ -708,6 +744,9 @@ impl TypeDefinitionRegistry {
         }
         for (k, v) in &other.method_env {
             self.method_env.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+        for (k, v) in &other.method_receiver_env {
+            self.method_receiver_env.entry(k.clone()).or_insert_with(|| v.clone());
         }
         for (k, v) in &other.enum_env {
             self.enum_env.entry(k.clone()).or_insert_with(|| v.clone());
@@ -802,12 +841,25 @@ impl InferContext {
         self.registry.register_method(type_name, method_name, fun_ty);
     }
 
+    pub fn register_method_receiver(
+        &mut self,
+        type_name: String,
+        method_name: String,
+        receiver_kind: ReceiverKind,
+    ) {
+        self.registry.register_method_receiver(type_name, method_name, receiver_kind);
+    }
+
     pub fn get_struct_fields(&self, name: &str) -> Option<&Vec<crate::typeinference::FieldEntry>> {
         self.registry.struct_fields(name)
     }
 
     pub fn get_method_type(&self, type_name: &str, method_name: &str) -> Option<&InferType> {
         self.registry.method_type(type_name, method_name)
+    }
+
+    pub fn get_method_receiver_kind(&self, type_name: &str, method_name: &str) -> Option<&ReceiverKind> {
+        self.registry.method_receiver_kind(type_name, method_name)
     }
 
     pub fn register_enum(&mut self, name: String, info: EnumInfo) {

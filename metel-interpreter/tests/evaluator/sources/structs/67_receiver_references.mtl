@@ -1,0 +1,20 @@
+struct Counter {
+    value: Int,
+}
+
+impl Counter {
+    fun increment(&mut self) {
+        self.value += 1;
+    }
+
+    fun current(&self) -> Int {
+        self.value
+    }
+}
+
+fun main() {
+    let mut counter = Counter { value: 0 };
+    counter.increment();
+    counter.increment();
+    assert(counter.current() == 2);
+}

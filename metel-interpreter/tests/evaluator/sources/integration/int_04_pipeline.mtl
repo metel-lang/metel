@@ -24,7 +24,7 @@ aspect From<T> {
 }
 
 aspect Iterable<T> {
-    fun next(mut self) -> Perhaps<T>;
+    fun next(&mut self) -> Perhaps<T>;
 }
 
 // ── Error types ────────────────────────────────────────────────────────────────
@@ -71,7 +71,7 @@ impl NumberList {
 }
 
 impl Iterable<Int> for NumberList {
-    fun next(mut self) -> Perhaps<Int> {
+    fun next(&mut self) -> Perhaps<Int> {
         if (self.pos < array_len(self.data)) {
             let v = self.data[self.pos];
             self.pos = self.pos + 1;

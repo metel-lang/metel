@@ -329,6 +329,12 @@ mod tests {
     fn receiver_references() { check("structs/67_receiver_references.mtl"); }
 
     #[test]
+    fn receiver_all_forms() { check("structs/68_receiver_all_forms.mtl"); }
+
+    #[test]
+    fn neg_ref_mut_through_shared_ptr() { check("structs/neg_24_ref_mut_method_through_shared_ptr.mtl"); }
+
+    #[test]
     fn neg_missing_field() { check("structs/neg_12_missing_field.mtl"); }
 
     // ── Enums ─────────────────────────────────────────────────────────────────

@@ -1,0 +1,21 @@
+fun main() {
+    let mut value = 1;
+    let captured = () -> Int {
+        value
+    };
+    value = 9;
+
+    let mut shared = 0;
+    let ptr = &mut shared;
+    let bump = () -> Int {
+        *ptr += 1;
+        *ptr
+    };
+
+    let first = bump();
+    let second = bump();
+
+    assert(captured() == 1);
+    assert(first == 1);
+    assert(second == 2);
+}

@@ -13,7 +13,7 @@ aspect From<T> {
 }
 
 aspect Iterable<T> {
-    fun next(mut self) -> Perhaps<T>;
+    fun next(&mut self) -> Perhaps<T>;
 }
 
 // ── Error hierarchy ────────────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ impl Counter {
 }
 
 impl Iterable<Int> for Counter {
-    fun next(mut self) -> Perhaps<Int> {
+    fun next(&mut self) -> Perhaps<Int> {
         if (self.current < self.limit) {
             let v = self.current;
             self.current = self.current + 1;

@@ -14,7 +14,7 @@ impl Point {
         Point { x: self.x + dx, y: self.y + dy }
     }
 
-    fun scale(mut self, factor: Float) {
+    fun scale(&mut self, factor: Float) {
         self.x = self.x * factor;
         self.y = self.y * factor;
     }
@@ -47,7 +47,7 @@ impl Counter {
         self.value + other.value
     }
 
-    fun reset(mut self) {
+    fun reset(&mut self) {
         self.value = 0;
     }
 }
