@@ -332,6 +332,9 @@ mod tests {
     fn receiver_all_forms() { check("structs/68_receiver_all_forms.mtl"); }
 
     #[test]
+    fn nested_field_mut_receiver() { check("structs/69_nested_field_mut_receiver.mtl"); }
+
+    #[test]
     fn neg_ref_mut_through_shared_ptr() { check("structs/neg_24_ref_mut_method_through_shared_ptr.mtl"); }
 
     #[test]

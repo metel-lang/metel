@@ -112,6 +112,55 @@ fn receiver_cell_from_value(value: &Value) -> Option<Rc<RefCell<Value>>> {
     }
 }
 
+// For a FieldAccess receiver like `a.b.c`, returns:
+//   (struct_cell, ["a","b","c"], leaf_cell)
+// where struct_cell is the Rc for the root variable (pointer-followed if needed),
+// the path encodes every field segment, and leaf_cell is a fresh Rc wrapping a clone
+// of the leaf value.  After a &mut self call the caller writes leaf_cell's value back.
+fn lvalue_field_cell(
+    receiver: &crate::typed_ast::TypedExpr,
+    env: &Environment,
+) -> Option<(Rc<RefCell<Value>>, Vec<String>, Rc<RefCell<Value>>)> {
+    use crate::typed_ast::TypedExpr;
+    fn walk_path(expr: &TypedExpr, path: &mut Vec<String>) -> Option<String> {
+        match expr {
+            TypedExpr::Ident(name, _, _) => Some(name.clone()),
+            TypedExpr::FieldAccess { object, field, .. } => {
+                let root = walk_path(object, path)?;
+                path.push(field.clone());
+                Some(root)
+            }
+            _ => None,
+        }
+    }
+    let mut path = Vec::new();
+    let root = walk_path(receiver, &mut path)?;
+
+    let root_cell = env.get_rc(&root)?;
+    let struct_cell = {
+        let inner = match &*root_cell.borrow() {
+            Value::Pointer(c) | Value::MutPointer(c) => Some(Rc::clone(c)),
+            _ => None,
+        };
+        inner.unwrap_or(root_cell)
+    };
+    let leaf_val = {
+        let borrowed = struct_cell.borrow();
+        let mut cur: &Value = &*borrowed;
+        for seg in &path {
+            match cur {
+                Value::Struct { fields, .. } | Value::Enum { fields, .. } => {
+                    cur = fields.get(seg.as_str())?;
+                }
+                _ => return None,
+            }
+        }
+        cur.clone()
+    };
+    let leaf_cell = Rc::new(RefCell::new(leaf_val));
+    Some((struct_cell, path, leaf_cell))
+}
+
 // ── Control flow signals ──────────────────────────────────────────────────────
 
 /// Returned by evaluation functions to handle non-local control flow.
@@ -1614,25 +1663,65 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                         Some(crate::ast::ReceiverKind::Ref) | Some(crate::ast::ReceiverKind::RefMut)
                     ) =>
                 {
-                    let receiver_binding = if let Some(cell) = match receiver.as_ref() {
+                    // For field-access chains (e.g. `pair.a.tick()`) we can't hand the
+                    // evaluator a direct Rc to the field because fields are stored by value
+                    // inside the parent struct's HashMap.  Instead we clone the leaf value
+                    // into a fresh cell, call through it, then write the (possibly mutated)
+                    // value back into the parent struct.
+                    let mut field_writeback: Option<(Rc<RefCell<Value>>, Vec<String>, Rc<RefCell<Value>>)> = None;
+
+                    let receiver_binding = match receiver.as_ref() {
                         TypedExpr::Ident(name, _, _) => {
-                            env.get_rc(name).map(|cell| {
-                                // If the identifier holds a pointer, use the pointed-to cell
-                                // so &self / &mut self methods see the struct, not the pointer.
+                            match env.get_rc(name).map(|cell| {
                                 let inner = match &*cell.borrow() {
                                     Value::Pointer(inner) | Value::MutPointer(inner) => Some(Rc::clone(inner)),
                                     _ => None,
                                 };
                                 inner.unwrap_or(cell)
-                            })
+                            }) {
+                                Some(cell) => call::ReceiverBinding::Shared(cell),
+                                None => call::ReceiverBinding::Value(recv_type_view.clone()),
+                            }
                         }
-                        _ => receiver_cell_from_value(&recv_val),
-                    } {
-                        call::ReceiverBinding::Shared(cell)
-                    } else {
-                        call::ReceiverBinding::Value(recv_type_view.clone())
+                        TypedExpr::FieldAccess { .. } => {
+                            match lvalue_field_cell(receiver, env) {
+                                Some((struct_cell, path, leaf_cell)) => {
+                                    let binding = call::ReceiverBinding::Shared(Rc::clone(&leaf_cell));
+                                    field_writeback = Some((struct_cell, path, leaf_cell));
+                                    binding
+                                }
+                                None => receiver_cell_from_value(&recv_val)
+                                    .map(call::ReceiverBinding::Shared)
+                                    .unwrap_or(call::ReceiverBinding::Value(recv_type_view.clone())),
+                            }
+                        }
+                        _ => receiver_cell_from_value(&recv_val)
+                            .map(call::ReceiverBinding::Shared)
+                            .unwrap_or(call::ReceiverBinding::Value(recv_type_view.clone())),
                     };
-                    call::call_method_function(func, receiver_binding, arg_vals, span)
+
+                    let result = call::call_method_function(func, receiver_binding, arg_vals, span)?;
+
+                    if let Some((struct_cell, path, leaf_cell)) = field_writeback {
+                        let new_val = leaf_cell.borrow().clone();
+                        let last = path.last().unwrap();
+                        let prefix = &path[..path.len() - 1];
+                        let mut borrow = struct_cell.borrow_mut();
+                        let mut cur: &mut Value = &mut *borrow;
+                        for seg in prefix {
+                            match cur {
+                                Value::Struct { fields, .. } | Value::Enum { fields, .. } => {
+                                    cur = fields.get_mut(seg.as_str()).unwrap();
+                                }
+                                _ => break,
+                            }
+                        }
+                        if let Value::Struct { fields, .. } | Value::Enum { fields, .. } = cur {
+                            fields.insert(last.clone(), new_val);
+                        }
+                    }
+
+                    Ok(result)
                 }
                 _ => {
                     let mut all_args = vec![recv_type_view];
