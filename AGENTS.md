@@ -23,9 +23,12 @@ The repository remote is Codeberg (`codeberg.org/metel-lang/metel`). Task tracki
 | `docs/public/reference/error-codes.md` | Error code reference |
 | `docs/public/release-notes/changelog.md` | Version changelog and release notes |
 | `docs/internal/versioning.md` | Version numbering, RFC lifecycle, and doc conventions |
-| `docs/internal/rfcs/active/` | RFCs under design or review |
-| `docs/internal/rfcs/accepted/` | Accepted RFCs not yet shipped |
-| `docs/internal/rfcs/implemented/` | Implemented/incorporated RFCs |
+| `docs/internal/rfcs/0-draft/` | Draft RFCs being written |
+| `docs/internal/rfcs/1-under-review/` | RFCs ready for evaluation |
+| `docs/internal/rfcs/2-accepted/` | Accepted RFCs assigned to a target version |
+| `docs/internal/rfcs/3-implemented/` | RFCs implemented and shipped |
+| `docs/internal/rfcs/4-superseded/` | RFCs replaced by later RFCs |
+| `docs/internal/rfcs/5-refused/` | RFCs refused with a recorded decision |
 | `docs/reports/` | Design reports and longer-form research notes |
 | `metel-interpreter/docs/architecture.md` | Interpreter pipeline and component boundaries |
 | `metel-interpreter/docs/typechecker.md` | Typechecker theory and implementation notes |
@@ -46,7 +49,8 @@ Current Plane identifiers:
 |---|---|
 | Project identifier | `METEL` |
 | Project ID | `ec7904a4-cd24-40bd-8089-19a5eb8875ab` |
-| States | `Backlog`, `Todo`, `In Progress`, `Done`, `Cancelled` |
+| Task states | `Backlog`, `Todo`, `In Progress`, `Done`, `Cancelled` |
+| RFC states | `draft`, `under-review`, `accepted`, `implemented`, `superseded`, `refused` |
 | Work item types | `Task`, `RFC`, `Epic` |
 | Product modules | `Interpreter`, `Wiki`, `Compiler`, `Playground`, `LSP` |
 
@@ -56,8 +60,9 @@ Common Plane actions:
 
 - Read a task: retrieve work item by project identifier `METEL` and sequence number.
 - Search tasks: list work items with a query, label, milestone, state, cycle, or module filter.
-- Start work: set the work item state to `In Progress`.
-- Finish work: set the work item state to `Done` only after acceptance criteria and tests pass.
+- Start task work: set the task work item state to `In Progress`.
+- Finish task work: set the task work item state to `Done` only after acceptance criteria and tests pass.
+- Move RFC work: move the RFC file to the directory for its state and set the Plane RFC state to the exact same state.
 - Track dependencies: use work item relations (`blocked_by`, `blocking`, `relates_to`) rather than encoding dependency state in files.
 - Version planning: use Plane milestones such as `v0.6.4`, `0.7.0`, `v0.8.0`.
 - Sprint planning: use Plane cycles such as `Sprint 17 - Aspect Bounds`.
@@ -106,7 +111,7 @@ Before opening a pull request from `sprint/N` to `main`, run the quality gate be
    - Module graph/name-resolution changes: `tests/module_loading/` or `tests/module_semantics/`.
 4. **Spec accuracy** - every language-visible change is documented in `docs/public/reference/spec.md` and the linked spec section.
 5. **Changelog** - version-visible work is recorded in `docs/public/release-notes/changelog.md`.
-6. **RFC state** - accepted RFCs implemented by the sprint are moved or marked according to `docs/internal/versioning.md`; incorporated RFCs must not remain in the accepted queue.
+6. **RFC state** - RFC files are in the directory for their current state, frontmatter agrees with that directory, and Plane RFC items reflect the same state exactly.
 7. **Internal docs** - update `metel-interpreter/docs/architecture.md`, `typechecker.md`, or `evaluator.md` when the corresponding pipeline, inference, construction, runtime, or builtin behavior changes.
 8. **Decision records** - add a new ADR in `metel-interpreter/docs/decisions/` for non-obvious architectural decisions, reversals, or workarounds future contributors must know.
 9. **Plane** - completed work items have satisfied acceptance criteria and are set to `Done`; deferred work is explicit in Plane, not hidden in comments.
@@ -147,19 +152,23 @@ After the gate passes, open a pull request from `sprint/N` to `main` on Codeberg
 
 RFCs live in `docs/internal/rfcs/` and are tracked in Plane with work item type `RFC`.
 
-Follow `docs/internal/versioning.md` for the lifecycle and frontmatter requirements. In practice, the folders are:
+Follow `docs/internal/versioning.md` for the lifecycle and frontmatter requirements. An RFC has exactly one of these states, represented primarily by its directory:
 
-- `active/` - design work not yet accepted or not yet scheduled.
-- `accepted/` - design accepted and assigned to a target version milestone.
-- `implemented/` - implemented and shipped/incorporated.
+- `0-draft/` - `draft`
+- `1-under-review/` - `under-review`
+- `2-accepted/` - `accepted`
+- `3-implemented/` - `implemented`
+- `4-superseded/` - `superseded`
+- `5-refused/` - `refused`
 
 Rules:
 
 - The RFC document is the source of truth for design details.
-- The Plane RFC item should summarize the topic and link to the RFC file; do not duplicate the whole RFC body in Plane.
+- The directory is the source of truth for the RFC's lifecycle state. The RFC frontmatter and Plane RFC item must reflect that directory exactly.
+- The Plane RFC item should summarize the topic, link to the RFC file, and use the same state as the RFC directory; do not duplicate the whole RFC body in Plane.
 - Accepted RFCs must have the relevant spec or internal architecture docs updated before implementation work begins.
 - Implementation tasks should relate back to the RFC work item.
-- When the target version ships, incorporated RFCs must be moved or marked according to `docs/internal/versioning.md`.
+- When the target version ships, accepted RFCs that shipped must be moved to `3-implemented/` and their Plane RFC items must be set to `implemented`.
 
 If an existing RFC's folder, frontmatter status, or `spec_status` contradicts `docs/internal/versioning.md`, stop and resolve the documentation workflow inconsistency before implementing against it.
 
