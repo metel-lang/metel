@@ -1,0 +1,35 @@
+// An aspect with multiple default methods; the impl provides only the required
+// method and inherits all defaults.
+
+struct Counter {
+    count: Int,
+}
+
+aspect Stats {
+    fun value(self) -> Int;
+
+    fun doubled(self) -> Int {
+        return self.value() * 2;
+    }
+
+    fun tripled(self) -> Int {
+        return self.value() * 3;
+    }
+}
+
+impl Stats for Counter {
+    fun value(self) -> Int {
+        return self.count;
+    }
+}
+
+fun main() {
+    let c = Counter { count: 5 };
+    assert(c.value() == 5);
+    assert(c.doubled() == 10);
+    assert(c.tripled() == 15);
+
+    let zero = Counter { count: 0 };
+    assert(zero.doubled() == 0);
+    assert(zero.tripled() == 0);
+}

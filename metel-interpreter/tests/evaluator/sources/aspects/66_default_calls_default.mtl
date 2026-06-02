@@ -1,0 +1,30 @@
+// A default method that calls another default method on self.
+
+struct Measurement {
+    raw: Int,
+}
+
+aspect Ops {
+    fun raw(self) -> Int;
+
+    fun scaled(self) -> Int {
+        return self.raw() * 10;
+    }
+
+    fun summary(self) -> String {
+        return "raw=" + self.raw().to_string() + " scaled=" + self.scaled().to_string();
+    }
+}
+
+impl Ops for Measurement {
+    fun raw(self) -> Int {
+        return self.raw;
+    }
+}
+
+fun main() {
+    let m = Measurement { raw: 7 };
+    assert(m.raw() == 7);
+    assert(m.scaled() == 70);
+    assert(m.summary() == "raw=7 scaled=70");
+}

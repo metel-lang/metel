@@ -1,0 +1,29 @@
+// Positive: an impl may provide a method that has a default body in the aspect.
+
+struct Circle {
+    radius: Int,
+}
+
+aspect Shape {
+    fun area_estimate(self) -> Int;
+
+    fun describe(self) -> String {
+        return "shape";
+    }
+}
+
+impl Shape for Circle {
+    fun area_estimate(self) -> Int {
+        return self.radius * self.radius;
+    }
+
+    fun describe(self) -> String {
+        return "circle(r=" + self.radius.to_string() + ")";
+    }
+}
+
+fun main() {
+    let c = Circle { radius: 5 };
+    let _: Int = c.area_estimate();
+    let _: String = c.describe();
+}

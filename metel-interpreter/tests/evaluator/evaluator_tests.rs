@@ -407,6 +407,18 @@ mod tests {
     fn default_methods() { check("aspects/63_default_methods.mtl"); }
 
     #[test]
+    fn default_method_override() { check("aspects/64_default_method_override.mtl"); }
+
+    #[test]
+    fn multiple_defaults_inherited() { check("aspects/65_multiple_defaults_inherited.mtl"); }
+
+    #[test]
+    fn default_calls_default() { check("aspects/66_default_calls_default.mtl"); }
+
+    #[test]
+    fn two_structs_same_default() { check("aspects/67_two_structs_same_default.mtl"); }
+
+    #[test]
     fn neg_missing_aspect_method() { check("aspects/neg_22_missing_aspect_method.mtl"); }
 
     // ── Error handling ────────────────────────────────────────────────────────

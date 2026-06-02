@@ -1,0 +1,20 @@
+// Negative: a required method (no default body) must still be provided even when
+// the impl provides other methods that have defaults in the aspect.
+
+struct Widget {
+    id: Int,
+}
+
+aspect Render {
+    fun draw(self) -> String;
+
+    fun preview(self) -> String {
+        return "preview: " + self.draw();
+    }
+}
+
+impl Render for Widget { // ERROR[T0003]
+    fun preview(self) -> String {
+        return "overriding the default";
+    }
+}

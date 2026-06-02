@@ -1,0 +1,31 @@
+// When an impl provides a body for a method that has a default in the aspect,
+// the impl body is used instead of the default.
+
+struct Point {
+    x: Int,
+    y: Int,
+}
+
+aspect Shape {
+    fun label(self) -> String;
+
+    fun describe(self) -> String {
+        return "shape: " + self.label();
+    }
+}
+
+impl Shape for Point {
+    fun label(self) -> String {
+        return "(" + self.x.to_string() + ", " + self.y.to_string() + ")";
+    }
+
+    fun describe(self) -> String {
+        return "Point" + self.label();
+    }
+}
+
+fun main() {
+    let p = Point { x: 3, y: 4 };
+    assert(p.label() == "(3, 4)");
+    assert(p.describe() == "Point(3, 4)");
+}

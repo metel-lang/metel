@@ -1,0 +1,39 @@
+// Two different structs implement the same aspect and both inherit the same
+// default method; each gets its own correct dispatch.
+
+struct Dog {
+    name: String,
+}
+
+struct Cat {
+    name: String,
+}
+
+aspect Named {
+    fun name(self) -> String;
+
+    fun greeting(self) -> String {
+        return "Hi, I'm " + self.name();
+    }
+}
+
+impl Named for Dog {
+    fun name(self) -> String {
+        return self.name;
+    }
+}
+
+impl Named for Cat {
+    fun name(self) -> String {
+        return self.name;
+    }
+}
+
+fun main() {
+    let d = Dog { name: "Rex" };
+    let c = Cat { name: "Whiskers" };
+    assert(d.greeting() == "Hi, I'm Rex");
+    assert(c.greeting() == "Hi, I'm Whiskers");
+    assert(d.name() == "Rex");
+    assert(c.name() == "Whiskers");
+}

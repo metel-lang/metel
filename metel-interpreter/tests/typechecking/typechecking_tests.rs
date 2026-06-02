@@ -554,6 +554,15 @@ fun main() {
     #[test]
     fn stage12_default_methods() { check("aspects/stage12_01_default_methods.mtl"); }
 
+    #[test]
+    fn stage12_override_replaces_default() { check("aspects/stage12_02_override_replaces_default.mtl"); }
+
+    #[test]
+    fn stage12_multiple_defaults() { check("aspects/stage12_03_multiple_defaults.mtl"); }
+
+    #[test]
+    fn stage12_neg_missing_required_with_defaults() { check("aspects/stage12_neg_01_missing_required_with_defaults.mtl"); }
+
     // ── Known limitations ─────────────────────────────────────────────────────
 
     #[test]
