@@ -20,7 +20,7 @@ use typechecker::StdPrelude;
 
 #[derive(Parser)]
 #[command(name = "metel")]
-#[command(version = "0.7.0")]
+#[command(version)]
 #[command(about = "Metel interpreter")]
 #[command(long_about = "A tree-walk interpreter for the metel programming language")]
 struct Args {
