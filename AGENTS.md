@@ -50,8 +50,10 @@ Current Plane identifiers:
 | Project identifier | `METEL` |
 | Project ID | `ec7904a4-cd24-40bd-8089-19a5eb8875ab` |
 | Task states | `Backlog`, `Todo`, `In Progress`, `Done`, `Cancelled` |
-| RFC states | `draft`, `under-review`, `accepted`, `implemented`, `superseded`, `refused` |
+| RFC Status values | `draft`, `under-review`, `accepted`, `implemented`, `superseded`, `refused` |
 | Work item types | `Task`, `RFC`, `Epic` |
+| RFC work item type ID | `6b00ca94-017d-45e2-81eb-f7b6bed6ac89` |
+| RFC Status property ID | `4d858d79-066b-4948-b1bd-7f166b7cd024` |
 | Product modules | `Interpreter`, `Wiki`, `Compiler`, `Playground`, `LSP` |
 
 Use Plane work item identifiers in user-facing references and commit messages, for example `METEL-57`. When a tool requires the UUID, use the project ID above.
@@ -62,12 +64,64 @@ Common Plane actions:
 - Search tasks: list work items with a query, label, milestone, state, cycle, or module filter.
 - Start task work: set the task work item state to `In Progress`.
 - Finish task work: set the task work item state to `Done` only after acceptance criteria and tests pass.
-- Move RFC work: move the RFC file to the directory for its state and set the Plane RFC state to the exact same state.
+- Move RFC work: use the custom `RFC` work item type and set its `RFC Status` custom property to the state represented by the RFC file directory.
 - Track dependencies: use work item relations (`blocked_by`, `blocking`, `relates_to`) rather than encoding dependency state in files.
 - Version planning: use Plane milestones such as `v0.6.4`, `0.7.0`, `v0.8.0`.
 - Sprint planning: use Plane cycles such as `Sprint 17 - Aspect Bounds`.
 
 Do not rely on `.github/` automation or GitHub issue labels. This checkout no longer has `.github/` workflow or issue-template files.
+
+### Plane RFC API Steps
+
+Use the Plane MCP tools for ordinary work item reads, creation, updates, links, and relations. Use the Plane REST API directly for RFC custom property values.
+
+Reason: the MCP work item tools expose standard work item fields but do not expose a custom-property-value upsert tool. The MCP property listing path can also fail response validation on Plane properties with nullable fields. Direct API calls use Plane's official custom property endpoints and are the reliable way to keep `RFC Status` and `RFC Number` synchronized with the RFC file.
+
+Use `https://api.plane.so/api/v1/workspaces/vladastos` with header `x-api-key: $PLANE_API_KEY`. Never write the API key into a tracked file.
+
+When creating a new RFC:
+
+1. Create the RFC document in the directory matching its lifecycle state, for example `docs/internal/rfcs/0-draft/rfc-0042-let-mut-bindings.md`.
+2. Create a Plane work item with type `RFC` using `type_id: 6b00ca94-017d-45e2-81eb-f7b6bed6ac89`. Put the work item on the normal task board state that best matches the planning workflow, usually `Backlog` for a draft RFC.
+3. Do not set the Plane `Doc Path` property. RFC paths include the lifecycle directory and therefore change whenever an RFC changes state. Derive the current path by scanning `docs/internal/rfcs/*/` for the RFC frontmatter `id`.
+4. Do not add direct Codeberg file links for stateful RFC paths unless a stable redirect or generated RFC index URL exists. Direct file links include the lifecycle directory and become stale on every state change.
+5. Query RFC work item properties if IDs need confirmation:
+
+```bash
+curl -sS \
+  -H "x-api-key: $PLANE_API_KEY" \
+  "https://api.plane.so/api/v1/workspaces/vladastos/projects/ec7904a4-cd24-40bd-8089-19a5eb8875ab/work-item-types/6b00ca94-017d-45e2-81eb-f7b6bed6ac89/work-item-properties/"
+```
+
+6. Upsert custom property values with:
+
+```bash
+curl -sS -X POST \
+  -H "x-api-key: $PLANE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"value":"<value-or-option-id>"}' \
+  "https://api.plane.so/api/v1/workspaces/vladastos/projects/ec7904a4-cd24-40bd-8089-19a5eb8875ab/work-items/<work_item_id>/work-item-properties/<property_id>/values/"
+```
+
+Known RFC custom properties:
+
+| Property | Property ID | Value |
+|---|---|---|
+| `RFC Number` | `71ccf8fa-9926-4216-8786-7f70e6eaec87` | decimal number, for example `42` |
+| `RFC Status` | `4d858d79-066b-4948-b1bd-7f166b7cd024` | option ID from the table below |
+
+Do not use the Plane `Doc Path` property for RFCs. The current path is derived from `RFC Number` plus the RFC file's frontmatter `id`.
+
+Known `RFC Status` option IDs:
+
+| Status | Option ID |
+|---|---|
+| `draft` | `bd6dc307-d1de-4363-a2ca-c99964258c49` |
+| `under-review` | `de40e974-2b7e-4d7f-a070-165c28ee40f0` |
+| `accepted` | `9fa2ac30-e5b0-4965-b83c-82bc92415218` |
+| `implemented` | `e90b9ab6-b177-48bf-a356-fc1da3be2c89` |
+| `superseded` | `63606434-211c-41ae-8f1e-7544b2d43d19` |
+| `refused` | `d0f15e96-e5f0-4cc3-8c86-b876c8ae9f0c` |
 
 ---
 
@@ -111,7 +165,7 @@ Before opening a pull request from `sprint/N` to `main`, run the quality gate be
    - Module graph/name-resolution changes: `tests/module_loading/` or `tests/module_semantics/`.
 4. **Spec accuracy** - every language-visible change is documented in `docs/public/reference/spec.md` and the linked spec section.
 5. **Changelog** - version-visible work is recorded in `docs/public/release-notes/changelog.md`.
-6. **RFC state** - RFC files are in the directory for their current state, frontmatter agrees with that directory, and Plane RFC items reflect the same state exactly.
+6. **RFC state** - RFC files are in the directory for their current state, frontmatter agrees with that directory, and Plane `RFC` work items have the matching `RFC Status` custom property.
 7. **Internal docs** - update `metel-interpreter/docs/architecture.md`, `typechecker.md`, or `evaluator.md` when the corresponding pipeline, inference, construction, runtime, or builtin behavior changes.
 8. **Decision records** - add a new ADR in `metel-interpreter/docs/decisions/` for non-obvious architectural decisions, reversals, or workarounds future contributors must know.
 9. **Plane** - completed work items have satisfied acceptance criteria and are set to `Done`; deferred work is explicit in Plane, not hidden in comments.
@@ -164,11 +218,11 @@ Follow `docs/internal/versioning.md` for the lifecycle and frontmatter requireme
 Rules:
 
 - The RFC document is the source of truth for design details.
-- The directory is the source of truth for the RFC's lifecycle state. The RFC frontmatter and Plane RFC item must reflect that directory exactly.
-- The Plane RFC item should summarize the topic, link to the RFC file, and use the same state as the RFC directory; do not duplicate the whole RFC body in Plane.
+- The directory is the source of truth for the RFC's lifecycle state. The RFC frontmatter and the Plane `RFC Status` custom property must reflect that directory exactly.
+- The Plane item must use the custom `RFC` work item type, summarize the topic, link to the RFC file, and set `RFC Status` to the same state as the RFC directory; do not duplicate the whole RFC body in Plane.
 - Accepted RFCs must have the relevant spec or internal architecture docs updated before implementation work begins.
 - Implementation tasks should relate back to the RFC work item.
-- When the target version ships, accepted RFCs that shipped must be moved to `3-implemented/` and their Plane RFC items must be set to `implemented`.
+- When the target version ships, accepted RFCs that shipped must be moved to `3-implemented/` and their Plane `RFC Status` custom property must be set to `implemented`.
 
 If an existing RFC's folder, frontmatter status, or `spec_status` contradicts `docs/internal/versioning.md`, stop and resolve the documentation workflow inconsistency before implementing against it.
 
