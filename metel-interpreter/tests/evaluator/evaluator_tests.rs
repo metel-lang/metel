@@ -266,6 +266,24 @@ mod tests {
     #[test]
     fn closures_advanced() { check("closures/42_closures_advanced.mtl"); }
 
+    #[test]
+    fn closure_capture_and_pointers() { check("functions/66_closure_capture_and_pointers.mtl"); }
+
+    #[test]
+    fn closure_shared_mutable_refs() { check("functions/67_closure_shared_mutable_refs.mtl"); }
+
+    #[test]
+    fn closure_different_calls() { check("functions/68_closure_different_calls.mtl"); }
+
+    #[test]
+    fn nice_closure_abuse() { check("functions/69_nice_closure_abuse.mtl"); }
+
+    #[test]
+    fn fun_ptr_unification() { check("functions/70_fun_ptr_unification.mtl"); }
+
+    #[test]
+    fn fun_ptr_autoderef() { check("functions/71_fun_ptr_autodref.mtl"); }
+
     // ── Structs ───────────────────────────────────────────────────────────────
 
     #[test]
@@ -306,6 +324,9 @@ mod tests {
 
     #[test]
     fn self_method_signatures() { check("structs/48_self_method_signatures.mtl"); }
+
+    #[test]
+    fn receiver_references() { check("structs/67_receiver_references.mtl"); }
 
     #[test]
     fn neg_missing_field() { check("structs/neg_12_missing_field.mtl"); }

@@ -32,6 +32,7 @@ fn type_expr_to_infer_in_context(
                 ("Bool",   0) => InferType::bool(),
                 ("String", 0) => InferType::str(),
                 ("Never",  0) => InferType::never(),
+                ("Array",  1) => InferType::Array(Box::new(arg_tys.into_iter().next().unwrap())),
                 _             => InferType::Named(name.clone(), arg_tys),
             }
         }
@@ -40,6 +41,12 @@ fn type_expr_to_infer_in_context(
             ts.iter().map(|t| type_expr_to_infer_in_context(t, generics, self_ty_name)).collect(),
         ),
         TypeExpr::Array(t) => InferType::Array(
+            Box::new(type_expr_to_infer_in_context(t, generics, self_ty_name)),
+        ),
+        TypeExpr::Pointer(t) => InferType::Pointer(
+            Box::new(type_expr_to_infer_in_context(t, generics, self_ty_name)),
+        ),
+        TypeExpr::MutPointer(t) => InferType::MutPointer(
             Box::new(type_expr_to_infer_in_context(t, generics, self_ty_name)),
         ),
         TypeExpr::Fun(ps, ret) => InferType::Fun(
@@ -107,6 +114,8 @@ pub(super) fn infer_type_to_type(ty: &InferType, span: &Span) -> Result<Type, Me
             Ok(Type::Tuple(t?))
         }
         InferType::Array(t) => Ok(Type::Array(Box::new(infer_type_to_type(t, span)?))),
+        InferType::Pointer(t) => Ok(Type::Pointer(Box::new(infer_type_to_type(t, span)?))),
+        InferType::MutPointer(t) => Ok(Type::MutPointer(Box::new(infer_type_to_type(t, span)?))),
         InferType::Named(name, args) => {
             let a: Result<Vec<_>, _> = args.iter().map(|a| infer_type_to_type(a, span)).collect();
             let args = a?;
@@ -128,6 +137,8 @@ pub(super) fn type_to_infer(ty: &Type) -> InferType {
         Type::Never          => InferType::Never,
         Type::Array(t)       => InferType::Array(Box::new(type_to_infer(t))),
         Type::Tuple(ts)      => InferType::Tuple(ts.iter().map(type_to_infer).collect()),
+        Type::Pointer(t)     => InferType::Pointer(Box::new(type_to_infer(t))),
+        Type::MutPointer(t)  => InferType::MutPointer(Box::new(type_to_infer(t))),
         Type::Fun(ps, ret)   => InferType::Fun(
             ps.iter().map(type_to_infer).collect(),
             Box::new(type_to_infer(ret)),

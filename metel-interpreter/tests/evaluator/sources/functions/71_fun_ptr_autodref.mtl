@@ -1,0 +1,113 @@
+// ── Auto-deref for function pointer calls ─────────────────────────────────────
+
+// Calling *() -> T directly (no explicit (*ptr)() needed)
+fun test_immutable_fun_ptr_call() {
+    let f = () -> { return 42; };
+    let ptr = &f;
+    assert(ptr() == 42);
+}
+
+// *mut () -> T is also auto-deref callable
+fun test_mutable_fun_ptr_call() {
+    let mut x = 0;
+    let p = &mut x;
+    let inc = () -> { *p += 7; };
+    let mut_ptr = &mut inc;
+    mut_ptr();
+    assert(x == 7);
+}
+
+// Function taking *() -> T and calling it directly
+fun call_via_ptr(f: *() -> Int) -> Int {
+    return f();
+}
+
+fun test_fun_ptr_param() {
+    let f = () -> { return 99; };
+    assert(call_via_ptr(&f) == 99);
+}
+
+// Array<*() -> ()> — iteration and call via auto-deref
+fun apply_ptrs(fns: Array<*() -> ()>) {
+    for (let f in fns) {
+        f();
+    }
+}
+
+fun test_array_of_fun_ptrs() {
+    let mut total = 0;
+    let ptr = &mut total;
+    let add1 = () -> { *ptr += 1; };
+    let add10 = () -> { *ptr += 10; };
+    apply_ptrs([&add1, &add10]);
+    assert(total == 11);
+}
+
+// ── Closures capturing function pointers ──────────────────────────────────────
+
+// A closure that captures a *() -> () variable and calls it.
+// Before auto-deref, this required (*inc_ptr)() inside the outer closure.
+fun test_closure_captures_fun_ptr() {
+    let mut x = 0;
+    let p = &mut x;
+    let inc = () -> { *p += 1; };
+    let inc_ptr = &inc;              // type: *() -> ()
+    let double_via_ptr = () -> {
+        inc_ptr();                   // auto-deref: calls the captured pointer
+        inc_ptr();
+    };
+    double_via_ptr();
+    assert(x == 2);
+}
+
+// Same pattern, but the pointer is *mut () -> ()
+fun test_closure_captures_mut_fun_ptr() {
+    let mut x = 0;
+    let p = &mut x;
+    let add5 = () -> { *p += 5; };
+    let mut ptr = &mut add5;
+    let triple = () -> {
+        ptr();
+        ptr();
+        ptr();
+    };
+    triple();
+    assert(x == 15);
+}
+
+// ── Closure capture-by-value semantics ────────────────────────────────────────
+
+// Closures capture variables BY VALUE at creation time.
+// Mutations inside the closure do not affect the outer binding.
+fun test_capture_by_value() {
+    let mut x = 0;
+    let f = () -> { x += 1; };
+    f();
+    f();
+    f();
+    // x in this scope is unchanged — f modified its own captured copy
+    assert(x == 0);
+}
+
+// Using *mut explicitly shares the mutation back to the outer scope.
+fun test_capture_via_pointer_propagates() {
+    let mut x = 0;
+    let ptr = &mut x;
+    let f = () -> { *ptr += 1; };
+    f();
+    f();
+    f();
+    // Mutation is visible because it went through the shared pointer
+    assert(x == 3);
+}
+
+fun main() {
+    test_immutable_fun_ptr_call();
+    test_mutable_fun_ptr_call();
+    test_fun_ptr_param();
+    test_array_of_fun_ptrs();
+    test_closure_captures_fun_ptr();
+    test_closure_captures_mut_fun_ptr();
+    test_capture_by_value();
+    test_capture_via_pointer_propagates();
+}

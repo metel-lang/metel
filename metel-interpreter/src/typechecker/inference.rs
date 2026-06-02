@@ -589,6 +589,12 @@ fn infer_expr(
         }
         Expr::Call { callee, args, span } => {
             let callee_ty = infer_expr(callee, ctx, fun_generalizations)?;
+            // Auto-deref: *(() -> T) and *mut (() -> T) are callable directly.
+            let callee_ty = match ctx.solve()?.apply(&callee_ty) {
+                InferType::Pointer(inner) | InferType::MutPointer(inner)
+                    if matches!(*inner, InferType::Fun(..)) => *inner,
+                _ => callee_ty,
+            };
             let arg_tys: Vec<InferType> = args.iter()
                 .map(|a| infer_expr(a, ctx, fun_generalizations))
                 .collect::<Result<_, _>>()?;
@@ -634,6 +640,19 @@ fn infer_expr(
                 AssignTarget::Ident(name, target_span) => {
                     ctx.lookup_for_write(name, target_span)?
                 }
+                AssignTarget::Deref { object, span: target_span } => {
+                    let obj_ty = infer_expr(object, ctx, fun_generalizations)?;
+                    match ctx.solve()?.apply(&obj_ty) {
+                        InferType::Pointer(inner) | InferType::MutPointer(inner) => *inner,
+                        other => {
+                            return Err(MetelError::type_error(
+                                TypeErrorCode::T0002,
+                                format!("cannot assign through non-pointer type `{other}`"),
+                                target_span,
+                            ));
+                        }
+                    }
+                }
                 AssignTarget::Index { object, index, span: target_span } => {
                     let obj_ty   = infer_expr(object, ctx, fun_generalizations)?;
                     let idx_ty   = infer_expr(index,  ctx, fun_generalizations)?;
@@ -668,7 +687,14 @@ fn infer_expr(
                 "cannot infer struct type for field access; add a type annotation",
                 span,
             ))?;
-            let type_args = if let InferType::Named(_, args) = &obj_ty { args.clone() } else { vec![] };
+            let type_args = match &obj_ty {
+                InferType::Named(_, args) => args.clone(),
+                InferType::Pointer(inner) | InferType::MutPointer(inner) => match inner.as_ref() {
+                    InferType::Named(_, args) => args.clone(),
+                    _ => vec![],
+                },
+                _ => vec![],
+            };
             let fields = ctx.get_struct_fields(&struct_name)
                 .ok_or_else(|| MetelError::type_error(
                     TypeErrorCode::T0003,
@@ -709,10 +735,13 @@ fn infer_expr(
 
             // Fast path: concrete named type — look up method as usual.
             if let Some(struct_name) = named_type_name(&recv_ty) {
-                let recv_type_args = if let InferType::Named(_, args) = &recv_ty {
-                    args.clone()
-                } else {
-                    vec![]
+                let recv_type_args = match &recv_ty {
+                    InferType::Named(_, args) => args.clone(),
+                    InferType::Pointer(inner) | InferType::MutPointer(inner) => match inner.as_ref() {
+                        InferType::Named(_, args) => args.clone(),
+                        _ => vec![],
+                    },
+                    _ => vec![],
                 };
 
                 // Try concrete method_env first; fall back to method_scheme_env for generic structs.
@@ -735,12 +764,26 @@ fn infer_expr(
                     ));
                 };
 
+                if matches!(
+                    ctx.get_method_receiver_kind(&struct_name, method),
+                    Some(crate::ast::ReceiverKind::RefMut)
+                ) && !matches!(recv_ty, InferType::MutPointer(_))
+                {
+                    if let Expr::Ident(name, recv_span) = receiver.as_ref() {
+                        let _ = ctx.lookup_for_write(name, recv_span)?;
+                    }
+                }
+
                 let arg_tys: Vec<InferType> = args.iter()
                     .map(|a| infer_expr(a, ctx, fun_generalizations))
                     .collect::<Result<_, _>>()?;
                 let ret_var = ctx.fresh_var();
+                let receiver_ty_for_method = match &recv_ty {
+                    InferType::Pointer(inner) | InferType::MutPointer(inner) => *inner.clone(),
+                    _ => recv_ty.clone(),
+                };
                 let expected = InferType::Fun(
-                    std::iter::once(recv_ty).chain(arg_tys).collect(),
+                    std::iter::once(receiver_ty_for_method).chain(arg_tys).collect(),
                     Box::new(ret_var.clone()),
                 );
                 ctx.add_constraint(method_ty, expected, span.clone());
@@ -1012,6 +1055,7 @@ fn pattern_span(pattern: &Pattern) -> &Span {
 fn named_type_name(ty: &InferType) -> Option<String> {
     match ty {
         InferType::Named(name, _)         => Some(name.clone()),
+        InferType::Pointer(inner) | InferType::MutPointer(inner) => named_type_name(inner),
         InferType::Concrete(Type::Str)    => Some("String".to_string()),
         InferType::Concrete(Type::Int)    => Some("Int".to_string()),
         InferType::Concrete(Type::Float)  => Some("Float".to_string()),
@@ -1171,6 +1215,16 @@ fn infer_unaryop(
             ctx.add_constraint(ty, InferType::bool(), span.clone());
             Ok(InferType::bool())
         }
+        UnaryOp::Ref => Ok(InferType::Pointer(Box::new(ty))),
+        UnaryOp::RefMut => Ok(InferType::MutPointer(Box::new(ty))),
+        UnaryOp::Deref => match ctx.solve()?.apply(&ty) {
+            InferType::Pointer(inner) | InferType::MutPointer(inner) => Ok(*inner),
+            other => Err(MetelError::type_error(
+                TypeErrorCode::T0002,
+                format!("cannot dereference non-pointer type `{other}`"),
+                span,
+            )),
+        },
     }
 }
 
@@ -1336,7 +1390,14 @@ fn infer_field_assign_type(
             target_span,
         )
     })?;
-    let type_args = if let InferType::Named(_, args) = &obj_ty { args.clone() } else { vec![] };
+    let type_args = match &obj_ty {
+        InferType::Named(_, args) => args.clone(),
+        InferType::Pointer(inner) | InferType::MutPointer(inner) => match inner.as_ref() {
+            InferType::Named(_, args) => args.clone(),
+            _ => vec![],
+        },
+        _ => vec![],
+    };
     let fields = ctx.get_struct_fields(&struct_name)
         .ok_or_else(|| MetelError::type_error(
             TypeErrorCode::T0003,
@@ -1470,7 +1531,7 @@ pub(super) fn lower_impl_aspect(fun: &FunDecl, counter: &mut usize) -> FunDecl {
     let mut extra_generics: Vec<GenericParam> = Vec::new();
     let new_params: Vec<Param> = fun.params.iter().map(|p| {
         match &p.type_ann {
-            Some(TypeExpr::ImplAspect { bound, source_spell, .. }) => {
+            Some(TypeExpr::ImplAspect { bound, source_spell: _, .. }) => {
                 let anon_name = format!("_ImplT{}", counter);
                 *counter += 1;
                 extra_generics.push(GenericParam {
@@ -1479,6 +1540,7 @@ pub(super) fn lower_impl_aspect(fun: &FunDecl, counter: &mut usize) -> FunDecl {
                 });
                 Param {
                     mutable:  p.mutable,
+                    receiver: p.receiver.clone(),
                     name:     p.name.clone(),
                     type_ann: Some(TypeExpr::Named(anon_name, vec![])),
                     // Store source spelling as a tag in the span source (best-effort).

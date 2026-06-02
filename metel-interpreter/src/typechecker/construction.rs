@@ -646,6 +646,12 @@ fn construct_expr(
             let typed_obj = construct_expr(object, None, ctx)?;
             let (struct_name, type_args) = match typed_obj.ty() {
                 Type::Named(name, args) => (name.clone(), args.clone()),
+                Type::Pointer(inner) | Type::MutPointer(inner) => match inner.as_ref() {
+                    Type::Named(name, args) => (name.clone(), args.clone()),
+                    t => return Err(MetelError::internal(
+                        format!("field access on non-struct pointer target {t}")
+                    )),
+                },
                 t => return Err(MetelError::internal(
                     format!("field access on non-struct type {t}")
                 )),
@@ -682,6 +688,12 @@ fn construct_expr(
             let typed_receiver = construct_expr(receiver, None, ctx)?;
             let (struct_name, receiver_type_args) = match typed_receiver.ty() {
                 Type::Named(name, targs) => (name.clone(), targs.clone()),
+                Type::Pointer(inner) | Type::MutPointer(inner) => match inner.as_ref() {
+                    Type::Named(name, targs) => (name.clone(), targs.clone()),
+                    t => return Err(MetelError::internal(
+                        format!("method call on non-struct pointer target {t}")
+                    )),
+                },
                 Type::Str   => ("String".to_string(), vec![]),
                 Type::Int   => ("Int".to_string(),    vec![]),
                 Type::Float => ("Float".to_string(),  vec![]),
@@ -1317,7 +1329,13 @@ fn construct_call(
         }
     };
 
-    match &fun_ty {
+    // Auto-deref: calling through a *Fun or *mut Fun is allowed.
+    let fun_ty_inner = match &fun_ty {
+        Type::Pointer(inner) | Type::MutPointer(inner)
+            if matches!(inner.as_ref(), Type::Fun(..)) => inner.as_ref(),
+        other => other,
+    };
+    match fun_ty_inner {
         Type::Fun(params, ret) => {
             if params.len() != typed_args.len() {
                 return Err(MetelError::type_error(
@@ -1493,6 +1511,8 @@ fn type_to_type_expr(ty: &Type) -> TypeExpr {
         Type::Never => TypeExpr::Named("!".to_string(), vec![]),
         Type::Tuple(items) => TypeExpr::Tuple(items.iter().map(type_to_type_expr).collect()),
         Type::Array(item) => TypeExpr::Array(Box::new(type_to_type_expr(item))),
+        Type::Pointer(item) => TypeExpr::Pointer(Box::new(type_to_type_expr(item))),
+        Type::MutPointer(item) => TypeExpr::MutPointer(Box::new(type_to_type_expr(item))),
         Type::Fun(params, ret) => TypeExpr::Fun(
             params.iter().map(type_to_type_expr).collect(),
             Some(Box::new(type_to_type_expr(ret))),
@@ -1624,6 +1644,18 @@ fn construct_unaryop(
             t.clone()
         }
         UnaryOp::Not => Type::Bool,
+        UnaryOp::Ref => Type::Pointer(Box::new(operand.ty().clone())),
+        UnaryOp::RefMut => Type::MutPointer(Box::new(operand.ty().clone())),
+        UnaryOp::Deref => match operand.ty() {
+            Type::Pointer(inner) | Type::MutPointer(inner) => *inner.clone(),
+            t => {
+                return Err(MetelError::type_error(
+                    TypeErrorCode::T0002,
+                    format!("cannot dereference non-pointer type `{t}`"),
+                    span,
+                ));
+            }
+        },
     };
     Ok(TypedExpr::UnaryOp(op.clone(), Box::new(operand), ty, span.clone()))
 }
