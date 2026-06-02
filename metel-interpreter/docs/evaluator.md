@@ -37,8 +37,8 @@ pub enum Value {
     Enum   { name: String, variant: String, fields: HashMap<String, Value> },
     Closure(Rc<ClosureValue>),
     Builtin(String, fn(Vec<Value>, &Span) -> Result<Value, MetelError>),
-    Pointer(Rc<RefCell<Value>>),        // RFC-0001 placeholder — never constructed
-    MutPointer(Rc<RefCell<Value>>),     // RFC-0001 placeholder — never constructed
+    Pointer(Rc<RefCell<Value>>),        // shared immutable reference — &expr (RFC-0043)
+    MutPointer(Rc<RefCell<Value>>),     // shared mutable reference — &mut expr (RFC-0043)
 }
 ```
 
@@ -181,6 +181,23 @@ Anonymous closures appear as `<closure>`. The call stack is cleared at the start
 
 ---
 
+## Assignment and Typed Places
+
+Assignment targets are represented as `TypedPlace` (introduced in METEL-106, v0.7.0) rather than raw `AssignTarget` from the untyped AST. This ensures every sub-expression in an assignment target — including index expressions — is fully type-checked before the evaluator runs, so `arr[i + 1] = v` works correctly without re-entering the untyped evaluator.
+
+```
+TypedPlace::Ident(name)              — bare variable
+TypedPlace::Deref { object }         — *expr (pointer write-through)
+TypedPlace::Field { object, field }  — place.field  (pure field chain, root must be Ident)
+TypedPlace::Index { object, index }  — place[typed_expr]
+```
+
+`lvalue.rs` provides:
+- `eval_typed_place_value` — evaluates a place to get its current `Value` (used to retrieve the array `Rc` for index mutation)
+- `extract_typed_place_field_path` — walks a `Field` chain down to a root identifier and a list of field names
+
+Index mutation works by calling `eval_typed_place_value` on the receiver to get `Value::Array(rc)`, evaluating the index expression with `eval_expr`, then mutating through the shared `Rc<RefCell<Vec<Value>>>`. This preserves shared-reference semantics: if two bindings hold the same array Rc, mutation through either is visible via both.
+
 ## Function Call Dispatch
 
 `call_function(func, args, span)` handles three cases:
@@ -201,9 +218,9 @@ Generic functions and let-polymorphic closures re-run the construction pass at e
 
 ### `call_function_mut_self` — non-standard calling convention for iterators
 
-`call_function_mut_self` returns `(Signal, updated_self)` instead of just `Signal`. This exists because the language currently has no mutable references — when `next(&mut self)` is called on a user-defined iterator, mutations to `self` are local to the call frame and invisible to the caller. Returning `updated_self` threads the mutated iterator forward to the next loop iteration.
+`call_function_mut_self` returns `(Signal, updated_self)` instead of just `Signal`. This exists for the `for-in` loop path where `next(&mut self)` is called on a user-defined iterator: the `Iterable` aspect uses value-typed `self`, so mutations inside `next` are local to the call frame. Returning `updated_self` threads the mutated iterator state forward to the next loop iteration.
 
-This function goes away when RFC-0001 (memory model with mutable references) is implemented. At that point, `next` can take `&mut self` and mutate in place, and `eval_for_in` can call `call_function` directly.
+> *Note:* RFC-0044 (explicit receiver semantics, v0.7.0) introduced general `&self` / `&mut self` dispatch via `call.rs`. `call_function_mut_self` remains only for the `for-in` iterator path because `Iterable::next` takes value `self` (not `&mut self`) by the aspect definition. If `Iterable` is revised to use `&mut self`, this function can be removed.
 
 ### Cross-module mutual recursion is not supported (#189)
 

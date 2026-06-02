@@ -82,6 +82,7 @@ pub(super) fn extract_lvalue_path<'a>(
 
 /// Walk a `TypedPlace::Field` chain down to its root identifier, collecting the
 /// field names in order (including `final_field`).
+/// Field-chain-only; index steps in the path are not supported (see ADR-0035).
 /// Returns an error if any intermediate step is not a plain field or identifier
 /// (e.g. an index step), which is not yet supported for field-chain mutation.
 pub(super) fn extract_typed_place_field_path<'a>(

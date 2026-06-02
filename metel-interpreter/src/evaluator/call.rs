@@ -6,6 +6,9 @@ use crate::error::{MetelError, RuntimeErrorCode};
 
 use super::{ClosureBody, Signal, Value, attach_stack, eval_block, eval_untyped_block, pop_frame, push_frame};
 
+/// How the receiver is bound into the callee's environment.
+/// `Value` → cloned (value/&self receivers); `Shared` → Rc shared (mut self / &mut self).
+/// See ADR-0036 for the dispatch design.
 pub(super) enum ReceiverBinding {
     Value(Value),
     Shared(Rc<RefCell<Value>>),
