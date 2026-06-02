@@ -163,14 +163,14 @@ fun main() {
     // StringBag Iterable: concatenate labels
     let bag = StringBag::new(["a", "b", "c"]);
     assert(bag.len() == 3);
-    mut result = "";
+    let mut result = "";
     for (let label in bag) {
         result = string_concat(result, label);
     }
     assert(result == "abc");
 
     // Empty StringBag
-    mut empty_ran = false;
+    let mut empty_ran = false;
     let empty_strs: String[] = [];
     for (let _label in StringBag::new(empty_strs)) { empty_ran = true; }
     assert(!empty_ran);

@@ -3,7 +3,7 @@
 // Plain `=` and all compound operators on mut bindings.
 
 fun counter() {
-    mut n = 0;
+    let mut n = 0;
     n = 10;
     n += 5;
     n -= 3;
@@ -13,18 +13,18 @@ fun counter() {
 }
 
 fun accumulate(start: Int) -> Int {
-    mut total = start;
+    let mut total = start;
     total += 100;
     total += 200;
     total
 }
 
 fun reassign_string() {
-    mut s: String = "hello";
+    let mut s: String  = "hello";
     s = "world";
 }
 
 fun reassign_bool() {
-    mut flag = true;
+    let mut flag = true;
     flag = false;
 }

@@ -74,7 +74,7 @@ fun main() {
     println(float_to_string(p.x));      // 3.0
 
     // --- mut self method ---
-    mut q = Point::new(0.0, 0.0);
+    let mut q = Point::new(0.0, 0.0);
     q.translate(5.0, 7.0);
     println(q.to_string());             // (5.0, 7.0)
 
@@ -87,7 +87,7 @@ fun main() {
     println(pair.describe());           // 42 -> hello
 
     // --- counter with mut self ---
-    mut ctr = Counter::new();
+    let mut ctr = Counter::new();
     ctr.increment();
     ctr.increment();
     ctr.increment();

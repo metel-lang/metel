@@ -1,6 +1,6 @@
 fun main() {
     // Early return exits main cleanly; the division never executes.
-    mut i = 0;
+    let mut i = 0;
     while (true) {
         if (i == 3) { return; }
         i = i + 1;

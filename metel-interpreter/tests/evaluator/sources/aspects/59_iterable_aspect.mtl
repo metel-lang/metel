@@ -27,7 +27,7 @@ impl Iterable<Int> for Counter {
 }
 
 fun main() {
-    mut sum = 0;
+    let mut sum = 0;
     let c = Counter::new(5);
     for (let x in c) {
         sum += x;

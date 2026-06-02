@@ -25,7 +25,7 @@ fun main() {
     assert("\${value}" == "\${value}");
     assert("$5" == "$5");
     // array_len and array_push
-    mut arr = [10, 20, 30];
+    let mut arr = [10, 20, 30];
     assert(array_len(arr) == 3);
     array_push(arr, 40);
     assert(array_len(arr) == 4);
@@ -36,8 +36,8 @@ fun main() {
     assert(array_len(arr) == 6);
     assert(arr[5] == 60);
     // Building an array from scratch with push.
-    mut built: Int[] = [];
-    mut i = 1;
+    let mut built: Int[]  = [];
+    let mut i = 1;
     while (i <= 5) {
         array_push(built, i * i);
         i += 1;

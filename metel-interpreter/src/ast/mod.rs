@@ -277,6 +277,7 @@ pub struct ForStmt {
 
 #[derive(Debug, Clone)]
 pub enum ForInit {
+    Let(LetDecl),
     Mut(MutDecl),
     Expr(Expr),
 }
@@ -284,6 +285,7 @@ pub enum ForInit {
 #[derive(Debug, Clone)]
 pub struct ForInStmt {
     pub binding:  String,
+    pub mutable:  bool,
     pub iterable: Expr,
     pub body:     Block,
     pub span:     Span,

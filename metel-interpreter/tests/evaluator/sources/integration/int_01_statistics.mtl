@@ -22,8 +22,8 @@ fun sqrt_approx(x: Float) -> Float {
     if (x <= 0.0) {
         0.0
     } else {
-        mut guess = x / 2.0;
-        mut i = 0;
+        let mut guess = x / 2.0;
+        let mut i = 0;
         while (i < 20) {
             guess = (guess + x / guess) / 2.0;
             i += 1;
@@ -40,12 +40,12 @@ fun int_max(a: Int, b: Int) -> Int {
 
 // Bubble sort — returns a sorted copy of the input array.
 fun sort_floats(arr: Float[]) -> Float[] {
-    mut s: Float[] = [];
+    let mut s: Float[]  = [];
     for (let x in arr) { array_push(s, x); }
     let n = array_len(s);
-    mut i = 0;
+    let mut i = 0;
     while (i < n) {
-        mut j = 0;
+        let mut j = 0;
         while (j < n - i - 1) {
             let jp1 = j + 1;
             if (s[j] > s[jp1]) {
@@ -65,8 +65,8 @@ fun sort_floats(arr: Float[]) -> Float[] {
 // Binary search in a sorted Float[].  Returns Perhaps<Int> with the index.
 fun binary_search(sorted: Float[], target: Float) -> Perhaps<Int> {
     if (array_len(sorted) == 0) { return None; }
-    mut lo = 0;
-    mut hi = array_len(sorted) - 1;
+    let mut lo = 0;
+    let mut hi = array_len(sorted) - 1;
     while (lo <= hi) {
         let mid = (lo + hi) / 2;
         if (float_eq(sorted[mid], target)) {
@@ -114,10 +114,10 @@ fun compute_stats(data: Float[]) -> Result<Stats, String> {
     if (n == 0) {
         return Result::Err { error: "empty dataset" };
     }
-    mut total = 0.0;
-    mut mn    = data[0];
-    mut mx    = data[0];
-    mut i     = 0;
+    let mut total = 0.0;
+    let mut mn = data[0];
+    let mut mx = data[0];
+    let mut i = 0;
     while (i < n) {
         let x = data[i];
         total += x;
@@ -126,8 +126,8 @@ fun compute_stats(data: Float[]) -> Result<Stats, String> {
         i += 1;
     }
     let mean = total / (n as Float);
-    mut var_sum = 0.0;
-    mut j = 0;
+    let mut var_sum = 0.0;
+    let mut j = 0;
     while (j < n) {
         let xj = data[j];
         let d  = xj - mean;
@@ -169,13 +169,13 @@ fun z_score(data: Float[], value: Float) -> Result<Float, String> {
 // ── Higher-order functions ────────────────────────────────────────────────────
 
 fun sum_floats(data: Float[]) -> Float {
-    mut acc = 0.0;
+    let mut acc = 0.0;
     for (let x in data) { acc += x; }
     acc
 }
 
 fun count_if(data: Float[], pred: (Float) -> Bool) -> Int {
-    mut cnt = 0;
+    let mut cnt = 0;
     for (let x in data) {
         if (pred(x)) { cnt += 1; }
     }
@@ -183,13 +183,13 @@ fun count_if(data: Float[], pred: (Float) -> Bool) -> Int {
 }
 
 fun map_floats(data: Float[], f: (Float) -> Float) -> Float[] {
-    mut out: Float[] = [];
+    let mut out: Float[]  = [];
     for (let x in data) { array_push(out, f(x)); }
     out
 }
 
 fun filter_floats(data: Float[], pred: (Float) -> Bool) -> Float[] {
-    mut out: Float[] = [];
+    let mut out: Float[]  = [];
     for (let x in data) {
         if (pred(x)) { array_push(out, x); }
     }
@@ -198,8 +198,8 @@ fun filter_floats(data: Float[], pred: (Float) -> Bool) -> Float[] {
 
 // Prefix sums: out[i] = data[0] + ... + data[i].
 fun running_sums(data: Float[]) -> Float[] {
-    mut out: Float[] = [];
-    mut acc = 0.0;
+    let mut out: Float[]  = [];
+    let mut acc = 0.0;
     for (let x in data) {
         acc += x;
         array_push(out, acc);
@@ -209,8 +209,8 @@ fun running_sums(data: Float[]) -> Float[] {
 
 // Build an Int[] of squares using a C-style for loop.
 fun squares_up_to(n: Int) -> Int[] {
-    mut out: Int[] = [];
-    for (mut i = 1; i <= n; i += 1) {
+    let mut out: Int[]  = [];
+    for (let mut i = 1; i <= n; i += 1) {
         array_push(out, i * i);
     }
     out
@@ -357,7 +357,7 @@ fun main() {
     assert(sq5[4] == 25);
 
     // 12. Range for-in: sum 0..10 = 45.
-    mut range_sum = 0;
+    let mut range_sum = 0;
     for (let i in 0..10) { range_sum += i; }
     assert(range_sum == 45);
 

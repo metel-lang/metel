@@ -173,6 +173,7 @@ pub struct TypedForStmt {
 
 #[derive(Debug, Clone)]
 pub enum TypedForInit {
+    Let(TypedLetDecl),
     Mut(TypedMutDecl),
     Expr(TypedExpr),
 }
@@ -180,6 +181,7 @@ pub enum TypedForInit {
 #[derive(Debug, Clone)]
 pub struct TypedForInStmt {
     pub binding:  String,
+    pub mutable:  bool,
     pub iterable: TypedExpr,
     pub body:     TypedBlock,
     pub span:     Span,

@@ -132,12 +132,12 @@ fun main() {
     // Iterable<Int>: sum of [1,2,3,4,5]
     let list = NumberList::new([1, 2, 3, 4, 5]);
     assert(list.len() == 5);
-    mut total = 0;
+    let mut total = 0;
     for (let x in list) { total += x; }
     assert(total == 15);
 
     // Empty NumberList: loop body never runs
-    mut ran = false;
+    let mut ran = false;
     let empty_ints: Int[] = [];
     for (let _x in NumberList::new(empty_ints)) { ran = true; }
     assert(!ran);
@@ -179,7 +179,7 @@ fun main() {
 
     // Iterable with doubles accumulated
     let list2 = NumberList::new([10, 20, 30]);
-    mut doubled_sum = 0;
+    let mut doubled_sum = 0;
     for (let x in list2) { doubled_sum += x * 2; }
     assert(doubled_sum == 120);
 

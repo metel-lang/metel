@@ -1,18 +1,18 @@
 fun main() {
     // Basic counting.
-    mut sum = 0;
-    for (mut i = 0; i < 5; i += 1) { sum += i; }
+    let mut sum = 0;
+    for (let mut i = 0; i < 5; i += 1) { sum += i; }
     assert(sum == 10);
     // Break exits the loop.
-    mut count = 0;
-    for (mut i = 0; i < 100; i += 1) {
+    let mut count = 0;
+    for (let mut i = 0; i < 100; i += 1) {
         if (i == 5) { break; }
         count += 1;
     }
     assert(count == 5);
     // Continue still executes the step expression.
-    mut c2 = 0;
-    for (mut i = 0; i < 5; i += 1) {
+    let mut c2 = 0;
+    for (let mut i = 0; i < 5; i += 1) {
         if (i == 2) { continue; }
         c2 += 1;
     }

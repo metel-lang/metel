@@ -26,8 +26,8 @@ impl Stack<Int> {
         }
         let top = self.items[len - 1];
         // rebuild without last element
-        mut new_items: Int[] = [];
-        mut i = 0;
+        let mut new_items: Int[]  = [];
+        let mut i = 0;
         while (i < len - 1) {
             array_push(new_items, self.items[i]);
             i += 1;
@@ -113,7 +113,7 @@ impl Task {
 }
 
 fun count_done(tasks: Task[]) -> Int {
-    mut n = 0;
+    let mut n = 0;
     for (let t in tasks) {
         if (t.done) { n += 1; }
     }
@@ -126,7 +126,7 @@ fun count_done(tasks: Task[]) -> Int {
 
 fun main() {
     // --- Stack ---
-    mut s = Stack::new();
+    let mut s = Stack::new();
     println(bool_to_string(s.is_empty()));   // true
 
     s.push(10);
@@ -167,8 +167,8 @@ fun main() {
         Token::Number { value: 5 },
     ];
 
-    mut token_str = "";
-    mut first = true;
+    let mut token_str = "";
+    let mut first = true;
     for (let tok in tokens) {
         if (!first) { token_str = token_str + " "; }
         token_str = token_str + token_to_string(tok);
@@ -177,7 +177,7 @@ fun main() {
     println(token_str);   // 3 * 4 + 5
 
     // --- Tasks ---
-    mut tasks: Task[] = [
+    let mut tasks: Task[]  = [
         Task::new("Write interpreter", Priority::High),
         Task::new("Write tests", Priority::High),
         Task::new("Update docs", Priority::Medium),
@@ -203,7 +203,7 @@ fun main() {
     // --- closures + arrays together ---
     let multipliers: Int[] = [1, 2, 3, 4, 5];
     let base = 7;
-    mut products: Int[] = [];
+    let mut products: Int[]  = [];
     for (let m in multipliers) {
         array_push(products, m * base);
     }

@@ -12,7 +12,7 @@
 
 use std::collections::HashSet;
 
-use crate::ast::{Block, Decl, Expr, ForInit, FunDecl, ImplBlock, MatchArm, MutDecl, Stmt};
+use crate::ast::{Block, Decl, Expr, ForInit, FunDecl, ImplBlock, LetDecl, MatchArm, MutDecl, Stmt};
 use crate::error::MetelError;
 use crate::module_loader::{LoadedModule, ModuleGraph};
 use crate::name_resolver::{ModuleScope, ResolvedNames};
@@ -131,6 +131,7 @@ fn normalize_stmt(
             if let Some(init) = &mut f.init {
                 match init {
                     ForInit::Expr(e) => normalize_expr(e, scope, module_names)?,
+                    ForInit::Let(ld) => normalize_let_decl(ld, scope, module_names)?,
                     ForInit::Mut(md) => normalize_mut_decl(md, scope, module_names)?,
                 }
             }
@@ -151,6 +152,14 @@ fn normalize_mut_decl(
     module_names: &HashSet<String>,
 ) -> Result<(), MetelError> {
     normalize_expr(&mut md.value, scope, module_names)
+}
+
+fn normalize_let_decl(
+    ld: &mut LetDecl,
+    scope: Option<&ModuleScope>,
+    module_names: &HashSet<String>,
+) -> Result<(), MetelError> {
+    normalize_expr(&mut ld.value, scope, module_names)
 }
 
 fn normalize_expr(

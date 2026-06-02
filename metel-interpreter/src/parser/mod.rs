@@ -150,7 +150,7 @@ fn parse_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Decl,
         .ok_or_else(|| MetelError::internal("decl: missing inner rule"))?;
     match inner.as_rule() {
         Rule::let_decl    => Ok(Decl::Let(parse_let_decl(inner, filename)?)),
-        Rule::mut_decl    => Ok(Decl::Mut(parse_mut_decl(inner, filename)?)),
+        Rule::let_mut_decl => Ok(Decl::Mut(parse_mut_decl(inner, filename)?)),
         Rule::fun_decl    => Ok(Decl::Fun(parse_fun_decl(inner, filename)?)),
         Rule::struct_decl => Ok(Decl::Struct(parse_struct_decl(inner, filename)?)),
         Rule::enum_decl   => Ok(Decl::Enum(parse_enum_decl(inner, filename)?)),
@@ -174,9 +174,16 @@ fn parse_let_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<L
 fn parse_mut_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<MutDecl, MetelError> {
     let span = Span::of(&pair, filename);
     let mut inner = pair.into_inner();
-    let name = inner.next()
-        .ok_or_else(|| MetelError::internal("mut_decl: expected identifier"))?
-        .as_str().to_string();
+    let first = inner.next()
+        .ok_or_else(|| MetelError::internal("mut_decl: expected identifier"))?;
+    let name = if first.as_rule() == Rule::mut_kw {
+        inner.next()
+            .ok_or_else(|| MetelError::internal("mut_decl: expected identifier after mut"))?
+            .as_str()
+            .to_string()
+    } else {
+        first.as_str().to_string()
+    };
     let (type_ann, value) = parse_opt_type_then_expr(&mut inner, filename)?;
     Ok(MutDecl { name, type_ann, value, span })
 }
@@ -492,7 +499,8 @@ fn parse_for_stmt(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<F
     let init = if init_pair.as_rule() == Rule::for_init {
         match init_pair.into_inner().next() {
             Some(p) => match p.as_rule() {
-                Rule::mut_decl  => Some(ForInit::Mut(parse_mut_decl(p, filename)?)),
+                Rule::let_decl  => Some(ForInit::Let(parse_let_decl(p, filename)?)),
+                Rule::let_mut_decl => Some(ForInit::Mut(parse_mut_decl(p, filename)?)),
                 Rule::expr_stmt => {
                     let ep = p.into_inner().next()
                         .ok_or_else(|| MetelError::internal("for_stmt: expected expr in expr_stmt"))?;
@@ -1001,6 +1009,10 @@ fn shift_stmt_span(stmt: &mut Stmt, base_start: usize, base_line: u32, base_col:
         Stmt::For(fs) => {
             if let Some(init) = &mut fs.init {
                 match init {
+                    ForInit::Let(ld) => {
+                        shift_expr_span(&mut ld.value, base_start, base_line, base_col);
+                        shift_span(&mut ld.span, base_start, base_line, base_col);
+                    }
                     ForInit::Mut(md) => {
                         shift_expr_span(&mut md.value, base_start, base_line, base_col);
                         shift_span(&mut md.span, base_start, base_line, base_col);
@@ -1667,9 +1679,16 @@ fn parse_type_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<
 fn parse_for_in_stmt(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<ForInStmt, MetelError> {
     let span = Span::of(&pair, filename);
     let mut inner = pair.into_inner();
-    let binding  = inner.next()
-        .ok_or_else(|| MetelError::internal("for_in: expected binding name"))?
-        .as_str().to_string();
+    let first = inner.next()
+        .ok_or_else(|| MetelError::internal("for_in: expected binding"))?;
+    let (mutable, binding) = if first.as_rule() == Rule::ident {
+        (false, first.as_str().to_string())
+    } else {
+        let name = inner.next()
+            .ok_or_else(|| MetelError::internal("for_in: expected binding name after mut"))?
+            .as_str().to_string();
+        (true, name)
+    };
     let iterable = parse_expr(
         inner.next().ok_or_else(|| MetelError::internal("for_in: expected iterable expression"))?,
         filename,
@@ -1678,7 +1697,7 @@ fn parse_for_in_stmt(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resul
         inner.next().ok_or_else(|| MetelError::internal("for_in: expected body block"))?,
         filename,
     )?;
-    Ok(ForInStmt { binding, iterable, body, span })
+    Ok(ForInStmt { binding, mutable, iterable, body, span })
 }
 
 fn parse_block(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Block, MetelError> {

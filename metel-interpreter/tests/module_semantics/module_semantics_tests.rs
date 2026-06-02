@@ -394,7 +394,7 @@ fn private_struct_field_assignment_across_modules_is_t0009() {
     let main = dir.join("main.mtl");
     write(
         &main,
-        "import token::make;\nfun main() -> Int { mut t = make(); t.offset = 9; return t.kind; }\n",
+        "import token::make;\nfun main() -> Int { let mut t = make(); t.offset = 9; return t.kind; }\n",
     );
     write(
         &dir.join("token.mtl"),
@@ -649,8 +649,8 @@ fn std_core_builtins_available_in_each_module_without_import() {
         &dir.join("helper.mtl"),
         "pub fun sum(arr: Int[]) -> Int {\
          \n    assert(array_len(arr) > 0);\
-         \n    mut total = 0;\
-         \n    mut i = 0;\
+         \n    let mut total = 0;\
+         \n    let mut i = 0;\
          \n    while (i < array_len(arr)) { total += arr[i]; i += 1; }\
          \n    return total;\
          \n}\n",
@@ -711,7 +711,7 @@ fn multi_module_perhaps_and_result_without_explicit_std_import() {
     write(
         &dir.join("finder.mtl"),
         "pub fun find_first_positive(arr: Int[]) -> Perhaps<Int> {\
-         \n    mut i = 0;\
+         \n    let mut i = 0;\
          \n    while (i < array_len(arr)) {\
          \n        if (arr[i] > 0) { return Perhaps::Some { value: arr[i] }; }\
          \n        i += 1;\
@@ -892,7 +892,7 @@ pub struct ValidationError { pub message: String }
         &dir.join("utils.mtl"),
         r#"
 pub fun filter_array<T>(arr: T[], pred: (T) -> Bool) -> T[] {
-    mut out: T[] = [];
+    let mut out: T[]  = [];
     for (let x in arr) {
         if (pred(x)) { array_push(out, x); }
     }
@@ -900,13 +900,13 @@ pub fun filter_array<T>(arr: T[], pred: (T) -> Bool) -> T[] {
 }
 
 pub fun map_array<T, U>(arr: T[], f: (T) -> U) -> U[] {
-    mut out: U[] = [];
+    let mut out: U[]  = [];
     for (let x in arr) { array_push(out, f(x)); }
     out
 }
 
 pub fun fold_left<T, A>(arr: T[], init: A, f: (A, T) -> A) -> A {
-    mut acc = init;
+    let mut acc = init;
     for (let x in arr) {
         acc = f(acc, x);
     }
@@ -921,7 +921,7 @@ pub fun find_first<T>(arr: T[], pred: (T) -> Bool) -> Perhaps<T> {
 }
 
 pub fun sum_ints(arr: Int[]) -> Int {
-    mut total = 0;
+    let mut total = 0;
     for (let x in arr) { total += x; }
     total
 }
@@ -950,7 +950,7 @@ pub fun total_effort(tasks: Task[]) -> Int {
 }
 
 pub fun open_task_count(tasks: Task[]) -> Int {
-    mut count = 0;
+    let mut count = 0;
     for (let t in tasks) {
         match t.status {
             Status::Open       => { count += 1; },
@@ -988,7 +988,7 @@ pub fun find_by_title(tasks: Task[], title: String) -> Perhaps<Task> {
 pub fun compute_completion_pct(tasks: Task[]) -> Int {
     let n = array_len(tasks);
     if (n == 0) { return 0; }
-    mut done = 0;
+    let mut done = 0;
     for (let t in tasks) {
         if (is_done(t)) { done += 1; }
     }
@@ -1111,16 +1111,16 @@ fun main() {
     assert(array_len(heavy) == 3);
 
     // 15. C-style for: manual effort accumulation
-    mut manual_sum = 0;
-    for (mut i = 0; i < array_len(tasks); i += 1) {
+    let mut manual_sum = 0;
+    for (let mut i = 0; i < array_len(tasks); i += 1) {
         manual_sum += tasks[i].effort;
     }
     assert(manual_sum == 15);
 
     // 16. while loop: count high-priority non-done tasks
     // t1(High,Open) and t5(High,InProgress) qualify; t3(High,Done) does not
-    mut hp_active = 0;
-    mut idx = 0;
+    let mut hp_active = 0;
+    let mut idx = 0;
     while (idx < array_len(tasks)) {
         let t = tasks[idx];
         if (is_high_priority(t) && !is_done(t)) { hp_active += 1; }
@@ -1129,7 +1129,7 @@ fun main() {
     assert(hp_active == 2);
 
     // 17. Range for-in: sum 0+1+2+3+4 = 10
-    mut range_sum = 0;
+    let mut range_sum = 0;
     for (let i in 0..5) { range_sum += i; }
     assert(range_sum == 10);
 

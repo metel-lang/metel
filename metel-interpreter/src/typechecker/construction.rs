@@ -472,6 +472,16 @@ fn construct_stmt(stmt: &Stmt, ctx: &mut ConstructCtx) -> Result<TypedStmt, Mete
         Stmt::For(fs) => {
             ctx.push_scope();
             let init = match &fs.init {
+                Some(ForInit::Let(ld)) => {
+                    let value = construct_expr(&ld.value, None, ctx)?;
+                    let ty = value.ty().clone();
+                    ctx.bind(&ld.name, ty);
+                    let typed_ld = TypedLetDecl {
+                        name: ld.name.clone(), type_ann: ld.type_ann.clone(),
+                        value, span: ld.span.clone(),
+                    };
+                    Some(TypedForInit::Let(typed_ld))
+                }
                 Some(ForInit::Mut(md)) => {
                     let value = construct_expr(&md.value, None, ctx)?;
                     let ty = value.ty().clone();
@@ -525,7 +535,7 @@ fn construct_stmt(stmt: &Stmt, ctx: &mut ConstructCtx) -> Result<TypedStmt, Mete
             let body = construct_block(&fi.body, None, ctx)?;
             ctx.pop_scope();
             Ok(TypedStmt::ForIn(Box::new(TypedForInStmt {
-                binding: fi.binding.clone(), iterable, body, span: fi.span.clone(),
+                binding: fi.binding.clone(), mutable: fi.mutable, iterable, body, span: fi.span.clone(),
             })))
         }
     }

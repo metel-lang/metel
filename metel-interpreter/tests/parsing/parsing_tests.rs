@@ -48,6 +48,35 @@ fn test_11_block_expr_stmts() { run("11_block_expr_stmts.mtl"); }
 fn test_12_modules() { run("12_modules.mtl"); }
 
 #[test]
+fn rejects_standalone_mut_binding_syntax() {
+    let source = r#"
+fun main() {
+    mut counter = 0;
+}
+"#;
+    assert!(
+        parser::parse(source, "compat_mut_alias.mtl").is_err(),
+        "standalone `mut` binding syntax should be rejected"
+    );
+}
+
+#[test]
+fn mutable_for_in_binding_parses() {
+    let source = r#"
+fun main() {
+    let values = [1, 2, 3];
+    let mut total = 0;
+    for (let mut item in values) {
+        item += 1;
+        total += item;
+    }
+}
+"#;
+    parser::parse(source, "mutable_for_in.mtl")
+        .unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
 fn module_ast_preserves_roots_aliases_groups_and_globs() {
     let source = r#"
 import std::math;

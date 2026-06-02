@@ -1,5 +1,5 @@
 fun find(arr: Int[], target: Int) -> Perhaps<Int> {
-    mut i = 0;
+    let mut i = 0;
     while (i < array_len(arr)) {
         if (arr[i] == target) {
             return Perhaps::Some { value: i };

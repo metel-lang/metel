@@ -60,7 +60,7 @@ fun record_swap<K, V>(r: Record<K, V>) -> Record<V, K> {
 // ── Generic pipeline combinators ──────────────────────────────────────────────
 
 fun filter_array<T>(arr: T[], pred: (T) -> Bool) -> T[] {
-    mut out: T[] = [];
+    let mut out: T[]  = [];
     for (let x in arr) {
         if (pred(x)) { array_push(out, x); }
     }
@@ -68,15 +68,15 @@ fun filter_array<T>(arr: T[], pred: (T) -> Bool) -> T[] {
 }
 
 fun map_array<T, U>(arr: T[], f: (T) -> U) -> U[] {
-    mut out: U[] = [];
+    let mut out: U[]  = [];
     for (let x in arr) { array_push(out, f(x)); }
     out
 }
 
 fun zip_with<A, B, C>(a: A[], b: B[], f: (A, B) -> C) -> C[] {
-    mut out: C[] = [];
+    let mut out: C[]  = [];
     let len = if (array_len(a) < array_len(b)) array_len(a) else array_len(b);
-    mut i = 0;
+    let mut i = 0;
     while (i < len) {
         array_push(out, f(a[i], b[i]));
         i += 1;
@@ -99,8 +99,8 @@ fun all<T>(arr: T[], pred: (T) -> Bool) -> Bool {
 }
 
 fun take<T>(arr: T[], n: Int) -> T[] {
-    mut out: T[] = [];
-    mut i = 0;
+    let mut out: T[]  = [];
+    let mut i = 0;
     while (i < n && i < array_len(arr)) {
         array_push(out, arr[i]);
         i += 1;
@@ -109,8 +109,8 @@ fun take<T>(arr: T[], n: Int) -> T[] {
 }
 
 fun drop<T>(arr: T[], n: Int) -> T[] {
-    mut out: T[] = [];
-    mut i = n;
+    let mut out: T[]  = [];
+    let mut i = n;
     while (i < array_len(arr)) {
         array_push(out, arr[i]);
         i += 1;

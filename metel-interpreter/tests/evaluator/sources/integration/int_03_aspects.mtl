@@ -207,13 +207,13 @@ fun main() {
     let areas: Float[] = [c5.area(), r34.area(), c10.area()];
     let seq = AreaList::new(areas);
     assert(seq.len() == 3);
-    mut total_area = 0.0;
+    let mut total_area = 0.0;
     for (let a in seq) { total_area += a; }
     // ≈ 78.54 + 12.0 + 314.16 = 404.70
     assert(approx(total_area, 404.70));
 
     // Empty Iterable: loop body never runs
-    mut body_ran: Bool = false;
+    let mut body_ran: Bool  = false;
     let empty_areas: Float[] = [];
     for (let _a in AreaList::new(empty_areas)) { body_ran = true; }
     assert(!body_ran);

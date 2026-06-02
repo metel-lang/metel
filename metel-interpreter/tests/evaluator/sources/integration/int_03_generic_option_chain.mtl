@@ -74,7 +74,7 @@ fun pair_swap<A, B>(p: Pair<A, B>) -> Pair<B, A> {
 // ── Generic array utilities ───────────────────────────────────────────────────
 
 fun find_first<T>(arr: T[], pred: (T) -> Bool) -> Option<T> {
-    mut i = 0;
+    let mut i = 0;
     while (i < array_len(arr)) {
         if (pred(arr[i])) { return Option::Some { value: arr[i] }; }
         i += 1;
@@ -83,7 +83,7 @@ fun find_first<T>(arr: T[], pred: (T) -> Bool) -> Option<T> {
 }
 
 fun count_where<T>(arr: T[], pred: (T) -> Bool) -> Int {
-    mut cnt = 0;
+    let mut cnt = 0;
     for (let x in arr) {
         if (pred(x)) { cnt += 1; }
     }
@@ -91,7 +91,7 @@ fun count_where<T>(arr: T[], pred: (T) -> Bool) -> Int {
 }
 
 fun map_array<T, U>(arr: T[], f: (T) -> U) -> U[] {
-    mut out: U[] = [];
+    let mut out: U[]  = [];
     for (let x in arr) { array_push(out, f(x)); }
     out
 }

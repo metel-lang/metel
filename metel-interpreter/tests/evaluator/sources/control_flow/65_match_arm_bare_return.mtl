@@ -24,7 +24,7 @@ fun first_err(xs: Int[]) -> Perhaps<Int> {
 }
 
 fun find_nonzero(arr: Int[]) -> Int {
-    mut i = 0;
+    let mut i = 0;
     loop {
         if (i >= array_len(arr)) { break -1; }
         let found = match arr[i] {

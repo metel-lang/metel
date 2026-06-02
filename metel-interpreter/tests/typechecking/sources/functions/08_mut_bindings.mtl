@@ -9,6 +9,6 @@
 //   flag    : Bool   (inferred from literal false)
 //   name    : String (annotated String, value infers String — unification succeeds)
 
-mut counter = 0;
-mut flag    = false;
-mut name: String = "metel";
+let mut counter = 0;
+let mut flag = false;
+let mut name: String  = "metel";

@@ -2,7 +2,7 @@ struct Counter { value: Int, step: Int }
 
 fun main() {
     // Plain field assignment.
-    mut c = Counter { value: 0, step: 1 };
+    let mut c = Counter { value: 0, step: 1 };
     c.value = 42;
     assert(c.value == 42);
     // Compound field assignment operators.

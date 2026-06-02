@@ -1,6 +1,6 @@
 fun main() {
     // Plain index assignment.
-    mut arr = [10, 20, 30];
+    let mut arr = [10, 20, 30];
     arr[1] = 99;
     assert(arr[0] == 10);
     assert(arr[1] == 99);
@@ -11,7 +11,7 @@ fun main() {
     arr[2] *= 2;
     assert(arr[2] == 60);
     // Assignment using a variable as the index.
-    mut i = 1;
+    let mut i = 1;
     arr[i] = 0;
     assert(arr[1] == 0);
 }

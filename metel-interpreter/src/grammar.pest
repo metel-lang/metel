@@ -13,8 +13,8 @@
 //   This works because `break` / `return` alone fail `ident`'s `!keyword` guard,
 //   so `expr_stmt` never mis-parses actual break/return statements.
 //
-//   Similarly, `stmt` is tried before `let_decl` / `mut_decl` in `decl` so
-//   that `let_x = 5;` and `mut_x = 5;` are assignments, not declarations.
+//   Similarly, `stmt` is tried before binding declarations in `decl` so
+//   that `let_x = 5;` is an assignment, not a declaration.
 
 // ── Whitespace and comments ───────────────────────────────────────────────────
 
@@ -49,13 +49,13 @@ decl = {
   | enum_decl
   | impl_block
   | aspect_decl
-  | stmt          // before let/mut so that let_x=5 and mut_x=5 are assignments
+  | stmt          // before let-bindings so that let_x=5 is an assignment
+  | let_mut_decl
   | let_decl
-  | mut_decl
 }
 
-let_decl    = { "let" ~ ident ~ (":" ~ type_expr)? ~ "=" ~ expr ~ ";" }
-mut_decl    = { "mut" ~ ident ~ (":" ~ type_expr)? ~ "=" ~ expr ~ ";" }
+let_decl     = { "let" ~ !mut_kw ~ ident ~ (":" ~ type_expr)? ~ "=" ~ expr ~ ";" }
+let_mut_decl = { "let" ~ mut_kw ~ ident ~ (":" ~ type_expr)? ~ "=" ~ expr ~ ";" }
 
 fun_decl    = { pub_kw? ~ "fun" ~ ident ~ generic_params? ~ "(" ~ param_list? ~ ")" ~ ("->" ~ type_expr)? ~ where_clause? ~ block }
 
@@ -107,9 +107,9 @@ expr_stmt  = { expr ~ ";" }
 while_stmt = { "while" ~ "(" ~ expr ~ ")" ~ block }
 
 for_stmt   = { "for" ~ "(" ~ for_init ~ expr? ~ ";" ~ expr? ~ ")" ~ block }
-for_init   = { expr_stmt | mut_decl | ";" }
+for_init   = { expr_stmt | let_mut_decl | let_decl | ";" }
 
-for_in_stmt  = { "for" ~ "(" ~ "let" ~ ident ~ "in" ~ expr ~ ")" ~ block }
+for_in_stmt  = { "for" ~ "(" ~ "let" ~ mut_kw? ~ ident ~ "in" ~ expr ~ ")" ~ block }
 
 return_stmt   = { "return" ~ expr? ~ ";" }
 break_stmt    = { "break" ~ expr? ~ ";" }
@@ -239,6 +239,7 @@ none_lit  = @{ "None" ~ !(ASCII_ALPHANUMERIC | "_") }
 unit_lit  = @{ "()" }
 
 pub_kw   = @{ "pub" ~ !(ASCII_ALPHANUMERIC | "_") }
+mut_kw   = @{ "mut" ~ !(ASCII_ALPHANUMERIC | "_") }
 root_kw  = @{ "root" ~ !(ASCII_ALPHANUMERIC | "_") }
 std_kw   = @{ "std" ~ !(ASCII_ALPHANUMERIC | "_") }
 self_kw  = @{ "self" ~ !(ASCII_ALPHANUMERIC | "_") }

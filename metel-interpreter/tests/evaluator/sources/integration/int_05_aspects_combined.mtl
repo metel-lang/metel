@@ -116,17 +116,17 @@ fun main() {
     assert(t2.describe() == "Task[test, enabled=false]");
 
     // Countdown Iterable: 3,2,1
-    mut count_sum = 0;
+    let mut count_sum = 0;
     for (let v in Countdown::new(3)) { count_sum += v; }
     assert(count_sum == 6); // 3+2+1
 
     // Empty countdown
-    mut ran = false;
+    let mut ran = false;
     for (let _v in Countdown::new(0)) { ran = true; }
     assert(!ran);
 
     // break inside for-in: stop after first even number
-    mut first_even = -1;
+    let mut first_even = -1;
     for (let v in Countdown::new(10)) {
         let rem = v - (v / 2 * 2);
         if (rem == 0) {
@@ -137,7 +137,7 @@ fun main() {
     assert(first_even == 10); // 10 is even, it's the first emitted (countdown from 10)
 
     // continue inside for-in: sum only odd numbers in [1..5]
-    mut odd_sum = 0;
+    let mut odd_sum = 0;
     for (let v in Countdown::new(5)) {
         let rem = v - (v / 2 * 2);
         if (rem == 0) { continue; }
@@ -146,7 +146,7 @@ fun main() {
     assert(odd_sum == 9); // 5+3+1
 
     // nested for-in: 3x3 multiplication table sum = (1+2+3)*(1+2+3) = 36
-    mut mult_sum = 0;
+    let mut mult_sum = 0;
     for (let i in Countdown::new(3)) {
         for (let j in Countdown::new(3)) {
             mult_sum += i * j;

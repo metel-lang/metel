@@ -2,7 +2,7 @@
 // Covers issue #128: T/U in body annotations must resolve to TypeVars, not Named types.
 
 fun collect_matching<T>(arr: T[], pred: (T) -> Bool) -> T[] {
-    mut result: T[] = [];
+    let mut result: T[]  = [];
     for (let x in arr) {
         if (pred(x)) { array_push(result, x); }
     }
@@ -10,7 +10,7 @@ fun collect_matching<T>(arr: T[], pred: (T) -> Bool) -> T[] {
 }
 
 fun map_to<T, U>(arr: T[], f: (T) -> U) -> U[] {
-    mut out: U[] = [];
+    let mut out: U[]  = [];
     for (let x in arr) { array_push(out, f(x)); }
     out
 }

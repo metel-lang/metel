@@ -493,6 +493,10 @@ pub fn eval_stmt(stmt: &TypedStmt, env: &mut Environment) -> Result<Signal, Mete
             env.push_scope();
             if let Some(init) = &f.init {
                 match init {
+                    TypedForInit::Let(d) => {
+                        let val = eval_expr(&d.value, env)?.into_value();
+                        env.define(&d.name, val);
+                    }
                     TypedForInit::Mut(d) => {
                         let val = eval_expr(&d.value, env)?.into_value();
                         env.define(&d.name, val);
@@ -526,13 +530,14 @@ pub fn eval_stmt(stmt: &TypedStmt, env: &mut Environment) -> Result<Signal, Mete
 
         TypedStmt::ForIn(fi) => {
             let iterable = eval_expr(&fi.iterable, env)?.into_value();
-            eval_for_in(&fi.binding, iterable, &fi.body, &fi.span, env)
+            eval_for_in(&fi.binding, fi.mutable, iterable, &fi.body, &fi.span, env)
         }
     }
 }
 
 fn eval_for_in(
     binding: &str,
+    _mutable: bool,
     iterable: Value,
     body:     &TypedBlock,
     span:     &Span,
@@ -723,6 +728,10 @@ fn eval_untyped_stmt(stmt: &Stmt, env: &mut Environment) -> Result<Signal, Metel
             env.push_scope();
             if let Some(init) = &f.init {
                 match init {
+                    ForInit::Let(d) => {
+                        let val = eval_untyped_expr(&d.value, env)?.into_value();
+                        env.define(&d.name, val);
+                    }
                     ForInit::Mut(d) => {
                         let val = eval_untyped_expr(&d.value, env)?.into_value();
                         env.define(&d.name, val);
@@ -1511,4 +1520,3 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
 
     }
 }
-

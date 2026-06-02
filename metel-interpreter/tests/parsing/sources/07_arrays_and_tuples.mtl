@@ -4,7 +4,7 @@
 //         positional access (.0 .1), tuple destructuring in match.
 
 fun sum(arr: Int[]) -> Int {
-    mut total = 0;
+    let mut total = 0;
     for (let n in arr) {
         total += n;
     }
@@ -12,8 +12,8 @@ fun sum(arr: Int[]) -> Int {
 }
 
 fun reverse(arr: Int[]) -> Int[] {
-    mut result: Int[] = [];
-    mut i = array_len(arr) - 1;
+    let mut result: Int[]  = [];
+    let mut i = array_len(arr) - 1;
     while (i >= 0) {
         array_push(result, arr[i]);
         i -= 1;
@@ -22,8 +22,8 @@ fun reverse(arr: Int[]) -> Int[] {
 }
 
 fun zip_sum(a: Int[], b: Int[]) -> Int[] {
-    mut result: Int[] = [];
-    mut i = 0;
+    let mut result: Int[]  = [];
+    let mut i = 0;
     let len = array_len(a);
     while (i < len) {
         array_push(result, a[i] + b[i]);
@@ -33,8 +33,8 @@ fun zip_sum(a: Int[], b: Int[]) -> Int[] {
 }
 
 fun min_max(arr: Int[]) -> (Int, Int) {
-    mut lo = arr[0];
-    mut hi = arr[0];
+    let mut lo = arr[0];
+    let mut hi = arr[0];
     for (let n in arr) {
         if (n < lo) { lo = n; }
         if (n > hi) { hi = n; }
@@ -55,7 +55,7 @@ fun main() {
     println(int_to_string(array_len(words)));  // 3
 
     // --- array_push ---
-    mut growing: Int[] = [];
+    let mut growing: Int[]  = [];
     array_push(growing, 10);
     array_push(growing, 20);
     array_push(growing, 30);

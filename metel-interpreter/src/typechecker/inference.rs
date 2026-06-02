@@ -476,6 +476,13 @@ fn infer_stmt(
             ctx.push_scope();
             if let Some(init) = &fs.init {
                 match init {
+                    ForInit::Let(ld) => {
+                        let val_ty = infer_expr(&ld.value, ctx, fun_generalizations)?;
+                        if let Some(ann) = &ld.type_ann {
+                            ctx.add_constraint(val_ty.clone(), ann_to_infer(ann, ctx), ld.span.clone());
+                        }
+                        ctx.bind_mono(&ld.name, val_ty, false);
+                    }
                     ForInit::Mut(md) => {
                         let val_ty = infer_expr(&md.value, ctx, fun_generalizations)?;
                         if let Some(ann) = &md.type_ann {
@@ -532,7 +539,7 @@ fn infer_stmt(
                 }
             }
             ctx.push_scope();
-            ctx.bind_mono(&fi.binding, elem_ty, false);
+            ctx.bind_mono(&fi.binding, elem_ty, fi.mutable);
             infer_block(&fi.body, ctx, fun_generalizations)?;
             ctx.pop_scope();
             Ok(InferType::unit())
