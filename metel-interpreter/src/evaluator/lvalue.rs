@@ -80,35 +80,60 @@ pub(super) fn extract_lvalue_path<'a>(
     Ok((root, path))
 }
 
-/// Walk a `TypedPlace::Field` chain down to its root identifier, collecting the
-/// field names in order (including `final_field`).
-/// Field-chain-only; index steps in the path are not supported (see ADR-0035).
-/// Returns an error if any intermediate step is not a plain field or identifier
-/// (e.g. an index step), which is not yet supported for field-chain mutation.
-pub(super) fn extract_typed_place_field_path<'a>(
+/// Resolve the root `Rc<RefCell<Value>>` for a field-assign target and collect
+/// the full field path (including `final_field`) to navigate within it.
+///
+/// Handles three root forms:
+/// - `Ident(x)` — looks up `x` in the environment; auto-derefs one `*mut` level.
+/// - `Deref(ptr_expr)` — evaluates `ptr_expr` and extracts the `MutPointer` inner Rc.
+/// - `Field { object, field }` — recurses into `object`, then appends `field`.
+pub(super) fn resolve_field_assign_root<'a>(
     place: &'a TypedPlace,
     final_field: &'a str,
+    env: &mut Environment,
     span: &Span,
-) -> Result<(&'a str, Vec<&'a str>), MetelError> {
-    fn walk<'a>(place: &'a TypedPlace, path: &mut Vec<&'a str>, span: &Span) -> Result<&'a str, MetelError> {
+) -> Result<(std::rc::Rc<std::cell::RefCell<Value>>, Vec<&'a str>), MetelError> {
+    fn walk<'a>(
+        place: &'a TypedPlace,
+        path: &mut Vec<&'a str>,
+        env: &mut Environment,
+        span: &Span,
+    ) -> Result<std::rc::Rc<std::cell::RefCell<Value>>, MetelError> {
         match place {
-            TypedPlace::Ident(name, _) => Ok(name.as_str()),
+            TypedPlace::Ident(name, _) => {
+                let rc = env.get_rc(name).ok_or_else(|| {
+                    MetelError::panic(RuntimeErrorCode::R0003, format!("assign: `{name}` not found"), span)
+                })?;
+                // Auto-deref: if the binding holds a *mut pointer, follow it.
+                let inner = {
+                    let v = rc.borrow();
+                    if let Value::MutPointer(inner_rc) = &*v { Some(inner_rc.clone()) } else { None }
+                };
+                Ok(inner.unwrap_or(rc))
+            }
+            TypedPlace::Deref { object, span: tspan } => {
+                let ptr = eval_expr(object, env)?.into_value();
+                match ptr {
+                    Value::MutPointer(inner_rc) => Ok(inner_rc),
+                    _ => Err(MetelError::panic(RuntimeErrorCode::R0003, "field assign: not a *mut pointer", tspan)),
+                }
+            }
             TypedPlace::Field { object, field, .. } => {
-                let root = walk(object, path, span)?;
+                let root_rc = walk(object, path, env, span)?;
                 path.push(field.as_str());
-                Ok(root)
+                Ok(root_rc)
             }
             _ => Err(MetelError::panic(
                 RuntimeErrorCode::R0003,
-                "field assign: receiver must be a variable or field-access chain",
+                "field assign: unsupported receiver form",
                 span,
             )),
         }
     }
     let mut path = Vec::new();
-    let root = walk(place, &mut path, span)?;
+    let root_rc = walk(place, &mut path, env, span)?;
     path.push(final_field);
-    Ok((root, path))
+    Ok((root_rc, path))
 }
 
 /// Evaluate a `TypedPlace` to the `Value` it currently holds.

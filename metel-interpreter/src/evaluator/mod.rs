@@ -1596,18 +1596,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                 }
 
                 TypedPlace::Field { object, field, span: tspan } => {
-                    let (root, path) = lvalue::extract_typed_place_field_path(object, field, tspan)?;
-                    let outer_rc = env.get_rc(root).ok_or_else(|| {
-                        MetelError::panic(RuntimeErrorCode::R0003, format!("assign: `{root}` not found"), tspan)
-                    })?;
-                    // Auto-deref: if the root binding holds a *mut pointer, follow it.
-                    let rc: Rc<RefCell<Value>> = {
-                        let v = outer_rc.borrow();
-                        match &*v {
-                            Value::MutPointer(inner) => inner.clone(),
-                            _ => Rc::clone(&outer_rc),
-                        }
-                    };
+                    let (rc, path) = lvalue::resolve_field_assign_root(object, field, env, tspan)?;
                     let mut borrowed = rc.borrow_mut();
                     // Navigate intermediate path segments to reach the parent struct.
                     let mut cur: &mut Value = &mut borrowed;
