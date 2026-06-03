@@ -240,10 +240,11 @@ pub fn check_graph(
             decls: typed_decls,
             import_aliases,
             imported_names,
+            scheme_env,
         });
     }
 
-    Ok(TypedModuleGraph { modules: typed_modules })
+    Ok(TypedModuleGraph { modules: typed_modules, type_registry })
 }
 
 /// Build the set of imported name→scheme bindings for a module, drawn from
@@ -427,6 +428,37 @@ pub fn check(program: Program) -> Result<TypedProgram, MetelError> {
         &[],
     )?;
     Ok(decls)
+}
+
+/// Run the type checker and also return the type context needed for
+/// construction-at-call-time of generic function bodies.
+pub(crate) fn check_with_ctx(
+    program: Program,
+) -> Result<(TypedProgram, crate::typeinference::TypeCtx), MetelError> {
+    let (decls, scheme_env, registry) = check_impl(
+        &program,
+        &HashMap::new(),
+        &TypeDefinitionRegistry::new(),
+        &StdPrelude::default(),
+        &[],
+    )?;
+    Ok((decls, crate::typeinference::TypeCtx { scheme_env, registry }))
+}
+
+/// Construct a `TypedBlock` for a generic (polymorphic) function body at call time.
+///
+/// Called by the evaluator when it encounters `ClosureBody::Untyped` with a `type_ctx`.
+/// Instantiates the function's `TypeScheme` using the runtime argument types, builds
+/// a `ConstructCtx`, and runs the typechecker's construction pass on the raw block.
+pub(crate) fn construct_generic_body(
+    scheme:    &TypeScheme,
+    params:    &[crate::ast::Param],
+    arg_types: &[crate::types::Type],
+    body:      &crate::ast::Block,
+    span:      &crate::ast::Span,
+    type_ctx:  &crate::typeinference::TypeCtx,
+) -> Result<crate::typed_ast::TypedBlock, MetelError> {
+    construction::construct_generic_body(scheme, params, arg_types, body, span, type_ctx)
 }
 
 /// Core typechecking pipeline.

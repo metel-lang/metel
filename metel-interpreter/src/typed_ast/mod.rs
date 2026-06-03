@@ -2,11 +2,14 @@
 // Mirrors the untyped AST but every expression node carries resolved type information.
 // Generic declarations do not appear here — they are monomorphised by the type checker.
 
+use std::collections::HashMap;
+
 use crate::ast::{
     Literal, BinOp, UnaryOp, AssignOp, Pattern, Span,
     Param, TypeExpr, FieldDef, GenericParam, AspectMethod, VariantDef, Block,
 };
 use crate::types::Type;
+use crate::typeinference::{TypeDefinitionRegistry, TypeScheme};
 
 // ── Program ───────────────────────────────────────────────────────────────────
 
@@ -21,17 +24,25 @@ pub struct TypedModule {
     pub decls: Vec<TypedDecl>,
     /// Alias → canonical name for imports declared `import mod::name as alias`.
     /// The evaluator registers these so that `alias` resolves to the same value as `name`.
-    pub import_aliases: std::collections::HashMap<String, String>,
+    pub import_aliases: HashMap<String, String>,
     /// Every explicitly imported name: local_name → (source_module_path, canonical_name).
     /// Used by `evaluate_graph` to seed each module's environment from its dependencies.
-    pub imported_names: std::collections::HashMap<String, (Vec<String>, String)>,
+    pub imported_names: HashMap<String, (Vec<String>, String)>,
+    /// The full type-scheme environment produced by the typechecker for this module.
+    /// Used at runtime to run `construct_block` for generic function bodies
+    /// (`ClosureBody::Untyped`) without a separate untyped evaluator pipeline.
+    pub scheme_env: HashMap<String, TypeScheme>,
 }
 
 /// The output of `check_graph` — one typed module per loaded module, in
 /// topological order (dependencies before dependents).
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TypedModuleGraph {
     pub modules: Vec<TypedModule>,
+    /// Accumulated type-definition registry produced during type-checking, containing
+    /// all struct, enum, aspect, and method definitions visible after the full graph is
+    /// checked. Available to the evaluator for construction-at-call-time of generic bodies.
+    pub type_registry: TypeDefinitionRegistry,
 }
 
 // ── Typed Declarations ────────────────────────────────────────────────────────

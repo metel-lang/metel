@@ -4,7 +4,7 @@ use std::rc::Rc;
 use crate::ast::Span;
 use crate::error::{MetelError, RuntimeErrorCode};
 
-use super::{ClosureBody, Signal, Value, attach_stack, eval_block, eval_untyped_block, pop_frame, push_frame};
+use super::{ClosureBody, Signal, Value, attach_stack, eval_block, eval_untyped_block, pop_frame, push_frame, type_of};
 
 /// How the receiver is bound into the callee's environment.
 /// `Value` → cloned (value/&self receivers); `Shared` → Rc shared (mut self / &mut self).
@@ -35,8 +35,21 @@ pub(super) fn call_function(func: Value, args: Vec<Value>, span: &Span) -> Resul
                 call_env.define(&param.name, val.clone());
             }
             let result = match &closure.body {
-                ClosureBody::Typed(b)   => eval_block(b, &mut call_env),
-                ClosureBody::Untyped(b) => eval_untyped_block(b, &mut call_env),
+                ClosureBody::Typed(b) => eval_block(b, &mut call_env),
+                ClosureBody::Untyped(b) => {
+                    // Use construction-at-call-time when the closure carries a type context
+                    // and has a name we can look up in the scheme_env.
+                    let typed = closure.name.as_deref()
+                        .and_then(|name| closure.type_ctx.as_ref().map(|ctx| (name, ctx)))
+                        .and_then(|(name, type_ctx)| type_ctx.scheme_env.get(name).map(|s| (s, type_ctx)))
+                        .and_then(|(scheme, type_ctx)| {
+                            let arg_types: Vec<_> = args.iter().map(type_of::value_to_type).collect();
+                            crate::typechecker::construct_generic_body(
+                                scheme, &closure.params, &arg_types, b, span, type_ctx
+                            ).ok().map(|tb| eval_block(&tb, &mut call_env))
+                        });
+                    typed.unwrap_or_else(|| eval_untyped_block(b, &mut call_env))
+                }
             };
             let result = result.map_err(attach_stack);
             pop_frame();
@@ -81,8 +94,19 @@ pub(super) fn call_method_function(
                 call_env.define(&param.name, val.clone());
             }
             let result = match &closure.body {
-                ClosureBody::Typed(b)   => eval_block(b, &mut call_env),
-                ClosureBody::Untyped(b) => eval_untyped_block(b, &mut call_env),
+                ClosureBody::Typed(b) => eval_block(b, &mut call_env),
+                ClosureBody::Untyped(b) => {
+                    let typed = closure.name.as_deref()
+                        .and_then(|name| closure.type_ctx.as_ref().map(|ctx| (name, ctx)))
+                        .and_then(|(name, type_ctx)| type_ctx.scheme_env.get(name).map(|s| (s, type_ctx)))
+                        .and_then(|(scheme, type_ctx)| {
+                            let arg_types: Vec<_> = args.iter().map(type_of::value_to_type).collect();
+                            crate::typechecker::construct_generic_body(
+                                scheme, &closure.params, &arg_types, b, span, type_ctx
+                            ).ok().map(|tb| eval_block(&tb, &mut call_env))
+                        });
+                    typed.unwrap_or_else(|| eval_untyped_block(b, &mut call_env))
+                }
             };
             let result = result.map_err(attach_stack);
             pop_frame();

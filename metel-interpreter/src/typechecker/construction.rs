@@ -154,6 +154,67 @@ impl<'a> ConstructCtx<'a> {
     }
 }
 
+/// Construct a `TypedBlock` for a generic (polymorphic) function body at call time.
+///
+/// Instantiates `scheme` with fresh type vars, unifies each instantiated parameter
+/// type with the corresponding runtime argument type (via `arg_types`), then runs the
+/// construction pass on `body` with the resulting substitution.
+pub(super) fn construct_generic_body(
+    scheme:    &TypeScheme,
+    params:    &[crate::ast::Param],
+    arg_types: &[crate::types::Type],
+    body:      &crate::ast::Block,
+    span:      &crate::ast::Span,
+    type_ctx:  &crate::typeinference::TypeCtx,
+) -> Result<crate::typed_ast::TypedBlock, crate::error::MetelError> {
+    use crate::typeinference::{instantiate_with_renaming, TypeVarGenerator};
+    use super::conversions::{infer_type_to_type, type_to_infer};
+
+    let mut gen = TypeVarGenerator::new();
+
+    let (instance, _) = instantiate_with_renaming(scheme, &mut gen);
+    let (param_infertypes, ret_infertype) = match instance {
+        InferType::Fun(p, r) => (p, r),
+        _ => return Err(crate::error::MetelError::internal(
+            "construct_generic_body: scheme is not a function type"
+        )),
+    };
+
+    // Unify instantiated param types with concrete arg types from runtime values.
+    let mut subst = Substitution::new();
+    for (param_it, arg_ty) in param_infertypes.iter().zip(arg_types.iter()) {
+        let arg_it = type_to_infer(arg_ty);
+        let s = typeinference::unify(&subst.apply(param_it), &arg_it)
+            .map_err(|_| crate::error::MetelError::internal(
+                "construct_generic_body: argument type mismatch"
+            ))?;
+        subst = subst.compose(&s);
+    }
+
+    let ret_ty = infer_type_to_type(&subst.apply(&ret_infertype), span).ok();
+
+    let mut ctx = ConstructCtx::new(
+        &subst,
+        &type_ctx.scheme_env,
+        &type_ctx.registry,
+        gen,
+        vec![],
+    )?;
+
+    ctx.push_scope();
+    for (param, param_it) in params.iter().zip(param_infertypes.iter()) {
+        let concrete_ty = infer_type_to_type(&subst.apply(param_it), span)
+            .unwrap_or(crate::types::Type::Unit);
+        ctx.bind(&param.name, concrete_ty);
+    }
+    let saved_return = ctx.push_return_type(ret_ty.clone());
+    let typed_block = construct_block(body, ret_ty.as_ref(), &mut ctx)?;
+    ctx.pop_return_type(saved_return);
+    ctx.pop_scope();
+
+    Ok(typed_block)
+}
+
 pub(super) fn construct_program(
     program:    &Program,
     subst:      &Substitution,

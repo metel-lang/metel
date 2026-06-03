@@ -472,6 +472,7 @@ pub struct EnumInfo {
 /// derive their type information from this registry instead of maintaining parallel
 /// copies. Fields and variant payloads carry their declaration `Span` so that
 /// downstream errors can point back to the source location.
+#[derive(Debug, Clone)]
 pub struct TypeDefinitionRegistry {
     /// struct name → fields with declaration spans.
     struct_env:         HashMap<String, Vec<FieldEntry>>,
@@ -1106,4 +1107,20 @@ impl Default for InferContext {
             vec![],
         )
     }
+}
+
+// ── TypeCtx ───────────────────────────────────────────────────────────────────
+
+/// Type context carried by generic closures to support construction-at-call-time.
+///
+/// When a generic function body (`FunBody::Generic`) is stored as `ClosureBody::Untyped`,
+/// this context provides the data the typechecker's construction pass needs to produce
+/// a `TypedBlock` at the point of the call, given concrete argument types.
+#[derive(Debug, Clone)]
+pub struct TypeCtx {
+    /// Full scheme environment of the module where the closure was defined.
+    pub scheme_env: HashMap<String, TypeScheme>,
+    /// Accumulated type-definition registry (structs, enums, aspects, methods) visible
+    /// from the module where the closure was defined.
+    pub registry: TypeDefinitionRegistry,
 }

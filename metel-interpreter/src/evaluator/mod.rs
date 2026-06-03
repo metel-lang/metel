@@ -6,6 +6,7 @@ mod call;
 mod display;
 mod lvalue;
 mod pattern;
+mod type_of;
 
 use std::collections::HashMap;
 use std::cell::RefCell;
@@ -13,6 +14,7 @@ use std::rc::Rc;
 
 use crate::ast::{BinOp, Literal, Param, Span, UnaryOp};
 use crate::error::{FrameInfo, RuntimeErrorCode, MetelError};
+use crate::typeinference::TypeCtx;
 
 thread_local! {
     static CALL_STACK: RefCell<Vec<FrameInfo>> = const { RefCell::new(Vec::new()) };
@@ -73,6 +75,9 @@ pub struct ClosureValue {
     pub params:   Vec<Param>,
     pub body:     ClosureBody,
     pub captured: Environment,
+    /// Present only when `body` is `ClosureBody::Untyped` (generic function). Provides
+    /// the type context for construction-at-call-time so the untyped path is not needed.
+    pub type_ctx: Option<std::rc::Rc<TypeCtx>>,
 }
 
 /// Deep-clone a value so that arrays get independent copies.
@@ -357,8 +362,14 @@ pub fn evaluate_graph(graph: TypedModuleGraph) -> Result<(), MetelError> {
             }
         }
 
+        // Build type context for construction-at-call-time of generic function bodies.
+        let type_ctx = std::rc::Rc::new(TypeCtx {
+            scheme_env: module.scheme_env.clone(),
+            registry: graph.type_registry.clone(),
+        });
+
         // Run the standard 3-pass + alias evaluation on this module's decls.
-        run_passes(&module.decls, &module.import_aliases, &mut env)?;
+        run_passes(&module.decls, &module.import_aliases, &mut env, Some(type_ctx))?;
 
         module_envs.insert(module.module_path, env);
     }
@@ -374,7 +385,7 @@ pub fn evaluate(program: TypedProgram) -> Result<(), MetelError> {
     CALL_STACK.with(|s| s.borrow_mut().clear());
     let mut env = Environment::new();
     builtins::register_builtins(&mut env);
-    run_passes(&program, &std::collections::HashMap::new(), &mut env)?;
+    run_passes(&program, &std::collections::HashMap::new(), &mut env, None)?;
     run_main(&mut env)
 }
 
@@ -384,10 +395,14 @@ pub fn evaluate(program: TypedProgram) -> Result<(), MetelError> {
 /// Pass 1b: replace placeholders with real closures ("ties the knot").
 /// Alias registration: bind aliased import names after closures exist.
 /// Pass 2: evaluate top-level let/mut/stmt declarations in order.
+///
+/// `type_ctx`: when present, generic function bodies carry it so construction-at-call-time
+/// can replace the untyped evaluator path.
 fn run_passes(
-    decls:   &TypedProgram,
-    aliases: &std::collections::HashMap<String, String>,
-    env:     &mut Environment,
+    decls:    &TypedProgram,
+    aliases:  &std::collections::HashMap<String, String>,
+    env:      &mut Environment,
+    type_ctx: Option<std::rc::Rc<TypeCtx>>,
 ) -> Result<(), MetelError> {
     // Pass 1a
     for decl in decls {
@@ -409,26 +424,28 @@ fn run_passes(
     for decl in decls {
         match decl {
             TypedDecl::Fun(f) => {
-                let body = match &f.body {
-                    FunBody::Typed(b)   => ClosureBody::Typed(b.clone()),
-                    FunBody::Generic(b) => ClosureBody::Untyped(b.clone()),
+                let (body, ctx) = match &f.body {
+                    FunBody::Typed(b)   => (ClosureBody::Typed(b.clone()), None),
+                    FunBody::Generic(b) => (ClosureBody::Untyped(b.clone()), type_ctx.clone()),
                 };
                 let captured = env.clone();
                 env.set(&f.name, Value::Closure(Rc::new(ClosureValue {
                     name: Some(f.name.clone()), params: f.params.clone(), body, captured,
+                    type_ctx: ctx,
                 })));
             }
             TypedDecl::Impl(impl_block) => {
                 if let crate::ast::TypeExpr::Named(type_name, _) = &impl_block.target_type {
                     for method in &impl_block.methods {
-                        let body = match &method.body {
-                            FunBody::Typed(b)   => ClosureBody::Typed(b.clone()),
-                            FunBody::Generic(b) => ClosureBody::Untyped(b.clone()),
+                        let (body, ctx) = match &method.body {
+                            FunBody::Typed(b)   => (ClosureBody::Typed(b.clone()), None),
+                            FunBody::Generic(b) => (ClosureBody::Untyped(b.clone()), type_ctx.clone()),
                         };
                         let key = ImplMethodKey::from_block(type_name, &method.name, impl_block).to_env_key();
                         let captured = env.clone();
                         env.set(&key, Value::Closure(Rc::new(ClosureValue {
                             name: Some(method.name.clone()), params: method.params.clone(), body, captured,
+                            type_ctx: ctx,
                         })));
                     }
                 }
@@ -531,6 +548,7 @@ fn eval_decl(decl: &TypedDecl, env: &mut Environment) -> Result<Signal, MetelErr
                 params:   f.params.clone(),
                 body,
                 captured,
+                type_ctx: None,
             }));
             env.set(&f.name, closure);
             Ok(Signal::Value(Value::Unit))
@@ -778,6 +796,7 @@ fn eval_untyped_decl(decl: &Decl, env: &mut Environment) -> Result<Signal, Metel
                 params:   f.params.clone(),
                 body,
                 captured,
+                type_ctx: None,
             }));
             env.set(&f.name, closure);
             Ok(Signal::Value(Value::Unit))
@@ -1278,6 +1297,7 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Metel
                 params:   params.clone(),
                 body:     ClosureBody::Untyped(body.clone()),
                 captured,
+                type_ctx: None,
             }))))
         }
 
@@ -1787,6 +1807,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                 params:   params.clone(),
                 body:     ClosureBody::Typed(body.clone()),
                 captured,
+                type_ctx: None,
             }))))
         }
 
@@ -1797,6 +1818,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                 params:   params.clone(),
                 body:     ClosureBody::Untyped(body.clone()),
                 captured,
+                type_ctx: None,
             }))))
         }
 
