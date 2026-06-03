@@ -432,7 +432,7 @@ pub fn check(program: Program) -> Result<TypedProgram, MetelError> {
 
 /// Run the type checker and also return the type context needed for
 /// construction-at-call-time of generic function bodies.
-pub(crate) fn check_with_ctx(
+pub fn check_with_ctx(
     program: Program,
 ) -> Result<(TypedProgram, crate::typeinference::TypeCtx), MetelError> {
     let (decls, scheme_env, registry) = check_impl(

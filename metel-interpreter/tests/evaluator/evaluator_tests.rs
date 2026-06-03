@@ -64,8 +64,8 @@ mod tests {
             }
             Some((kind, expected)) if kind == "runtime" => {
                 let ast = parser::parse(&source, filename).expect("parse error");
-                let prog = typechecker::check(ast).expect("typecheck error");
-                let err = evaluator::evaluate(prog)
+                let (prog, ctx) = typechecker::check_with_ctx(ast).expect("typecheck error");
+                let err = evaluator::evaluate_with_ctx(prog, ctx)
                     .expect_err("expected runtime error, but program succeeded")
                     .to_string();
                 assert!(
@@ -85,8 +85,8 @@ mod tests {
             }
             None => {
                 let ast = parser::parse(&source, filename).expect("parse error");
-                let prog = typechecker::check(ast).expect("typecheck error");
-                evaluator::evaluate(prog).expect("runtime error");
+                let (prog, ctx) = typechecker::check_with_ctx(ast).expect("typecheck error");
+                evaluator::evaluate_with_ctx(prog, ctx).expect("runtime error");
             }
         }
     }
@@ -418,6 +418,9 @@ mod tests {
 
     #[test]
     fn neg_generic_type_conflict() { check("generics/neg_21_generic_type_conflict.mtl"); }
+
+    #[test]
+    fn generic_construction_at_calltime() { check("generics/80_generic_construction_at_calltime.mtl"); }
 
     // ── Aspects ───────────────────────────────────────────────────────────────
 

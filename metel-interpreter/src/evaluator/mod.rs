@@ -389,6 +389,18 @@ pub fn evaluate(program: TypedProgram) -> Result<(), MetelError> {
     run_main(&mut env)
 }
 
+pub fn evaluate_with_ctx(
+    program: TypedProgram,
+    ctx: TypeCtx,
+) -> Result<(), MetelError> {
+    CALL_STACK.with(|s| s.borrow_mut().clear());
+    let mut env = Environment::new();
+    builtins::register_builtins(&mut env);
+    let type_ctx_rc = std::rc::Rc::new(ctx);
+    run_passes(&program, &std::collections::HashMap::new(), &mut env, Some(type_ctx_rc))?;
+    run_main(&mut env)
+}
+
 /// Run the standard 3-pass evaluation on `decls` into `env`.
 ///
 /// Pass 1a: placeholder bindings so closures can capture each other's Rc.
