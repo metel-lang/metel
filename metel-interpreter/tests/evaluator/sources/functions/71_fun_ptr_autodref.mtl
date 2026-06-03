@@ -11,7 +11,7 @@ fun test_immutable_fun_ptr_call() {
 fun test_mutable_fun_ptr_call() {
     let mut x = 0;
     let p = &mut x;
-    let inc = () -> { *p += 7; };
+    let mut inc = () -> { *p += 7; };
     let mut_ptr = &mut inc;
     mut_ptr();
     assert(x == 7);
@@ -64,7 +64,7 @@ fun test_closure_captures_fun_ptr() {
 fun test_closure_captures_mut_fun_ptr() {
     let mut x = 0;
     let p = &mut x;
-    let add5 = () -> { *p += 5; };
+    let mut add5 = () -> { *p += 5; };
     let mut ptr = &mut add5;
     let triple = () -> {
         ptr();

@@ -296,6 +296,9 @@ mod tests {
     #[test]
     fn closure_external_ptr_affects_outer() { check("closures/74_closure_external_ptr_affects_outer.mtl"); }
 
+    #[test]
+    fn neg_refmut_immutable_binding() { check("closures/neg_75_refmut_immutable_binding.mtl"); }
+
     // ── Structs ───────────────────────────────────────────────────────────────
 
     #[test]
@@ -354,6 +357,9 @@ mod tests {
 
     #[test]
     fn neg_missing_field() { check("structs/neg_12_missing_field.mtl"); }
+
+    #[test]
+    fn neg_field_assign_immutable_binding() { check("structs/neg_76_field_assign_immutable_binding.mtl"); }
 
     // ── Enums ─────────────────────────────────────────────────────────────────
 

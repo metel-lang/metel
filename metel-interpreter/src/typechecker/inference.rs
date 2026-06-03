@@ -296,7 +296,8 @@ fn infer_impl_method(
 
     ctx.push_scope();
     for (p, pt) in method.params.iter().zip(param_types.iter()) {
-        ctx.bind_mono(&p.name, pt.clone(), p.mutable);
+        let is_mutable = p.mutable || matches!(p.receiver, Some(crate::ast::ReceiverKind::RefMut));
+        ctx.bind_mono(&p.name, pt.clone(), is_mutable);
     }
     let saved_type_params  = ctx.swap_type_params(generic_map);
     let saved_tp_bounds    = ctx.swap_type_param_bounds(struct_bounds);
@@ -368,7 +369,8 @@ fn infer_default_aspect_method(
 
     ctx.push_scope();
     for (p, pt) in method.params.iter().zip(param_types.iter()) {
-        ctx.bind_mono(&p.name, pt.clone(), p.mutable);
+        let is_mutable = p.mutable || matches!(p.receiver, Some(crate::ast::ReceiverKind::RefMut));
+        ctx.bind_mono(&p.name, pt.clone(), is_mutable);
     }
     let saved_type_params = ctx.swap_type_params(generic_map);
     let saved_ret = ctx.push_return_type(ret_ty.clone());
@@ -1216,7 +1218,12 @@ fn infer_unaryop(
             Ok(InferType::bool())
         }
         UnaryOp::Ref => Ok(InferType::Pointer(Box::new(ty))),
-        UnaryOp::RefMut => Ok(InferType::MutPointer(Box::new(ty))),
+        UnaryOp::RefMut => {
+            if let Expr::Ident(name, ident_span) = operand {
+                let _ = ctx.lookup_for_write(name, ident_span)?;
+            }
+            Ok(InferType::MutPointer(Box::new(ty)))
+        }
         UnaryOp::Deref => match ctx.solve()?.apply(&ty) {
             InferType::Pointer(inner) | InferType::MutPointer(inner) => Ok(*inner),
             other => Err(MetelError::type_error(
@@ -1374,6 +1381,19 @@ fn infer_struct_literal(
     Ok(InferType::Named(struct_name, type_args))
 }
 
+/// Walk an lvalue chain to the root identifier for mutability checking.
+/// Returns `None` when the chain passes through a pointer dereference,
+/// meaning write access is conferred by the pointer rather than the binding.
+fn root_binding_for_write(expr: &Expr) -> Option<(&str, &Span)> {
+    match expr {
+        Expr::Ident(name, span) => Some((name.as_str(), span)),
+        Expr::FieldAccess { object, .. } => root_binding_for_write(object),
+        Expr::Index { object, .. } => root_binding_for_write(object),
+        Expr::UnaryOp(UnaryOp::Deref, _, _) => None,
+        _ => None,
+    }
+}
+
 fn infer_field_assign_type(
     object: &Expr,
     field: &str,
@@ -1381,6 +1401,9 @@ fn infer_field_assign_type(
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
 ) -> Result<InferType, MetelError> {
+    if let Some((name, span)) = root_binding_for_write(object) {
+        let _ = ctx.lookup_for_write(name, span)?;
+    }
     let obj_ty = infer_expr(object, ctx, fun_generalizations)?;
     let obj_ty = ctx.solve()?.apply(&obj_ty);
     let struct_name = named_type_name(&obj_ty).ok_or_else(|| {

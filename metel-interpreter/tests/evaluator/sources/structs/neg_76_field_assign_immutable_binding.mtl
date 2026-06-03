@@ -1,0 +1,8 @@
+// Assigning to a field of a plain let binding is a type error.
+// TYPECHECK_ERROR[immutable binding]
+struct Point { x: Int, y: Int }
+
+fun main() {
+    let p = Point { x: 1, y: 2 };
+    p.x = 42;
+}
