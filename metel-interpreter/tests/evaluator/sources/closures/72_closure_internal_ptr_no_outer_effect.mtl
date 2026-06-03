@@ -1,0 +1,15 @@
+// A closure that takes &mut of a captured binding internally gets a pointer into
+// its own deep-cloned copy of the env, not the original binding. Mutations through
+// that internal pointer must not be visible in the outer scope after the call.
+fun main() {
+    let mut x = 10;
+
+    let f = () -> () {
+        let p: *mut Int = &mut x;
+        *p = 42;
+    };
+
+    f();
+
+    assert(x == 10);
+}

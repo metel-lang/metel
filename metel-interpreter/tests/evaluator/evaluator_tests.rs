@@ -287,6 +287,15 @@ mod tests {
     #[test]
     fn fun_ptr_autoderef() { check("functions/71_fun_ptr_autodref.mtl"); }
 
+    #[test]
+    fn closure_internal_ptr_no_outer_effect() { check("closures/72_closure_internal_ptr_no_outer_effect.mtl"); }
+
+    #[test]
+    fn closure_direct_assign_no_outer_effect() { check("closures/73_closure_direct_assign_no_outer_effect.mtl"); }
+
+    #[test]
+    fn closure_external_ptr_affects_outer() { check("closures/74_closure_external_ptr_affects_outer.mtl"); }
+
     // ── Structs ───────────────────────────────────────────────────────────────
 
     #[test]

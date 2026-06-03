@@ -1,0 +1,19 @@
+// A *mut pointer created in the outer scope and captured by a closure retains its
+// connection to the original binding: deep_clone_value preserves the inner Rc of a
+// pointer value rather than copying it. Mutations through the captured pointer
+// must be visible in the outer scope.
+fun main() {
+    let mut x = 10;
+    let p: *mut Int = &mut x;
+
+    let f = () -> () {
+        *p = 42;
+    };
+
+    f();
+
+    assert(x == 42);
+
+    // The pointer itself is also usable directly after the call.
+    assert(*p == 42);
+}
