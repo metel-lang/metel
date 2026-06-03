@@ -371,16 +371,22 @@ pub fn free_vars(ty: &InferType) -> HashSet<TypeVar> {
 ///
 /// Variables in `quantified_vars` are locally owned — each use site gets
 /// fresh copies via `instantiate`, enabling let-polymorphism.
+///
+/// `param_names` optionally holds the source-level names of each quantified variable,
+/// in the same sorted order as `quantified_vars`. Used during construction-at-call-time
+/// to resolve type annotations like `T[]` inside generic function bodies.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeScheme {
     pub quantified_vars: Vec<TypeVar>,
+    /// Source-level names for quantified vars (same order). Empty for builtins.
+    pub param_names: Vec<String>,
     pub ty: InferType,
 }
 
 impl TypeScheme {
     /// A monomorphic scheme — no quantified variables.
     pub fn mono(ty: InferType) -> Self {
-        Self { quantified_vars: vec![], ty }
+        Self { quantified_vars: vec![], param_names: vec![], ty }
     }
 }
 
@@ -410,7 +416,21 @@ pub fn generalize(ty: InferType, env_free_vars: &HashSet<TypeVar>) -> TypeScheme
         .copied()
         .collect();
     quantified.sort();
-    TypeScheme { quantified_vars: quantified, ty }
+    TypeScheme { quantified_vars: quantified, param_names: vec![], ty }
+}
+
+/// Like `generalize` but also records the source-level name for each quantified variable.
+/// `name_map` maps TypeVar ID → param name (e.g. `{5 → "T"}`).
+pub fn generalize_with_names(
+    ty: InferType,
+    env_free_vars: &HashSet<TypeVar>,
+    name_map: &HashMap<TypeVar, String>,
+) -> TypeScheme {
+    let mut scheme = generalize(ty, env_free_vars);
+    scheme.param_names = scheme.quantified_vars.iter()
+        .map(|v| name_map.get(v).cloned().unwrap_or_default())
+        .collect();
+    scheme
 }
 
 /// Instantiate a type scheme by replacing each quantified variable with a

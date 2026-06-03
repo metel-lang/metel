@@ -317,6 +317,9 @@ pub enum TypedExpr {
     /// A let-bound polymorphic closure (let-polymorphism).
     /// The body is kept untyped for runtime re-evaluation at each call site's concrete type.
     GenericClosure {
+        /// Binding name from the enclosing `let`/`mut` declaration, used at runtime to look
+        /// up the closure's `TypeScheme` from `type_ctx.scheme_env` for construction-at-call-time.
+        name:        Option<String>,
         params:      Vec<Param>,
         #[allow(dead_code)] // kept for future type annotation checking
         return_type: Option<TypeExpr>,

@@ -644,6 +644,7 @@ mod phase_6_type_schemes {
         // => (?t5) -> ?t5
         let scheme = TypeScheme {
             quantified_vars: vec![TypeVar(0)],
+            param_names: vec![],
             ty: InferType::Fun(
                 vec![InferType::var(TypeVar(0))],
                 Box::new(InferType::var(TypeVar(0))),
@@ -669,6 +670,7 @@ mod phase_6_type_schemes {
         let quantified = var_gen.fresh(); // TypeVar(0)
         let scheme = TypeScheme {
             quantified_vars: vec![quantified],
+            param_names: vec![],
             ty: InferType::var(quantified),
         };
         let first = instantiate(&scheme, &mut var_gen);
@@ -693,6 +695,7 @@ mod phase_6_type_schemes {
     fn test_display_poly() {
         let scheme = TypeScheme {
             quantified_vars: vec![TypeVar(0)],
+            param_names: vec![],
             ty: InferType::Fun(
                 vec![InferType::var(TypeVar(0))],
                 Box::new(InferType::var(TypeVar(0))),
@@ -705,6 +708,7 @@ mod phase_6_type_schemes {
     fn test_display_multi_var() {
         let scheme = TypeScheme {
             quantified_vars: vec![TypeVar(0), TypeVar(1)],
+            param_names: vec![],
             ty: InferType::Fun(
                 vec![InferType::var(TypeVar(0))],
                 Box::new(InferType::var(TypeVar(1))),
@@ -756,6 +760,7 @@ mod phase_7_infer_context {
         let v = ctx.fresh_var(); // TypeVar(0)
         let scheme = TypeScheme {
             quantified_vars: vec![TypeVar(0)],
+            param_names: vec![],
             ty: InferType::Fun(vec![v.clone()], Box::new(v)),
         };
         ctx.bind_poly("id", scheme);
@@ -772,6 +777,7 @@ mod phase_7_infer_context {
         let v = ctx.fresh_var(); // TypeVar(0)
         let scheme = TypeScheme {
             quantified_vars: vec![TypeVar(0)],
+            param_names: vec![],
             ty: v,
         };
         ctx.bind_poly("id", scheme);
@@ -788,6 +794,7 @@ mod phase_7_infer_context {
         ctx.bind_mono("f", InferType::int(), false);
         ctx.bind_poly("f", TypeScheme {
             quantified_vars: vec![TypeVar(0)],
+            param_names: vec![],
             ty: v,
         });
         // Poly env wins — result is a fresh Var, not Int
@@ -1036,6 +1043,7 @@ mod phase_8_known_limitations {
         // ∀?t0. (?t0) -> ?t0, instantiated twice with fresh variables
         let scheme = TypeScheme {
             quantified_vars: vec![TypeVar(0)],
+            param_names: vec![],
             ty: InferType::Fun(
                 vec![InferType::var(TypeVar(0))],
                 Box::new(InferType::var(TypeVar(0))),

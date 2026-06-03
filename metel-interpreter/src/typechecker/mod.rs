@@ -38,6 +38,8 @@ struct FunGeneralization {
     name:    String,
     fun_ty:  InferType,
     env_fvs: HashSet<TypeVar>,
+    /// Maps TypeVar ID → source-level generic param name, for scheme param_names.
+    name_map: HashMap<TypeVar, String>,
 }
 
 // ── StdPrelude ────────────────────────────────────────────────────────────────
@@ -235,12 +237,16 @@ pub fn check_graph(
             })
             .unwrap_or_default();
 
+        // Add builtin schemes so construction-at-call-time can resolve builtins
+        // like `array_len` inside generic function bodies.
+        let mut full_scheme_env = scheme_env;
+        registry::register_builtin_schemes(&mut full_scheme_env, &std_prelude);
         typed_modules.push(TypedModule {
             module_path: loaded.module_path.clone(),
             decls: typed_decls,
             import_aliases,
             imported_names,
-            scheme_env,
+            scheme_env: full_scheme_env,
         });
     }
 
@@ -435,14 +441,17 @@ pub fn check(program: Program) -> Result<TypedProgram, MetelError> {
 pub fn check_with_ctx(
     program: Program,
 ) -> Result<(TypedProgram, crate::typeinference::TypeCtx), MetelError> {
+    let std_prelude = StdPrelude::default();
     let (decls, scheme_env, registry) = check_impl(
         &program,
         &HashMap::new(),
         &TypeDefinitionRegistry::new(),
-        &StdPrelude::default(),
+        &std_prelude,
         &[],
     )?;
-    Ok((decls, crate::typeinference::TypeCtx { scheme_env, registry }))
+    let mut full_scheme_env = scheme_env;
+    registry::register_builtin_schemes(&mut full_scheme_env, &std_prelude);
+    Ok((decls, crate::typeinference::TypeCtx { scheme_env: full_scheme_env, registry }))
 }
 
 /// Construct a `TypedBlock` for a generic (polymorphic) function body at call time.
@@ -502,7 +511,7 @@ fn check_impl(
     let mut scheme_env: SchemeEnv = HashMap::new();
     for fg in fun_generalizations {
         let resolved = subst.apply(&fg.fun_ty);
-        let scheme = generalize(resolved, &fg.env_fvs);
+        let scheme = generalize_with_names(resolved, &fg.env_fvs, &fg.name_map);
         scheme_env.insert(fg.name, scheme);
     }
     // Imported schemes must be visible in the construction pass so calls to imported

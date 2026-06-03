@@ -1,59 +1,11 @@
 use std::collections::HashMap;
 
-use crate::ast::{BinOp, Literal, Span};
+use crate::ast::{BinOp, Span};
 use crate::error::{MetelError, RuntimeErrorCode};
 use crate::typed_ast::TypedPlace;
 
 use super::{eval_expr, Environment, Signal, Value};
 
-pub(super) fn eval_untyped_index(
-    expr: &crate::ast::Expr,
-    env: &Environment,
-    _span: &Span,
-) -> Result<i64, MetelError> {
-    use crate::ast::Expr;
-    match expr {
-        Expr::Literal(Literal::Int(n), _) => Ok(*n),
-        Expr::Ident(name, _) => match env.get(name) {
-            Some(Value::Int(n)) => Ok(n),
-            Some(_) => Err(MetelError::internal(format!("`{name}` is not an Int"))),
-            None    => Err(MetelError::internal(format!("eval_untyped_index: undefined `{name}`"))),
-        },
-        _ => Err(MetelError::internal(
-            "index expression too complex; assign the index to a variable first",
-        )),
-    }
-}
-
-pub(super) fn eval_untyped_lvalue_value(
-    expr: &crate::ast::Expr,
-    env: &Environment,
-    span: &Span,
-) -> Result<Value, MetelError> {
-    use crate::ast::Expr;
-    match expr {
-        Expr::Ident(name, _) => env.get(name).ok_or_else(|| {
-            MetelError::panic(RuntimeErrorCode::R0003, format!("assign: `{name}` not found"), span)
-        }),
-        Expr::FieldAccess { object, field, span: fspan } => {
-            let parent = eval_untyped_lvalue_value(object, env, fspan)?;
-            match parent {
-                Value::Struct { fields, .. } | Value::Enum { fields, .. } => {
-                    fields.get(field).cloned().ok_or_else(|| {
-                        MetelError::panic(RuntimeErrorCode::R0008,
-                            format!("field access: no field `{field}`"), fspan)
-                    })
-                }
-                _ => Err(MetelError::internal(format!(
-                    "field access: `{field}` receiver is not a struct/enum"
-                ))),
-            }
-        }
-        _ => Err(MetelError::internal(
-            "assign receiver too complex; assign to a variable first",
-        )),
-    }
-}
 
 pub(super) fn extract_lvalue_path<'a>(
     expr: &'a crate::ast::Expr,

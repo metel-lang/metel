@@ -40,6 +40,7 @@ fn collect_type_param_bounds(
 fn dbg_scheme(t: TypeVar) -> TypeScheme {
     TypeScheme {
         quantified_vars: vec![t],
+        param_names: vec![],
         ty: InferType::Fun(
             vec![InferType::Var(t)],
             Box::new(InferType::Var(t)),
@@ -50,6 +51,7 @@ fn dbg_scheme(t: TypeVar) -> TypeScheme {
 fn array_push_scheme(t: TypeVar) -> TypeScheme {
     TypeScheme {
         quantified_vars: vec![t],
+        param_names: vec![],
         ty: InferType::Fun(
             vec![InferType::Array(Box::new(InferType::Var(t))), InferType::Var(t)],
             Box::new(InferType::unit()),
@@ -60,6 +62,7 @@ fn array_push_scheme(t: TypeVar) -> TypeScheme {
 fn array_len_scheme(t: TypeVar) -> TypeScheme {
     TypeScheme {
         quantified_vars: vec![t],
+        param_names: vec![],
         ty: InferType::Fun(
             vec![InferType::Array(Box::new(InferType::Var(t)))],
             Box::new(InferType::int()),
@@ -70,6 +73,7 @@ fn array_len_scheme(t: TypeVar) -> TypeScheme {
 fn print_scheme(t: TypeVar) -> TypeScheme {
     TypeScheme {
         quantified_vars: vec![t],
+        param_names: vec![],
         ty: InferType::Fun(
             vec![InferType::Var(t)],
             Box::new(InferType::unit()),

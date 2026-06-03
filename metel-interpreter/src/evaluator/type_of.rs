@@ -32,7 +32,10 @@ pub(super) fn value_to_type(value: &Value) -> Type {
         }
         Value::Struct { name, .. } => Type::Named(name.clone(), vec![]),
         Value::Enum   { name, .. } => Type::Named(name.clone(), vec![]),
-        Value::Closure(_) | Value::Builtin(_, _) => {
+        Value::Closure(rc) => {
+            rc.fun_type.clone().unwrap_or_else(|| Type::Fun(vec![], Box::new(Type::Unit)))
+        }
+        Value::Builtin(_, _) => {
             Type::Fun(vec![], Box::new(Type::Unit))
         }
         Value::Pointer(rc)    => Type::Pointer(Box::new(value_to_type(&rc.borrow()))),

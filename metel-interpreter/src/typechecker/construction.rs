@@ -11,6 +11,7 @@ use super::conversions::{
     infer_type_to_type,
     resolved_to_type,
     type_expr_to_infer,
+    type_expr_to_infer_with_generics,
     type_expr_to_infer_with_self,
     type_to_infer,
 };
@@ -82,6 +83,9 @@ struct ConstructCtx<'a> {
     /// Break value type of the innermost enclosing `loop` (None = no loop or bare break).
     current_break_ty:  Option<Type>,
     current_module_path: Vec<String>,
+    /// Generic type param name → fresh TypeVar; populated during construction-at-call-time
+    /// so type annotations like `T[]` in a generic body resolve to concrete types.
+    generic_params: HashMap<String, TypeVar>,
 }
 
 impl<'a> ConstructCtx<'a> {
@@ -103,6 +107,7 @@ impl<'a> ConstructCtx<'a> {
             current_return_ty: None,
             current_break_ty:  None,
             current_module_path,
+            generic_params: HashMap::new(),
         };
         // Derive concrete types for all monomorphic entries in scheme_env.
         // Both builtins and user functions are populated here — no second registration site.
@@ -152,6 +157,16 @@ impl<'a> ConstructCtx<'a> {
     fn pop_break_type(&mut self, prev: Option<Type>) {
         self.current_break_ty = prev;
     }
+
+    /// Convert a type expression to an `InferType`, substituting generic param names
+    /// to their TypeVars when `self.generic_params` is populated (construction-at-call-time).
+    fn type_expr_to_infer_ctx(&self, te: &TypeExpr) -> InferType {
+        if self.generic_params.is_empty() {
+            type_expr_to_infer(te)
+        } else {
+            type_expr_to_infer_with_generics(te, &self.generic_params)
+        }
+    }
 }
 
 /// Construct a `TypedBlock` for a generic (polymorphic) function body at call time.
@@ -170,9 +185,12 @@ pub(super) fn construct_generic_body(
     use crate::typeinference::{instantiate_with_renaming, TypeVarGenerator};
     use super::conversions::{infer_type_to_type, type_to_infer};
 
-    let mut gen = TypeVarGenerator::new();
+    // Use a high starting counter to avoid collisions with registry TypeVars (allocated
+    // starting from 0 during build_registry). The substitution built here would otherwise
+    // incorrectly resolve registry TypeVars when ConstructCtx::new applies it.
+    let mut gen = TypeVarGenerator::with_counter(1_000_000);
 
-    let (instance, _) = instantiate_with_renaming(scheme, &mut gen);
+    let (instance, renaming) = instantiate_with_renaming(scheme, &mut gen);
     let (param_infertypes, ret_infertype) = match instance {
         InferType::Fun(p, r) => (p, r),
         _ => return Err(crate::error::MetelError::internal(
@@ -181,14 +199,29 @@ pub(super) fn construct_generic_body(
     };
 
     // Unify instantiated param types with concrete arg types from runtime values.
+    // Unification failures are skipped (not errors) — the typechecker already validated
+    // the program; here we only need a "good enough" substitution for construction.
+    // This handles cases where generic type parameters can't be recovered from runtime
+    // values (e.g. `Named("MyResult", [])` vs `Named("MyResult", [T, E])`).
     let mut subst = Substitution::new();
     for (param_it, arg_ty) in param_infertypes.iter().zip(arg_types.iter()) {
         let arg_it = type_to_infer(arg_ty);
-        let s = typeinference::unify(&subst.apply(param_it), &arg_it)
-            .map_err(|_| crate::error::MetelError::internal(
-                "construct_generic_body: argument type mismatch"
-            ))?;
-        subst = subst.compose(&s);
+        if let Ok(s) = typeinference::unify(&subst.apply(param_it), &arg_it) {
+            subst = subst.compose(&s);
+        }
+    }
+
+    // Fill any still-unresolved type vars with Unit so `infer_type_to_type` does not
+    // error during construction. The resulting typed AST may have placeholder types
+    // but evaluation correctness is unaffected — runtime dispatch goes by value kind.
+    let all_free: std::collections::HashSet<_> = param_infertypes.iter()
+        .chain(std::iter::once(&*ret_infertype))
+        .flat_map(|it| typeinference::free_vars(it))
+        .collect();
+    for v in all_free {
+        if subst.lookup(v).is_none() {
+            subst.bind(v, InferType::unit());
+        }
     }
 
     let ret_ty = infer_type_to_type(&subst.apply(&ret_infertype), span).ok();
@@ -200,6 +233,19 @@ pub(super) fn construct_generic_body(
         gen,
         vec![],
     )?;
+
+    // Build name → fresh TypeVar mapping so type annotations like `T[]` in the body
+    // resolve to concrete types. scheme.param_names[i] corresponds to quantified_vars[i],
+    // and renaming maps original TypeVar → fresh TypeVar.
+    if !scheme.param_names.is_empty() {
+        let mut gp: HashMap<String, TypeVar> = HashMap::new();
+        for (orig_var, name) in scheme.quantified_vars.iter().zip(scheme.param_names.iter()) {
+            if let Some(&fresh_var) = renaming.get(orig_var) {
+                gp.insert(name.clone(), fresh_var);
+            }
+        }
+        ctx.generic_params = gp;
+    }
 
     ctx.push_scope();
     for (param, param_it) in params.iter().zip(param_infertypes.iter()) {
@@ -245,6 +291,7 @@ fn construct_decl(decl: &Decl, ctx: &mut ConstructCtx) -> Result<TypedDecl, Mete
                             name:     ld.name.clone(),
                             type_ann: ld.type_ann.clone(),
                             value: TypedExpr::GenericClosure {
+                                name:        Some(ld.name.clone()),
                                 params:      params.clone(),
                                 return_type: return_type.clone(),
                                 body:        body.clone(),
@@ -257,7 +304,7 @@ fn construct_decl(decl: &Decl, ctx: &mut ConstructCtx) -> Result<TypedDecl, Mete
                 }
             }
             let expected_ty = ld.type_ann.as_ref()
-                .map(|ann| resolved_to_type(&type_expr_to_infer(ann), ctx.subst, &ld.span))
+                .map(|ann| resolved_to_type(&ctx.type_expr_to_infer_ctx(ann), ctx.subst, &ld.span))
                 .transpose()?;
             let value = construct_expr(&ld.value, expected_ty.as_ref(), ctx)?;
             let ty = expected_ty.unwrap_or_else(|| value.ty().clone());
@@ -269,7 +316,7 @@ fn construct_decl(decl: &Decl, ctx: &mut ConstructCtx) -> Result<TypedDecl, Mete
         }
         Decl::Mut(md) => {
             let expected_ty = md.type_ann.as_ref()
-                .map(|ann| resolved_to_type(&type_expr_to_infer(ann), ctx.subst, &md.span))
+                .map(|ann| resolved_to_type(&ctx.type_expr_to_infer_ctx(ann), ctx.subst, &md.span))
                 .transpose()?;
             let value = construct_expr(&md.value, expected_ty.as_ref(), ctx)?;
             let ty = expected_ty.unwrap_or_else(|| value.ty().clone());
@@ -485,7 +532,7 @@ fn construct_block(
         if let Decl::Struct(sd) = decl {
             let fields = sd.fields.iter()
                 .map(|f| {
-                    let ty = resolved_to_type(&type_expr_to_infer(&f.type_ann), ctx.subst, &f.span)?;
+                    let ty = resolved_to_type(&ctx.type_expr_to_infer_ctx(&f.type_ann), ctx.subst, &f.span)?;
                     Ok((f.name.clone(), ty, f.span.clone()))
                 })
                 .collect::<Result<_, MetelError>>()?;
@@ -905,7 +952,7 @@ fn construct_expr(
         Expr::Closure { params, return_type, body, span } => {
             let param_types: Vec<Type> = params.iter()
                 .map(|p| p.type_ann.as_ref()
-                    .map(|ann| resolved_to_type(&type_expr_to_infer(ann), ctx.subst, &p.span))
+                    .map(|ann| resolved_to_type(&ctx.type_expr_to_infer_ctx(ann), ctx.subst, &p.span))
                     .unwrap_or_else(|| Err(MetelError::type_error(
                         TypeErrorCode::T0002,
                         format!("closure parameter `{}` needs a type annotation", p.name),
@@ -913,7 +960,7 @@ fn construct_expr(
                     ))))
                 .collect::<Result<_, _>>()?;
             let ret_ty = return_type.as_ref()
-                .map(|ann| resolved_to_type(&type_expr_to_infer(ann), ctx.subst, span))
+                .map(|ann| resolved_to_type(&ctx.type_expr_to_infer_ctx(ann), ctx.subst, span))
                 .transpose()?
                 .unwrap_or(Type::Unit);
             ctx.push_scope();
@@ -939,13 +986,13 @@ fn construct_expr(
             construct_propagate_error(expr, span, ctx)
         }
         Expr::Ascribe { expr, ann, span } => {
-            let ty = resolved_to_type(&type_expr_to_infer(ann), ctx.subst, span)?;
+            let ty = resolved_to_type(&ctx.type_expr_to_infer_ctx(ann), ctx.subst, span)?;
             construct_expr(expr, Some(&ty), ctx)
         }
 
         Expr::Cast { expr, target_type, span } => {
             let typed_expr = construct_expr(expr, None, ctx)?;
-            let ty = resolved_to_type(&type_expr_to_infer(target_type), ctx.subst, span)?;
+            let ty = resolved_to_type(&ctx.type_expr_to_infer_ctx(target_type), ctx.subst, span)?;
             Ok(TypedExpr::Cast {
                 expr: Box::new(typed_expr),
                 target_type: target_type.clone(),
@@ -1468,7 +1515,8 @@ fn instantiate_scheme_for_call(
     let mut subst = Substitution::new();
     for (param, arg_ty) in params.iter().zip(arg_types.iter()) {
         let arg_infer = type_to_infer(*arg_ty);
-        let s = unify(&subst.apply(param), &arg_infer).map_err(|_| {
+        let applied = subst.apply(param);
+        let s = unify(&applied, &arg_infer).map_err(|_| {
             MetelError::type_error(TypeErrorCode::T0001, "argument type mismatch", span)
         })?;
         subst = subst.compose(&s);

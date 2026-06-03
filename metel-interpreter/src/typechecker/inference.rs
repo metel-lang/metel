@@ -75,9 +75,10 @@ fn infer_decl(
                 if !scheme.quantified_vars.is_empty() {
                     ctx.bind_poly(&ld.name, scheme);
                     fun_generalizations.push(FunGeneralization {
-                        name:    ld.name.clone(),
-                        fun_ty:  resolved_ty,
+                        name:     ld.name.clone(),
+                        fun_ty:   resolved_ty,
                         env_fvs,
+                        name_map: HashMap::new(),
                     });
                     return Ok(InferType::unit());
                 }
@@ -200,6 +201,10 @@ fn infer_fun_decl(
         ctx.bind_mono(&param.name, pt.clone(), false);
     }
 
+    // Build initial name_map from original TypeVars; will be resolved post-solve below.
+    let orig_name_map: HashMap<TypeVar, String> = generic_map.iter()
+        .map(|(n, &tv)| (tv, n.clone()))
+        .collect();
     let saved_type_params  = ctx.swap_type_params(generic_map);
     let saved_tp_bounds    = ctx.swap_type_param_bounds(type_var_bounds);
     let saved_ret = ctx.push_return_type(ret_ty.clone());
@@ -226,7 +231,18 @@ fn infer_fun_decl(
     let scheme = generalize(resolved_ty, &env_fvs);
     ctx.bind_poly(&fun.name, scheme);
 
-    fun_generalizations.push(FunGeneralization { name: fun.name.clone(), fun_ty, env_fvs });
+    // After solving, the original TypeVars may have been unified with others.
+    // Remap name_map through partial_subst so quantified_vars (which are in the
+    // resolved type) have correct names.
+    let name_map: HashMap<TypeVar, String> = orig_name_map.into_iter()
+        .filter_map(|(orig_tv, name)| {
+            match partial_subst.apply(&InferType::Var(orig_tv)) {
+                InferType::Var(final_tv) => Some((final_tv, name)),
+                _ => None, // var was solved to a concrete type; no longer generic
+            }
+        })
+        .collect();
+    fun_generalizations.push(FunGeneralization { name: fun.name.clone(), fun_ty, env_fvs, name_map });
     Ok(())
 }
 
