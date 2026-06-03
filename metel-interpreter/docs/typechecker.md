@@ -205,6 +205,18 @@ A few inference cases call `ctx.solve()` eagerly to determine structural type in
 
 These partial solves are read-only (they produce a `Substitution` value but don't modify `ctx.constraints`). They are a pragmatic workaround for the fact that field/method lookup requires knowing the concrete type name — a fundamental limitation of constraint-only inference.
 
+### Mutability Enforcement
+
+Binding mutability is tracked as a boolean flag in `mono_env`: `HashMap<String, (InferType, bool)>`. `bind_mono(name, ty, is_mutable)` stores the flag. `lookup_for_write(name, span)` retrieves the binding and returns `T0006` if `is_mutable` is false.
+
+Three write sites call `lookup_for_write` during Pass 1:
+
+1. **Direct assignment** (`Expr::Assign { target: Ident(x), .. }`) — checked directly.
+2. **`&mut x`** (`UnaryOp::RefMut` where the operand is `Ident`) — checked before returning `MutPointer(T)`.
+3. **Field assignment** (`Expr::FieldAssign`) — the object is inferred first to resolve its type. If the object type is `MutPointer(T)` (auto-deref field assign), the binding check is skipped entirely. Otherwise, `root_binding_for_write` walks the object chain (`FieldAccess → Index → Ident`) to find the root binding and calls `lookup_for_write` on it. Chains ending in `UnaryOp::Deref` also return `None` from `root_binding_for_write` and are exempt.
+
+Method `self` parameters: `self` in an `&mut self` method is bound with `is_mutable = true` regardless of the `Param::mutable` flag (which the parser always sets to `false` for receivers). This is handled at `infer_impl_method` and `infer_default_aspect_method` with `p.mutable || matches!(p.receiver, Some(ReceiverKind::RefMut))`.
+
 ### Type Ascription (`:` Operator)
 
 `e : T` is a pure inference hint. Inference:

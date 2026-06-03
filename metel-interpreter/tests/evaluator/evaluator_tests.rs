@@ -299,6 +299,9 @@ mod tests {
     #[test]
     fn neg_refmut_immutable_binding() { check("closures/neg_75_refmut_immutable_binding.mtl"); }
 
+    #[test]
+    fn neg_refmut_captured_immutable() { check("closures/neg_79_refmut_captured_immutable.mtl"); }
+
     // ── Structs ───────────────────────────────────────────────────────────────
 
     #[test]
@@ -360,6 +363,15 @@ mod tests {
 
     #[test]
     fn neg_field_assign_immutable_binding() { check("structs/neg_76_field_assign_immutable_binding.mtl"); }
+
+    #[test]
+    fn neg_compound_field_assign_immutable() { check("structs/neg_77_compound_field_assign_immutable.mtl"); }
+
+    #[test]
+    fn neg_nested_field_assign_immutable() { check("structs/neg_78_nested_field_assign_immutable.mtl"); }
+
+    #[test]
+    fn field_assign_through_mut_ptr() { check("structs/77_field_assign_through_mut_ptr.mtl"); }
 
     // ── Enums ─────────────────────────────────────────────────────────────────
 

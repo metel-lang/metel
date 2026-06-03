@@ -1401,11 +1401,16 @@ fn infer_field_assign_type(
     ctx: &mut InferContext,
     fun_generalizations: &mut Vec<FunGeneralization>,
 ) -> Result<InferType, MetelError> {
-    if let Some((name, span)) = root_binding_for_write(object) {
-        let _ = ctx.lookup_for_write(name, span)?;
-    }
     let obj_ty = infer_expr(object, ctx, fun_generalizations)?;
     let obj_ty = ctx.solve()?.apply(&obj_ty);
+    // Auto-deref through *mut T: writing via a mutable pointer doesn't require
+    // the pointer binding itself to be mutable — only the pointee is being written.
+    let is_through_mut_ptr = matches!(&obj_ty, InferType::MutPointer(_));
+    if !is_through_mut_ptr {
+        if let Some((name, span)) = root_binding_for_write(object) {
+            let _ = ctx.lookup_for_write(name, span)?;
+        }
+    }
     let struct_name = named_type_name(&obj_ty).ok_or_else(|| {
         MetelError::type_error(
             TypeErrorCode::T0002,

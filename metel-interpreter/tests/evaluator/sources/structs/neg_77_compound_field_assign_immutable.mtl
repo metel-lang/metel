@@ -1,0 +1,8 @@
+// Compound assignment to a field of a plain let binding is also a type error.
+// TYPECHECK_ERROR[immutable binding]
+struct Counter { value: Int }
+
+fun main() {
+    let c = Counter { value: 0 };
+    c.value += 1;
+}

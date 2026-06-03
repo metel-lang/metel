@@ -1,0 +1,15 @@
+// Field assignment through a *mut pointer uses auto-deref and is always allowed —
+// the binding check is bypassed when the root holds a *mut pointer value.
+struct Point { x: Int, y: Int }
+
+fun main() {
+    let mut p = Point { x: 1, y: 2 };
+    let ptr: *mut Point = &mut p;
+
+    // Auto-deref field assign through *mut Point.
+    ptr.x = 10;
+    assert(p.x == 10);
+
+    ptr.y += 8;
+    assert(p.y == 10);
+}
