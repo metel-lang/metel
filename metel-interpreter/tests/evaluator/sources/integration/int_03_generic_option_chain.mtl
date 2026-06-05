@@ -76,7 +76,7 @@ fun pair_swap<A, B>(p: Pair<A, B>) -> Pair<B, A> {
 fun find_first<T>(arr: T[], pred: (T) -> Bool) -> Option<T> {
     let mut i = 0;
     while (i < array_len(arr)) {
-        if (pred(arr[i])) { return Option::Some { value: arr[i] }; }
+        if (pred(arr[i as u64])) { return Option::Some { value: arr[i as u64] }; }
         i += 1;
     }
     Option::None
@@ -106,7 +106,7 @@ fun safe_div(a: Int, b: Int) -> Option<Int> {
 
 fun safe_get_int(arr: Int[], i: Int) -> Option<Int> {
     if (i < 0 || i >= array_len(arr)) Option::None
-    else Option::Some { value: arr[i] }
+    else Option::Some { value: arr[i as u64] }
 }
 
 // ── String lookup in a Pair<String,Int>[] "map" ───────────────────────────────

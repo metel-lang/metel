@@ -631,9 +631,9 @@ fn parse_literal_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resu
             })?
         ),
         Rule::int_lit_suffixed => {
-            // Split digits from suffix: suffix is the longest matching type name at the end.
-            let (suffix, digits_end) = if let Some(pos) = text.rfind(|c: char| !c.is_ascii_alphabetic()) {
-                (&text[pos + 1..], pos + 1)
+            // Split digits from suffix: find the first non-digit, non-underscore character.
+            let (suffix, digits_end) = if let Some(pos) = text.find(|c: char| !c.is_ascii_digit() && c != '_') {
+                (&text[pos..], pos)
             } else {
                 (text, 0)
             };
@@ -672,8 +672,9 @@ fn parse_literal_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resu
             Literal::SizedInt { value, kind }
         }
         Rule::float_lit_suffixed => {
-            let (suffix, digits_end) = if let Some(pos) = text.rfind(|c: char| !c.is_ascii_alphabetic()) {
-                (&text[pos + 1..], pos + 1)
+            // Float literals: digits and '.' at the start, suffix follows.
+            let (suffix, digits_end) = if let Some(pos) = text.find(|c: char| !c.is_ascii_digit() && c != '_' && c != '.') {
+                (&text[pos..], pos)
             } else {
                 (text, 0)
             };

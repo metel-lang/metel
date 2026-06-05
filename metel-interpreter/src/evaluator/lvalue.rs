@@ -122,7 +122,6 @@ pub(super) fn eval_typed_place_value(
             let arr = eval_typed_place_value(object, env, tspan)?;
             let idx = eval_expr(index, env)?.into_value();
             let i: i64 = match idx {
-                Value::Int(n)  => n,
                 Value::U64(u)  => {
                     if u > i64::MAX as u64 {
                         return Err(MetelError::panic(RuntimeErrorCode::R0004,
@@ -130,13 +129,7 @@ pub(super) fn eval_typed_place_value(
                     }
                     u as i64
                 }
-                Value::I8(n)   => n as i64,
-                Value::I16(n)  => n as i64,
-                Value::I32(n)  => n as i64,
-                Value::U8(n)   => n as i64,
-                Value::U16(n)  => n as i64,
-                Value::U32(n)  => n as i64,
-                _ => return Err(MetelError::internal("index expression must be an integer")),
+                _ => return Err(MetelError::internal("index: expected u64 index (typechecker should have caught this)")),
             };
             match arr {
                 Value::Array(rc) => {

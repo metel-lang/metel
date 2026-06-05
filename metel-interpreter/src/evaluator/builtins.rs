@@ -78,6 +78,75 @@ pub(super) fn register_builtins(env: &mut Environment) {
         }
     }));
 
+    // Sized integer / float → Int
+    macro_rules! int_from {
+        ($key:expr, $pat:pat => $val:expr) => {
+            env.define($key, Value::Builtin($key.to_string(), |args, _span| {
+                match args.first() {
+                    Some($pat) => Ok(Value::Int($val)),
+                    _ => Err(MetelError::internal(concat!($key, ": unexpected argument"))),
+                }
+            }));
+        };
+    }
+    int_from!("Int::From<i8>::from",  Value::I8(n)  => *n as i64);
+    int_from!("Int::From<i16>::from", Value::I16(n) => *n as i64);
+    int_from!("Int::From<i32>::from", Value::I32(n) => *n as i64);
+    int_from!("Int::From<u8>::from",  Value::U8(n)  => *n as i64);
+    int_from!("Int::From<u16>::from", Value::U16(n) => *n as i64);
+    int_from!("Int::From<u32>::from", Value::U32(n) => *n as i64);
+    int_from!("Int::From<u64>::from", Value::U64(n) => *n as i64);
+    int_from!("Int::From<f32>::from", Value::F32(f) => *f as i64);
+
+    // Sized integer / float → Float
+    macro_rules! float_from {
+        ($key:expr, $pat:pat => $val:expr) => {
+            env.define($key, Value::Builtin($key.to_string(), |args, _span| {
+                match args.first() {
+                    Some($pat) => Ok(Value::Float($val)),
+                    _ => Err(MetelError::internal(concat!($key, ": unexpected argument"))),
+                }
+            }));
+        };
+    }
+    float_from!("Float::From<i8>::from",  Value::I8(n)  => *n as f64);
+    float_from!("Float::From<i16>::from", Value::I16(n) => *n as f64);
+    float_from!("Float::From<i32>::from", Value::I32(n) => *n as f64);
+    float_from!("Float::From<u8>::from",  Value::U8(n)  => *n as f64);
+    float_from!("Float::From<u16>::from", Value::U16(n) => *n as f64);
+    float_from!("Float::From<u32>::from", Value::U32(n) => *n as f64);
+    float_from!("Float::From<u64>::from", Value::U64(n) => *n as f64);
+    float_from!("Float::From<f32>::from", Value::F32(f) => *f as f64);
+
+    // Int / Float → sized integer types (truncating / wrapping)
+    macro_rules! sized_from {
+        ($key:expr, Int => $cast:expr) => {
+            env.define($key, Value::Builtin($key.to_string(), |args, _span| {
+                match args.first() {
+                    Some(Value::Int(n))   => Ok($cast(*n as i128)),
+                    Some(Value::Float(f)) => Ok($cast(*f as i128)),
+                    _ => Err(MetelError::internal(concat!($key, ": unexpected argument"))),
+                }
+            }));
+        };
+    }
+    sized_from!("u64::From<Int>::from",   Int => |n: i128| Value::U64(n as u64));
+    sized_from!("u64::From<Float>::from", Int => |n: i128| Value::U64(n as u64));
+    sized_from!("i8::From<Int>::from",    Int => |n: i128| Value::I8(n as i8));
+    sized_from!("i8::From<Float>::from",  Int => |n: i128| Value::I8(n as i8));
+    sized_from!("i16::From<Int>::from",   Int => |n: i128| Value::I16(n as i16));
+    sized_from!("i16::From<Float>::from", Int => |n: i128| Value::I16(n as i16));
+    sized_from!("i32::From<Int>::from",   Int => |n: i128| Value::I32(n as i32));
+    sized_from!("i32::From<Float>::from", Int => |n: i128| Value::I32(n as i32));
+    sized_from!("u8::From<Int>::from",    Int => |n: i128| Value::U8(n as u8));
+    sized_from!("u8::From<Float>::from",  Int => |n: i128| Value::U8(n as u8));
+    sized_from!("u16::From<Int>::from",   Int => |n: i128| Value::U16(n as u16));
+    sized_from!("u16::From<Float>::from", Int => |n: i128| Value::U16(n as u16));
+    sized_from!("u32::From<Int>::from",   Int => |n: i128| Value::U32(n as u32));
+    sized_from!("u32::From<Float>::from", Int => |n: i128| Value::U32(n as u32));
+    sized_from!("f32::From<Int>::from",   Int => |n: i128| Value::F32(n as f32));
+    sized_from!("f32::From<Float>::from", Int => |n: i128| Value::F32(n as f32));
+
     env.define("string_len", Value::Builtin("string_len".to_string(), |args, _span| {
         if let Some(Value::Str(s)) = args.first() {
             Ok(Value::Int(s.chars().count() as i64))

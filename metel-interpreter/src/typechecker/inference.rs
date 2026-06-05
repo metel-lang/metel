@@ -631,8 +631,9 @@ fn infer_expr(
         }
         Expr::Index { object, index, span } => {
             let obj_ty   = infer_expr(object, ctx, fun_generalizations)?;
-            let idx_ty   = infer_expr(index,  ctx, fun_generalizations)?;
-            ctx.add_constraint(idx_ty, InferType::int(), span.clone());
+            // Index expression type is checked in the construction pass (must be u64).
+            // No inference constraint needed here; plain int literals are promoted to u64 by construction.
+            let _idx_ty  = infer_expr(index,  ctx, fun_generalizations)?;
             let elem_var = ctx.fresh_var();
             ctx.add_constraint(obj_ty, InferType::Array(Box::new(elem_var.clone())), span.clone());
             Ok(elem_var)
@@ -673,8 +674,8 @@ fn infer_expr(
                 }
                 AssignTarget::Index { object, index, span: target_span } => {
                     let obj_ty   = infer_expr(object, ctx, fun_generalizations)?;
-                    let idx_ty   = infer_expr(index,  ctx, fun_generalizations)?;
-                    ctx.add_constraint(idx_ty, InferType::int(), target_span.clone());
+                    // Index type checked in construction pass; no inference constraint here.
+                    let _idx_ty  = infer_expr(index,  ctx, fun_generalizations)?;
                     let elem_var = ctx.fresh_var();
                     ctx.add_constraint(obj_ty, InferType::Array(Box::new(elem_var.clone())), target_span.clone());
                     elem_var
@@ -1570,6 +1571,14 @@ fn infer_type_name(ty: &InferType) -> Option<&str> {
         InferType::Concrete(Type::Float) => Some("Float"),
         InferType::Concrete(Type::Bool)  => Some("Bool"),
         InferType::Concrete(Type::Str)   => Some("String"),
+        InferType::Concrete(Type::I8)    => Some("i8"),
+        InferType::Concrete(Type::I16)   => Some("i16"),
+        InferType::Concrete(Type::I32)   => Some("i32"),
+        InferType::Concrete(Type::U8)    => Some("u8"),
+        InferType::Concrete(Type::U16)   => Some("u16"),
+        InferType::Concrete(Type::U32)   => Some("u32"),
+        InferType::Concrete(Type::U64)   => Some("u64"),
+        InferType::Concrete(Type::F32)   => Some("f32"),
         InferType::Named(name, _)        => Some(name.as_str()),
         _ => None,
     }

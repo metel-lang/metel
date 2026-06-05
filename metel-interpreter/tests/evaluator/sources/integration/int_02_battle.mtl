@@ -162,7 +162,7 @@ fun best_attacker_idx(party: Fighter[]) -> Perhaps<Int> {
     if (n == 0) { return None; }
     let mut best = 0;
     for (let mut i = 1; i < n; i += 1) {
-        if (party[i].attack > party[best].attack) {
+        if (party[i as u64].attack > party[best as u64].attack) {
             best = i;
         }
     }

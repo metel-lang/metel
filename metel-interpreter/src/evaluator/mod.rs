@@ -773,9 +773,11 @@ fn range_field(fields: &HashMap<String, Value>, name: &str, _span: &Span) -> Res
 
 pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, MetelError> {
     match expr {
-        TypedExpr::Literal(lit, _, _) => {
+        TypedExpr::Literal(lit, ty, _) => {
             use crate::ast::{IntKind, FloatKind};
             let val = match lit {
+                // Plain int literal promoted to u64 at an index site by the construction pass.
+                Literal::Int(n) if ty == &crate::types::Type::U64 => Value::U64(*n as u64),
                 Literal::Int(n)   => Value::Int(*n),
                 Literal::Float(f) => Value::Float(*f),
                 Literal::SizedInt { value, kind } => match kind {
@@ -969,13 +971,6 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
             let idx = eval_expr(index, env)?.into_value();
             let i: usize = match idx {
                 Value::U64(u) => u as usize,
-                // Plain int literals in index position infer as u64 but evaluate as Int.
-                Value::Int(n) if n >= 0 => n as usize,
-                Value::Int(n) => return Err(MetelError::panic(
-                    RuntimeErrorCode::R0004,
-                    format!("index {n} out of bounds (negative)"),
-                    span,
-                )),
                 _ => return Err(MetelError::internal("index: expected u64 index (typechecker should have caught this)")),
             };
             match arr {
@@ -1088,13 +1083,13 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                     let arr_val = lvalue::eval_typed_place_value(object, env, tspan)?;
                     let idx_val = eval_expr(index, env)?.into_value();
                     let i = match idx_val {
-                        Value::Int(n) => n,
-                        _ => return Err(MetelError::internal("index expression must be an integer")),
+                        Value::U64(u) => u as usize,
+                        _ => return Err(MetelError::internal("index: expected u64 index (typechecker should have caught this)")),
                     };
                     match arr_val {
                         Value::Array(rc) => {
-                            let len = rc.borrow().len() as i64;
-                            if i < 0 || i >= len {
+                            let len = rc.borrow().len();
+                            if i >= len {
                                 return Err(MetelError::panic(
                                     RuntimeErrorCode::R0004, format!("index {i} out of bounds (len {len})"), span,
                                 ));
@@ -1102,10 +1097,10 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                             let new_val = if matches!(op, AssignOp::Assign) {
                                 rhs
                             } else {
-                                let cur = rc.borrow()[i as usize].clone();
+                                let cur = rc.borrow()[i].clone();
                                 lvalue::apply_assign_op(op, cur, rhs, span)?
                             };
-                            rc.borrow_mut()[i as usize] = new_val;
+                            rc.borrow_mut()[i] = new_val;
                             Ok(Signal::Value(Value::Unit))
                         }
                         _ => Err(MetelError::internal(

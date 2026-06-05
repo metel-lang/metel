@@ -89,6 +89,14 @@ fn register_builtin_aspect_impls(registry: &mut TypeDefinitionRegistry) {
     // From impls for numeric conversions
     registry.register_aspect_impl("Int".into(),   "From".into(), vec![Type::Float]);
     registry.register_aspect_impl("Float".into(), "From".into(), vec![Type::Int]);
+    // Sized integer ↔ Int / Float conversions
+    for sized in [Type::I8, Type::I16, Type::I32, Type::U8, Type::U16, Type::U32, Type::U64, Type::F32] {
+        let name = sized.to_string();
+        registry.register_aspect_impl("Int".into(),   "From".into(), vec![sized.clone()]);
+        registry.register_aspect_impl("Float".into(), "From".into(), vec![sized.clone()]);
+        registry.register_aspect_impl(name.clone(),   "From".into(), vec![Type::Int]);
+        registry.register_aspect_impl(name.clone(),   "From".into(), vec![Type::Float]);
+    }
     // Display impls for built-in types (used by to_string method dispatch)
     registry.register_aspect_impl("Int".into(),    "Display".into(), vec![]);
     registry.register_aspect_impl("Float".into(),  "Display".into(), vec![]);

@@ -1,7 +1,7 @@
 fun find(arr: Int[], target: Int) -> Perhaps<Int> {
     let mut i = 0;
     while (i < array_len(arr)) {
-        if (arr[i] == target) {
+        if (arr[i as u64] == target) {
             return Perhaps::Some { value: i };
         }
         i += 1;

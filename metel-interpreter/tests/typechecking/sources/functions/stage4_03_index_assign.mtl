@@ -13,7 +13,7 @@ fun bump(arr: Int[]) -> Int[] {
 }
 
 // Index expression evaluated at runtime
-fun set_at(arr: Int[], i: Int, v: Int) -> Int[] {
+fun set_at(arr: Int[], i: u64, v: Int) -> Int[] {
     arr[i] = v;
     arr
 }

@@ -62,7 +62,7 @@ impl StringBag {
 impl Iterable<String> for StringBag {
     fun next(&mut self) -> Perhaps<String> {
         if (self.pos < array_len(self.items)) {
-            let v = self.items[self.pos];
+            let v = self.items[self.pos as u64];
             self.pos = self.pos + 1;
             Perhaps::Some { value: v }
         } else {

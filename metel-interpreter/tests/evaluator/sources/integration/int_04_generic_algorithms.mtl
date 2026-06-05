@@ -71,7 +71,7 @@ fun stack_push(s: Stack, v: Int) -> Stack {
 }
 
 fun stack_top(s: Stack) -> Int {
-    s.items[s.size - 1]
+    s.items[(s.size - 1) as u64]
 }
 
 fun stack_empty(s: Stack) -> Bool {
@@ -105,7 +105,7 @@ fun zip_with<A, B, C>(a: A[], b: B[], f: (A, B) -> C) -> C[] {
     let len = if (array_len(a) < array_len(b)) array_len(a) else array_len(b);
     let mut i = 0;
     while (i < len) {
-        array_push(out, f(a[i], b[i]));
+        array_push(out, f(a[i as u64], b[i as u64]));
         i += 1;
     }
     out
@@ -129,7 +129,7 @@ fun take<T>(arr: T[], n: Int) -> T[] {
     let mut out: T[]  = [];
     let mut i = 0;
     while (i < n && i < array_len(arr)) {
-        array_push(out, arr[i]);
+        array_push(out, arr[i as u64]);
         i += 1;
     }
     out
@@ -139,7 +139,7 @@ fun drop<T>(arr: T[], n: Int) -> T[] {
     let mut out: T[]  = [];
     let mut i = n;
     while (i < array_len(arr)) {
-        array_push(out, arr[i]);
+        array_push(out, arr[i as u64]);
         i += 1;
     }
     out
@@ -153,14 +153,14 @@ fun max_int(a: Int, b: Int) -> Int { if (a > b) a else b }
 fun array_min(arr: Int[]) -> Int {
     let mut m = arr[0];
     let mut i = 1;
-    while (i < array_len(arr)) { m = min_int(m, arr[i]); i += 1; }
+    while (i < array_len(arr)) { m = min_int(m, arr[i as u64]); i += 1; }
     m
 }
 
 fun array_max(arr: Int[]) -> Int {
     let mut m = arr[0];
     let mut i = 1;
-    while (i < array_len(arr)) { m = max_int(m, arr[i]); i += 1; }
+    while (i < array_len(arr)) { m = max_int(m, arr[i as u64]); i += 1; }
     m
 }
 
@@ -169,8 +169,8 @@ fun array_max(arr: Int[]) -> Int {
 fun bsearch(arr: Int[], target: Int, lo: Int, hi: Int) -> Int {
     if (lo > hi) { return -1; }
     let mid = (lo + hi) / 2;
-    if (arr[mid] == target) { return mid; }
-    if (arr[mid] < target) { return bsearch(arr, target, mid + 1, hi); }
+    if (arr[mid as u64] == target) { return mid; }
+    if (arr[mid as u64] < target) { return bsearch(arr, target, mid + 1, hi); }
     bsearch(arr, target, lo, mid - 1)
 }
 
@@ -178,7 +178,7 @@ fun bsearch(arr: Int[], target: Int, lo: Int, hi: Int) -> Int {
 
 fun rsum(arr: Int[], i: Int) -> Int {
     if (i >= array_len(arr)) { return 0; }
-    arr[i] + rsum(arr, i + 1)
+    arr[i as u64] + rsum(arr, i + 1)
 }
 
 // ── Concat two int arrays ─────────────────────────────────────────────────────

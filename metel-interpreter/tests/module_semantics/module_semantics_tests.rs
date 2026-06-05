@@ -651,7 +651,7 @@ fn std_core_builtins_available_in_each_module_without_import() {
          \n    assert(array_len(arr) > 0);\
          \n    let mut total = 0;\
          \n    let mut i = 0;\
-         \n    while (i < array_len(arr)) { total += arr[i]; i += 1; }\
+         \n    while (i < array_len(arr)) { total += arr[i as u64]; i += 1; }\
          \n    return total;\
          \n}\n",
     );
@@ -713,7 +713,7 @@ fn multi_module_perhaps_and_result_without_explicit_std_import() {
         "pub fun find_first_positive(arr: Int[]) -> Perhaps<Int> {\
          \n    let mut i = 0;\
          \n    while (i < array_len(arr)) {\
-         \n        if (arr[i] > 0) { return Perhaps::Some { value: arr[i] }; }\
+         \n        if (arr[i as u64] > 0) { return Perhaps::Some { value: arr[i as u64] }; }\
          \n        i += 1;\
          \n    }\
          \n    None\
@@ -1113,7 +1113,7 @@ fun main() {
     // 15. C-style for: manual effort accumulation
     let mut manual_sum = 0;
     for (let mut i = 0; i < array_len(tasks); i += 1) {
-        manual_sum += tasks[i].effort;
+        manual_sum += tasks[i as u64].effort;
     }
     assert(manual_sum == 15);
 
@@ -1122,7 +1122,7 @@ fun main() {
     let mut hp_active = 0;
     let mut idx = 0;
     while (idx < array_len(tasks)) {
-        let t = tasks[idx];
+        let t = tasks[idx as u64];
         if (is_high_priority(t) && !is_done(t)) { hp_active += 1; }
         idx += 1;
     }
@@ -1150,7 +1150,7 @@ fun main() {
 
     // 21. Let-polymorphism: identity closure used at two different types
     let id = (x) -> { x };
-    assert(id(tasks[0]).effort == 5);
+    assert(id(tasks[0u64]).effort == 5);
     assert(id(42) == 42);
 }
 "#,

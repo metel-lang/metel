@@ -704,6 +704,13 @@ fn construct_expr(
         Expr::Index { object, index, span } => {
             let typed_obj = construct_expr(object, None, ctx)?;
             let typed_idx = construct_expr(index,  Some(&Type::U64), ctx)?;
+            if typed_idx.ty() != &Type::U64 {
+                return Err(MetelError::type_error(
+                    TypeErrorCode::T0001,
+                    format!("array index must be u64, got {}; use `expr as u64`", typed_idx.ty()),
+                    span,
+                ));
+            }
             let elem_ty = match typed_obj.ty() {
                 Type::Array(elem) => *elem.clone(),
                 _ => return Err(MetelError::type_error(
@@ -1828,12 +1835,21 @@ fn assign_target_to_typed_place(
                 field: field.clone(),
                 span: span.clone(),
             }),
-        AssignTarget::Index { object, index, span } =>
+        AssignTarget::Index { object, index, span } => {
+            let typed_idx = construct_expr(index, Some(&Type::U64), ctx)?;
+            if typed_idx.ty() != &Type::U64 {
+                return Err(MetelError::type_error(
+                    TypeErrorCode::T0001,
+                    format!("array index must be u64, got {}; use `expr as u64`", typed_idx.ty()),
+                    span,
+                ));
+            }
             Ok(TypedPlace::Index {
                 object: Box::new(expr_to_typed_place(object, ctx)?),
-                index:  Box::new(construct_expr(index, None, ctx)?),
+                index:  Box::new(typed_idx),
                 span: span.clone(),
-            }),
+            })
+        }
     }
 }
 
@@ -1847,12 +1863,21 @@ fn expr_to_typed_place(expr: &Expr, ctx: &mut ConstructCtx<'_>) -> Result<TypedP
                 field: field.clone(),
                 span: span.clone(),
             }),
-        Expr::Index { object, index, span } =>
+        Expr::Index { object, index, span } => {
+            let typed_idx = construct_expr(index, Some(&Type::U64), ctx)?;
+            if typed_idx.ty() != &Type::U64 {
+                return Err(MetelError::type_error(
+                    TypeErrorCode::T0001,
+                    format!("array index must be u64, got {}; use `expr as u64`", typed_idx.ty()),
+                    span,
+                ));
+            }
             Ok(TypedPlace::Index {
                 object: Box::new(expr_to_typed_place(object, ctx)?),
-                index:  Box::new(construct_expr(index, None, ctx)?),
+                index:  Box::new(typed_idx),
                 span: span.clone(),
-            }),
+            })
+        }
         Expr::UnaryOp(UnaryOp::Deref, inner, span) =>
             Ok(TypedPlace::Deref {
                 object: Box::new(construct_expr(inner, None, ctx)?),

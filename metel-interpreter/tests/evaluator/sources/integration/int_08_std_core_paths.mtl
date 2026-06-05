@@ -49,7 +49,7 @@ fun add_parsed(a: String, b: String) -> Result<Int, MathError> {
 fun find_in(arr: Int[], target: Int) -> Perhaps<Int> {
     let mut i = 0;
     while (i < array_len(arr)) {
-        if (arr[i] == target) { return Perhaps::Some { value: i }; }
+        if (arr[i as u64] == target) { return Perhaps::Some { value: i }; }
         i += 1;
     }
     None

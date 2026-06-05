@@ -48,10 +48,10 @@ fun sort_floats(arr: Float[]) -> Float[] {
         let mut j = 0;
         while (j < n - i - 1) {
             let jp1 = j + 1;
-            if (s[j] > s[jp1]) {
-                let tmp = s[j];
-                s[j]   = s[jp1];
-                s[jp1] = tmp;
+            if (s[j as u64] > s[jp1 as u64]) {
+                let tmp = s[j as u64];
+                s[j as u64]   = s[jp1 as u64];
+                s[jp1 as u64] = tmp;
             }
             j += 1;
         }
@@ -69,9 +69,9 @@ fun binary_search(sorted: Float[], target: Float) -> Perhaps<Int> {
     let mut hi = array_len(sorted) - 1;
     while (lo <= hi) {
         let mid = (lo + hi) / 2;
-        if (float_eq(sorted[mid], target)) {
+        if (float_eq(sorted[mid as u64], target)) {
             return Perhaps::Some { value: mid };
-        } else if (sorted[mid] < target) {
+        } else if (sorted[mid as u64] < target) {
             lo = mid + 1;
         } else {
             hi = mid - 1;
@@ -119,7 +119,7 @@ fun compute_stats(data: Float[]) -> Result<Stats, String> {
     let mut mx = data[0];
     let mut i = 0;
     while (i < n) {
-        let x = data[i];
+        let x = data[i as u64];
         total += x;
         if (x < mn) { mn = x; }
         if (x > mx) { mx = x; }
@@ -129,7 +129,7 @@ fun compute_stats(data: Float[]) -> Result<Stats, String> {
     let mut var_sum = 0.0;
     let mut j = 0;
     while (j < n) {
-        let xj = data[j];
+        let xj = data[j as u64];
         let d  = xj - mean;
         var_sum += d * d;
         j += 1;
@@ -146,10 +146,10 @@ fun median(data: Float[]) -> Perhaps<Float> {
     let sorted = sort_floats(data);
     let mid = n / 2;
     if (n % 2 == 1) {
-        Perhaps::Some { value: sorted[mid] }
+        Perhaps::Some { value: sorted[mid as u64] }
     } else {
         let mid1 = mid - 1;
-        Perhaps::Some { value: (sorted[mid1] + sorted[mid]) / 2.0 }
+        Perhaps::Some { value: (sorted[mid1 as u64] + sorted[mid as u64]) / 2.0 }
     }
 }
 

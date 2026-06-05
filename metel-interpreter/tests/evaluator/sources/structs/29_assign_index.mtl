@@ -11,7 +11,7 @@ fun main() {
     arr[2] *= 2;
     assert(arr[2] == 60);
     // Assignment using a variable as the index.
-    let mut i = 1;
-    arr[i] = 0;
+    let i = 1;
+    arr[i as u64] = 0;
     assert(arr[1] == 0);
 }
