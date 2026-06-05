@@ -4,6 +4,7 @@
 pub enum Type {
     Bool,
     Str,
+    Char,
     Unit,
     /// The bottom type `!`. Produced by expressions that never return (infinite
     /// loops with no reachable `break`, `return`, `panic!`). Coerces to any type.
@@ -49,6 +50,7 @@ impl std::fmt::Display for Type {
             Type::F64 => write!(f, "f64"),
             Type::Bool => write!(f, "Bool"),
             Type::Str => write!(f, "String"),
+            Type::Char => write!(f, "Char"),
             Type::Unit => write!(f, "()"),
             Type::Never => write!(f, "!"),
             Type::I8  => write!(f, "i8"),

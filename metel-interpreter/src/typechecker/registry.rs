@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{AspectDecl, AspectMethod, Decl, GenericParam, Program, Span, TypeExpr, WhereClause};
+use crate::types::Type;
 use crate::typeinference::{
     EnumInfo, FieldEntry, InferContext, InferType, TypeDefinitionRegistry, TypeScheme, TypeVar,
     TypeVarGenerator, VariantInfo,
@@ -101,7 +102,11 @@ fn register_builtin_aspect_impls(registry: &mut TypeDefinitionRegistry) {
     registry.register_aspect_impl("i64".into(),    "Display".into(), vec![]);
     registry.register_aspect_impl("f64".into(),  "Display".into(), vec![]);
     registry.register_aspect_impl("Bool".into(),   "Display".into(), vec![]);
+    registry.register_aspect_impl("Char".into(),   "Display".into(), vec![]);
     registry.register_aspect_impl("String".into(), "Display".into(), vec![]);
+    // Char ↔ u32 (Unicode code point) conversions
+    registry.register_aspect_impl("u32".into(),  "From".into(), vec![Type::Char]);
+    registry.register_aspect_impl("Char".into(), "From".into(), vec![Type::U32]);
 }
 
 /// Build the `TypeDefinitionRegistry` from the program's declarations and built-in types.
@@ -373,11 +378,13 @@ pub(super) fn register_builtins(ctx: &mut InferContext, prelude: &super::StdPrel
     }
 
     // Methods are not free functions; they're not in StdPrelude::schemes.
-    for type_name in &["i64", "f64", "Bool", "String"] {
+    let char_ty = InferType::Concrete(Type::Char);
+    for type_name in &["i64", "f64", "Bool", "Char", "String"] {
         let self_ty = match *type_name {
             "i64"    => int_ty.clone(),
             "f64"    => float_ty.clone(),
             "Bool"   => bool_ty.clone(),
+            "Char"   => char_ty.clone(),
             "String" => str_ty.clone(),
             _ => unreachable!(),
         };

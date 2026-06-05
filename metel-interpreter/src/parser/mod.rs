@@ -594,7 +594,7 @@ fn parse_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Expr,
             parse_expr(inner, filename)
         }
         // Terminals and composites reachable from primary_expr
-        Rule::int_lit | Rule::float_lit | Rule::string_lit
+        Rule::int_lit | Rule::float_lit | Rule::string_lit | Rule::char_lit
         | Rule::bool_lit | Rule::none_lit | Rule::unit_lit
         | Rule::int_lit_suffixed | Rule::float_lit_suffixed => parse_literal_expr(pair, filename),
         Rule::path_expr     => parse_path_expr(pair, filename),
@@ -693,6 +693,16 @@ fn parse_literal_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resu
             Literal::SizedFloat { value, kind }
         }
         Rule::string_lit => return parse_string_literal_expr(text, span, filename),
+        Rule::char_lit   => {
+            let inner = &text[1..text.len() - 1];
+            let ch = parse_char_inner(inner).ok_or_else(|| MetelError::ParseError {
+                code: ParseErrorCode::P0004,
+                message: format!("invalid character literal {text}"),
+                start: span.start, end: span.end, filename: filename.to_string(),
+                line: span.line, col: span.col, source_line: None,
+            })?;
+            Literal::Char(ch)
+        }
         Rule::bool_lit   => Literal::Bool(text == "true"),
         Rule::none_lit   => Literal::None,
         Rule::unit_lit   => Literal::Unit,
@@ -1905,6 +1915,30 @@ fn parse_aspect_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resul
     Ok(AspectDecl { visibility, name, generics, methods, span })
 }
 
+
+fn parse_char_inner(s: &str) -> Option<char> {
+    if let Some(rest) = s.strip_prefix('\\') {
+        let mut chars = rest.chars();
+        match chars.next()? {
+            'n'  => Some('\n'),
+            't'  => Some('\t'),
+            'r'  => Some('\r'),
+            '\\' => Some('\\'),
+            '\'' => Some('\''),
+            'u'  => {
+                let hex = rest.strip_prefix("u{")?
+                    .strip_suffix('}')?;
+                let code = u32::from_str_radix(hex, 16).ok()?;
+                char::from_u32(code)
+            }
+            _ => None,
+        }
+    } else {
+        let mut chars = s.chars();
+        let c = chars.next()?;
+        if chars.next().is_none() { Some(c) } else { None }
+    }
+}
 
 fn unescape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());

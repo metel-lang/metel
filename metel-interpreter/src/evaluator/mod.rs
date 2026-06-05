@@ -51,6 +51,7 @@ pub enum Value {
     F64(f64),
     /// 32-bit float.
     F32(f32),
+    Char(char),
     Bool(bool),
     Str(String),
     Unit,
@@ -792,6 +793,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                     FloatKind::F32 => Value::F32(*value as f32),
                     FloatKind::F64 => Value::F64(*value),
                 },
+                Literal::Char(c)  => Value::Char(*c),
                 Literal::Bool(b)  => Value::Bool(*b),
                 Literal::Str(s)   => Value::Str(s.clone()),
                 Literal::None     => Value::Enum { name: "Perhaps".into(), variant: "None".into(), fields: HashMap::new() },
@@ -933,6 +935,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                     Value::U64(_)  => Some("u64"),
                     Value::F64(_) => Some("f64"),
                     Value::F32(_)   => Some("f32"),
+                    Value::Char(_)  => Some("Char"),
                     Value::Bool(_)  => Some("Bool"),
                     Value::Str(_)   => Some("String"),
                     _ => None,
@@ -1198,6 +1201,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                 Value::Struct { name, .. } | Value::Enum { name, .. } => name.clone(),
                 Value::I64(_)   => "i64".to_string(),
                 Value::F64(_) => "f64".to_string(),
+                Value::Char(_)  => "Char".to_string(),
                 Value::Bool(_)  => "Bool".to_string(),
                 Value::Str(_)   => "String".to_string(),
                 _ => return Err(MetelError::panic(

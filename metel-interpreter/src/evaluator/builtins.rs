@@ -55,6 +55,12 @@ pub(super) fn register_builtins(env: &mut Environment) {
             _ => Err(MetelError::internal("Bool::to_string: expected Bool")),
         }
     }));
+    env.define("Char::to_string", Value::Builtin("Char::to_string".to_string(), |args, _span| {
+        match args.first() {
+            Some(Value::Char(c)) => Ok(Value::Str(c.to_string())),
+            _ => Err(MetelError::internal("Char::to_string: expected Char")),
+        }
+    }));
     env.define("String::to_string", Value::Builtin("String::to_string".to_string(), |args, _span| {
         match args.first() {
             Some(Value::Str(s)) => Ok(Value::Str(s.clone())),
@@ -146,6 +152,21 @@ pub(super) fn register_builtins(env: &mut Environment) {
     sized_from!("u32::From<f64>::from",   Int => |n: i128| Value::U32(n as u32));
     sized_from!("f32::From<i64>::from",   Int => |n: i128| Value::F32(n as f32));
     sized_from!("f32::From<f64>::from",   Int => |n: i128| Value::F32(n as f32));
+
+    env.define("u32::From<Char>::from", Value::Builtin("u32::From<Char>::from".to_string(), |args, _span| {
+        match args.first() {
+            Some(Value::Char(c)) => Ok(Value::U32(*c as u32)),
+            _ => Err(MetelError::internal("u32::From<Char>::from: expected Char")),
+        }
+    }));
+    env.define("Char::From<u32>::from", Value::Builtin("Char::From<u32>::from".to_string(), |args, span| {
+        match args.first() {
+            Some(Value::U32(n)) => char::from_u32(*n).map(Value::Char).ok_or_else(|| {
+                MetelError::panic(RuntimeErrorCode::R0009, format!("u32 value {n} is not a valid Unicode scalar"), span)
+            }),
+            _ => Err(MetelError::internal("Char::From<u32>::from: expected u32")),
+        }
+    }));
 
     env.define("string_len", Value::Builtin("string_len".to_string(), |args, _span| {
         if let Some(Value::Str(s)) = args.first() {

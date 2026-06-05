@@ -16,6 +16,7 @@ pub enum ParseErrorCode {
     P0001, // Syntax error
     P0002, // Invalid integer literal
     P0003, // Invalid float literal
+    P0004, // Invalid character literal
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

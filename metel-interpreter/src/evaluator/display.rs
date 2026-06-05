@@ -12,6 +12,7 @@ pub(super) fn value_to_display_string(v: &Value) -> Option<String> {
     match v {
         Value::I64(n)   => Some(n.to_string()),
         Value::F64(f) => Some(format_float(*f)),
+        Value::Char(c)  => Some(c.to_string()),
         Value::Bool(b)  => Some(if *b { "true" } else { "false" }.to_string()),
         Value::Str(s)   => Some(s.clone()),
         Value::I8(n)    => Some(n.to_string()),
@@ -30,6 +31,7 @@ pub(super) fn format_value(val: &Value) -> String {
     match val {
         Value::I64(n)   => n.to_string(),
         Value::F64(f) => f.to_string(),
+        Value::Char(c)  => format!("'{}'", c),
         Value::Bool(b)  => b.to_string(),
         Value::Str(s)   => format!("{:?}", s),
         Value::Unit     => "()".to_string(),

@@ -814,6 +814,7 @@ fn construct_expr(
                 Type::I64   => ("i64".to_string(), vec![]),
                 Type::F64 => ("f64".to_string(), vec![]),
                 Type::Bool  => ("Bool".to_string(),   vec![]),
+                Type::Char  => ("Char".to_string(),   vec![]),
                 t => return Err(MetelError::internal(
                     format!("method call on non-struct type {t}")
                 )),
@@ -1581,6 +1582,7 @@ fn construct_literal_type(
             FloatKind::F32 => Type::F32,
             FloatKind::F64 => Type::F64,
         }),
+        Literal::Char(_)  => Ok(Type::Char),
         Literal::Bool(_)  => Ok(Type::Bool),
         Literal::Str(_)   => Ok(Type::Str),
         Literal::Unit     => Ok(Type::Unit),
@@ -1652,6 +1654,7 @@ fn type_to_type_expr(ty: &Type) -> TypeExpr {
         Type::I64   => named("i64"),
         Type::F64 => named("f64"),
         Type::Bool  => named("Bool"),
+        Type::Char  => named("Char"),
         Type::Str   => named("String"),
         Type::Unit  => TypeExpr::Unit,
         Type::Never => named("!"),

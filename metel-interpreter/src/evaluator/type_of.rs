@@ -17,6 +17,7 @@ pub(super) fn value_to_type(value: &Value) -> Type {
     match value {
         Value::I64(_)   => Type::I64,
         Value::F64(_) => Type::F64,
+        Value::Char(_)  => Type::Char,
         Value::Bool(_)  => Type::Bool,
         Value::Str(_)   => Type::Str,
         Value::Unit     => Type::Unit,

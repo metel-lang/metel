@@ -157,6 +157,7 @@ primary_expr = {
   | int_lit_suffixed    // must come before int_lit — "42u8" would match int "42" first otherwise
   | int_lit
   | string_lit
+  | char_lit
   | bool_lit
   | none_lit
   | closure_expr
@@ -202,7 +203,7 @@ pattern = {
 
 tuple_pattern   = { "(" ~ pattern ~ ("," ~ pattern)* ~ ")" }
 enum_pattern    = { ident ~ "::" ~ ident ~ ("{" ~ ident ~ ("," ~ ident)* ~ "}")? }
-literal_pattern = { float_lit_suffixed | float_lit | int_lit_suffixed | int_lit | string_lit | bool_lit }
+literal_pattern = { float_lit_suffixed | float_lit | int_lit_suffixed | int_lit | string_lit | char_lit | bool_lit }
 bind_pattern    = { ident }
 
 // ── Type expressions ──────────────────────────────────────────────────────────
@@ -243,6 +244,10 @@ decimal_int = @{ ASCII_DIGIT+ }
 string_lit  = @{ "\"" ~ string_char* ~ "\"" }
 string_char = _{ "\\" ~ escape_seq | (!("\"" | "\\") ~ ANY) }
 escape_seq  = _{ "n" | "t" | "r" | "\\" | "\"" | "$" }
+
+char_lit      = @{ "'" ~ char_char ~ "'" }
+char_char     = _{ "\\" ~ char_escape_seq | (!("'" | "\\") ~ ANY) }
+char_escape_seq = _{ "u" ~ "{" ~ ASCII_HEX_DIGIT{1, 6} ~ "}" | "n" | "t" | "r" | "\\" | "'" }
 
 bool_lit  = @{ ("true" | "false") ~ !(ASCII_ALPHANUMERIC | "_") }
 none_lit  = @{ "None" ~ !(ASCII_ALPHANUMERIC | "_") }
