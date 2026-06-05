@@ -1,4 +1,4 @@
-fun find(arr: Int[], target: Int) -> Perhaps<Int> {
+fun find(arr: i64[], target: i64) -> Perhaps<i64> {
     let mut i = 0;
     while (i < array_len(arr)) {
         if (arr[i as u64] == target) {
@@ -11,7 +11,7 @@ fun find(arr: Int[], target: Int) -> Perhaps<Int> {
 
 fun main() {
     // None literal matches the None pattern.
-    let n: Perhaps<Int> = None;
+    let n: Perhaps<i64> = None;
     let r1 = match n { None => -1, Perhaps::Some { value } => value, };
     assert(r1 == -1);
     // Perhaps::Some construction and field extraction via match.

@@ -2,7 +2,7 @@
 // Covers: if/else (statement and expression), while, C-style for, for-in,
 //         loop, break, break-with-value, continue, return.
 
-fun sign(n: Int) -> String {
+fun sign(n: i64) -> String {
     if (n > 0) {
         return "positive";
     } else if (n < 0) {
@@ -12,7 +12,7 @@ fun sign(n: Int) -> String {
     }
 }
 
-fun sum_to(n: Int) -> Int {
+fun sum_to(n: i64) -> i64 {
     let mut total = 0;
     let mut i = 1;
     while (i <= n) {
@@ -22,7 +22,7 @@ fun sum_to(n: Int) -> Int {
     return total;
 }
 
-fun first_even_above(start: Int) -> Int {
+fun first_even_above(start: i64) -> i64 {
     // loop + break with value
     let result = loop {
         if (start % 2 == 0) {
@@ -54,7 +54,7 @@ fun main() {
     println(int_to_string(c_sum));        // 15
 
     // --- for-in over array ---
-    let nums: Int[] = [10, 20, 30];
+    let nums: i64[] = [10, 20, 30];
     let mut for_in_sum = 0;
     for (let n in nums) {
         for_in_sum += n;

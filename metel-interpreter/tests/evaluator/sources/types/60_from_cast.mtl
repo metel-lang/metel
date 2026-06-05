@@ -5,11 +5,11 @@ aspect From<T> {
 }
 
 struct Celsius {
-    degrees: Float,
+    degrees: f64,
 }
 
 struct Fahrenheit {
-    degrees: Float,
+    degrees: f64,
 }
 
 impl From<Celsius> for Fahrenheit {
@@ -23,12 +23,12 @@ fun main() {
     let f = c as Fahrenheit;
     assert(f.degrees == 212.0);
 
-    // Built-in From impls: Int <-> Float
-    let n: Int = 3;
-    let x = n as Float;
+    // Built-in From impls: i64 <-> f64
+    let n: i64 = 3;
+    let x = n as f64;
     assert(x == 3.0);
 
-    let y: Float = 7.9;
-    let z = y as Int;
+    let y: f64 = 7.9;
+    let z = y as i64;
     assert(z == 7);
 }

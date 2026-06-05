@@ -1,5 +1,5 @@
-struct Point { x: Int, y: Int }
-struct Color { r: Int, g: Int, b: Int }
+struct Point { x: i64, y: i64 }
+struct Color { r: i64, g: i64, b: i64 }
 
 fun main() {
     // Basic struct construction.

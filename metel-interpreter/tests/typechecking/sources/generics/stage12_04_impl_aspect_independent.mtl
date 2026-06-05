@@ -5,7 +5,7 @@ aspect Printable {
     fun print(self);
 }
 
-struct A { value: Int }
+struct A { value: i64 }
 struct B { value: String }
 
 impl Printable for A { fun print(self) {} }

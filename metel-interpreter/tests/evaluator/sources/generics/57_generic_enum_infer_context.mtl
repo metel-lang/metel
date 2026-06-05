@@ -36,15 +36,15 @@ fun either_right_or<L, R>(e: Either<L, R>, default: R) -> R {
     }
 }
 
-fun classify(n: Int) -> Either<Int, String> {
+fun classify(n: i64) -> Either<i64, String> {
     if (n > 0) { Either::Left { val: n } }
     else       { Either::Right { val: "non-positive" } }
 }
 
 fun main() {
     // Explicit annotation provides the missing type param
-    let l: Either<Int, String> = Either::Left  { val: 42 };
-    let r: Either<Int, String> = Either::Right { val: "hello" };
+    let l: Either<i64, String> = Either::Left  { val: 42 };
+    let r: Either<i64, String> = Either::Right { val: "hello" };
 
     assert(either_is_left(l));
     assert(!either_is_left(r));
@@ -52,12 +52,12 @@ fun main() {
     assert(either_right_or(r, "") == "hello");
 
     // map_left: Left(42) → Left(84)
-    let doubled = either_map_left(l, (x: Int) -> Int { x * 2 });
+    let doubled = either_map_left(l, (x: i64) -> i64 { x * 2 });
     assert(either_is_left(doubled));
     assert(either_left_or(doubled, 0) == 84);
 
     // map_left on Right: Right passes through unchanged
-    let pass = either_map_left(r, (x: Int) -> Int { x + 1 });
+    let pass = either_map_left(r, (x: i64) -> i64 { x + 1 });
     assert(!either_is_left(pass));
 
     // Type inference from if-else arms in a function with return annotation
@@ -68,9 +68,9 @@ fun main() {
     assert(either_left_or(pos,  0)  == 5);
     assert(either_right_or(neg, "") == "non-positive");
 
-    // Either<Bool, Int>
-    let b: Either<Bool, Int> = Either::Left  { val: true };
-    let n: Either<Bool, Int> = Either::Right { val: 99 };
+    // Either<Bool, i64>
+    let b: Either<Bool, i64> = Either::Left  { val: true };
+    let n: Either<Bool, i64> = Either::Right { val: 99 };
     assert(either_is_left(b));
     assert(!either_is_left(n));
     assert(either_left_or(b, false));

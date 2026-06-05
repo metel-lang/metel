@@ -7,14 +7,14 @@
 // All cases here are correct — annotation matches the inferred value type.
 //
 // Expected inferred types:
-//   x : Int          (annotation Int, value infers Int — unification succeeds)
-//   y : Float        (annotation Float, value infers Float)
+//   x : i64          (annotation i64, value infers i64 — unification succeeds)
+//   y : f64        (annotation f64, value infers f64)
 //   z : Bool         (annotation Bool, value infers Bool)
 //   s : String       (annotation String, value infers String)
-//   n : Perhaps<Int> (None literal; type comes from annotation — Pass 2 expected_ty path)
+//   n : Perhaps<i64> (None literal; type comes from annotation — Pass 2 expected_ty path)
 
-let x: Int = 100;
-let y: Float = 2.718;
+let x: i64 = 100;
+let y: f64 = 2.718;
 let z: Bool = false;
 let s: String = "metel";
-let n: Perhaps<Int> = None;
+let n: Perhaps<i64> = None;

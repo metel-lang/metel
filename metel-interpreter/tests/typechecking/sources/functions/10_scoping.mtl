@@ -14,12 +14,12 @@
 // at the top level.
 //
 // Expected inferred types:
-//   foo(Int) -> Int    (x is Int inside foo)
+//   foo(i64) -> i64    (x is i64 inside foo)
 //   bar(Bool) -> Bool  (x is Bool inside bar — different x, different scope)
-//   a : Int
+//   a : i64
 //   b : Bool
 
-fun foo(x: Int) -> Int {
+fun foo(x: i64) -> i64 {
     x + 1
 }
 

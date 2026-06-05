@@ -2,7 +2,7 @@
 // Calling a &mut self method through a *T (immutable) pointer is rejected.
 
 struct Counter {
-    value: Int,
+    value: i64,
 }
 
 impl Counter {

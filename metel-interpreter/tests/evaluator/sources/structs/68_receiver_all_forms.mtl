@@ -1,22 +1,22 @@
 // ── Struct used throughout ────────────────────────────────────────────────────
 
 struct Counter {
-    value: Int,
-    step:  Int,
+    value: i64,
+    step:  i64,
 }
 
 impl Counter {
-    fun new(step: Int) -> Counter {
+    fun new(step: i64) -> Counter {
         Counter { value: 0, step: step }
     }
 
     // value receiver: returns a new Counter, does not mutate in place
-    fun with_value(self, n: Int) -> Counter {
+    fun with_value(self, n: i64) -> Counter {
         Counter { value: n, step: self.step }
     }
 
     // &self: read-only, non-consuming
-    fun get(&self) -> Int {
+    fun get(&self) -> i64 {
         self.value
     }
 
@@ -33,7 +33,7 @@ impl Counter {
         self.value = 0;
     }
 
-    fun add(&mut self, n: Int) {
+    fun add(&mut self, n: i64) {
         self.value += n;
     }
 }
@@ -127,8 +127,8 @@ fun test_pointer_and_direct_share_storage() {
 // ── Builder pattern: chained value receivers ─────────────────────────────────
 
 struct Builder {
-    x: Int,
-    y: Int,
+    x: i64,
+    y: i64,
     label: String,
 }
 
@@ -137,15 +137,15 @@ impl Builder {
         Builder { x: 0, y: 0, label: "" }
     }
 
-    fun set_x(self, x: Int) -> Builder {
+    fun set_x(self, x: i64) -> Builder {
         Builder { x: x, y: self.y, label: self.label }
     }
 
-    fun set_y(self, y: Int) -> Builder {
+    fun set_y(self, y: i64) -> Builder {
         Builder { x: self.x, y: y, label: self.label }
     }
 
-    fun sum(&self) -> Int {
+    fun sum(&self) -> i64 {
         self.x + self.y
     }
 }

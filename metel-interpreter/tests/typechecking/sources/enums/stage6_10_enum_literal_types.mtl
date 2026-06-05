@@ -1,7 +1,7 @@
 // Stage 6: enum variant literals correctly preserve type arguments.
 
-// Perhaps<Int> literal
-let _: Perhaps<Int> = Perhaps::Some { value: 42 };
+// Perhaps<i64> literal
+let _: Perhaps<i64> = Perhaps::Some { value: 42 };
 
 // Perhaps<Bool> literal
 let _: Perhaps<Bool> = Perhaps::Some { value: true };
@@ -9,12 +9,12 @@ let _: Perhaps<Bool> = Perhaps::Some { value: true };
 // Perhaps<String> literal
 let _: Perhaps<String> = Perhaps::Some { value: "hello" };
 
-// Result<Int, String> literal
-let _: Result<Int, String> = Result::Ok { value: 0 };
+// Result<i64, String> literal
+let _: Result<i64, String> = Result::Ok { value: 0 };
 
-// Result<Bool, Int> literal
-let _: Result<Bool, Int> = Result::Err { error: 42 };
+// Result<Bool, i64> literal
+let _: Result<Bool, i64> = Result::Err { error: 42 };
 
 // Single-segment struct literals (no generics)
-struct Point { x: Int, y: Int }
+struct Point { x: i64, y: i64 }
 let _: Point = Point { x: 1, y: 2 };

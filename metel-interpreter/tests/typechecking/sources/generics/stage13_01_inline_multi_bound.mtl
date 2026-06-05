@@ -6,7 +6,7 @@ aspect Printable {
 }
 
 aspect Comparable {
-    fun compare(self, other: Self) -> Int;
+    fun compare(self, other: Self) -> i64;
 }
 
 struct SortedList<T: Printable + Comparable> {
@@ -14,7 +14,7 @@ struct SortedList<T: Printable + Comparable> {
 }
 
 struct Item {
-    value: Int,
+    value: i64,
 }
 
 impl Printable for Item {
@@ -22,7 +22,7 @@ impl Printable for Item {
 }
 
 impl Comparable for Item {
-    fun compare(self, other: Item) -> Int {
+    fun compare(self, other: Item) -> i64 {
         self.value - other.value
     }
 }

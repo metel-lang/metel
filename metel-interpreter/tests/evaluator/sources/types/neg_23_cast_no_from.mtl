@@ -1,8 +1,8 @@
 // Negative test: casting to a type that has no From impl must be rejected.
 // TYPECHECK_ERROR[cannot cast `Foo` to `Bar`]
 
-struct Foo { x: Int }
-struct Bar { y: Int }
+struct Foo { x: i64 }
+struct Bar { y: i64 }
 
 fun main() {
     let f = Foo { x: 1 };

@@ -1,4 +1,4 @@
 // Negative: field access on a non-struct type.
 
-let n: Int = 42;
+let n: i64 = 42;
 let x = n.field; // ERROR[T0003]

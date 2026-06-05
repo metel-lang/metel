@@ -10,7 +10,7 @@ enum Container<T: Printable> {
     Empty {},
 }
 
-struct Plain { x: Int }
+struct Plain { x: i64 }
 
 // Plain does not implement Printable.
 

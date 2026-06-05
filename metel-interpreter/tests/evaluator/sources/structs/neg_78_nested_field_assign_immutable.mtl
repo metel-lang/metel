@@ -1,6 +1,6 @@
 // Field assignment to a nested field chain rooted at a plain let binding is a type error.
 // TYPECHECK_ERROR[immutable binding]
-struct Inner { x: Int }
+struct Inner { x: i64 }
 struct Outer { inner: Inner }
 
 fun main() {

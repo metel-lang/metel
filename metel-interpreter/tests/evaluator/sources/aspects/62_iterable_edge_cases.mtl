@@ -14,14 +14,14 @@ aspect Iterable<T> {
 }
 
 // Generic counter: emits 0, 1, …, limit-1
-struct Counter { current: Int, limit: Int }
+struct Counter { current: i64, limit: i64 }
 
 impl Counter {
-    fun new(limit: Int) -> Counter { Counter { current: 0, limit: limit } }
+    fun new(limit: i64) -> Counter { Counter { current: 0, limit: limit } }
 }
 
-impl Iterable<Int> for Counter {
-    fun next(&mut self) -> Perhaps<Int> {
+impl Iterable<i64> for Counter {
+    fun next(&mut self) -> Perhaps<i64> {
         if (self.current < self.limit) {
             let v = self.current;
             self.current = self.current + 1;
@@ -33,14 +33,14 @@ impl Iterable<Int> for Counter {
 }
 
 // Countdown: emits start, start-1, …, 1
-struct Countdown { current: Int }
+struct Countdown { current: i64 }
 
 impl Countdown {
-    fun new(start: Int) -> Countdown { Countdown { current: start } }
+    fun new(start: i64) -> Countdown { Countdown { current: start } }
 }
 
-impl Iterable<Int> for Countdown {
-    fun next(&mut self) -> Perhaps<Int> {
+impl Iterable<i64> for Countdown {
+    fun next(&mut self) -> Perhaps<i64> {
         if (self.current > 0) {
             let v = self.current;
             self.current = self.current - 1;

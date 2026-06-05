@@ -1,15 +1,15 @@
 // Stage 3: array construction and indexing
 //
 // All elements must unify to a common type. The result is Array(T).
-// Indexing requires an Int index and produces the element type T.
+// Indexing requires an i64 index and produces the element type T.
 // Empty arrays require a type annotation.
 
-fun first(xs: Int[]) -> Int {
+fun first(xs: i64[]) -> i64 {
     xs[0]
 }
 
-let nums: Int[] = [1, 2, 3];
+let nums: i64[] = [1, 2, 3];
 let bools: Bool[] = [true, false, true];
-let empty: Int[] = [];
-let elem: Int = nums[0];
-let also: Int = first(nums);
+let empty: i64[] = [];
+let elem: i64 = nums[0];
+let also: i64 = first(nums);

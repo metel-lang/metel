@@ -22,8 +22,8 @@ fun wrap_pair<A, B>(a: A, b: B) -> A[] {
 }
 
 fun main() {
-    let nums: Int[] = [1, 2, 3, 4, 5, 6];
-    let evens = collect_matching(nums, (x: Int) -> Bool { x % 2 == 0 });
+    let nums: i64[] = [1, 2, 3, 4, 5, 6];
+    let evens = collect_matching(nums, (x: i64) -> Bool { x % 2 == 0 });
     assert(array_len(evens) == 3);
     assert(evens[0] == 2);
 
@@ -31,12 +31,12 @@ fun main() {
     let long = collect_matching(strs, (s: String) -> Bool { string_len(s) > 2 });
     assert(array_len(long) == 2);
 
-    let squares = map_to(nums, (x: Int) -> Int { x * x });
+    let squares = map_to(nums, (x: i64) -> i64 { x * x });
     assert(array_len(squares) == 6);
     assert(squares[0] == 1);
     assert(squares[5] == 36);
 
-    let bools = map_to(nums, (x: Int) -> Bool { x > 3 });
+    let bools = map_to(nums, (x: i64) -> Bool { x > 3 });
     assert(array_len(bools) == 6);
     assert(!bools[0]);
     assert(bools[5]);

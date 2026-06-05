@@ -3,12 +3,12 @@
 //         &mut self, associated functions (constructors), generic structs.
 
 struct Point {
-    x: Float,
-    y: Float,
+    x: f64,
+    y: f64,
 }
 
 impl Point {
-    fun new(x: Float, y: Float) -> Point {
+    fun new(x: f64, y: f64) -> Point {
         return Point { x: x, y: y };
     }
 
@@ -16,12 +16,12 @@ impl Point {
         return "(" + float_to_string(self.x) + ", " + float_to_string(self.y) + ")";
     }
 
-    fun translate(&mut self, dx: Float, dy: Float) {
+    fun translate(&mut self, dx: f64, dy: f64) {
         self.x = self.x + dx;
         self.y = self.y + dy;
     }
 
-    fun distance_to(self, other: Point) -> Float {
+    fun distance_to(self, other: Point) -> f64 {
         let dx = self.x - other.x;
         let dy = self.y - other.y;
         // manual sqrt approximation via Newton's method for test purposes
@@ -35,8 +35,8 @@ struct Pair<A, B> {
     second: B,
 }
 
-impl Pair<Int, String> {
-    fun new(a: Int, b: String) -> Pair<Int, String> {
+impl Pair<i64, String> {
+    fun new(a: i64, b: String) -> Pair<i64, String> {
         return Pair { first: a, second: b };
     }
 
@@ -46,7 +46,7 @@ impl Pair<Int, String> {
 }
 
 struct Counter {
-    value: Int,
+    value: i64,
 }
 
 impl Counter {
@@ -62,7 +62,7 @@ impl Counter {
         self.value = 0;
     }
 
-    fun get(self) -> Int {
+    fun get(self) -> i64 {
         return self.value;
     }
 }

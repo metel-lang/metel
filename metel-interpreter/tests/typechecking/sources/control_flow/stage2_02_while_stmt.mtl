@@ -7,7 +7,7 @@ fun loop_while(b: Bool) {
     }
 }
 
-fun while_with_computation(x: Int) {
+fun while_with_computation(x: i64) {
     let keep_going: Bool = x > 0;
     while (keep_going) {
         return;

@@ -1,13 +1,13 @@
-struct Point { x: Int, y: Int }
+struct Point { x: i64, y: i64 }
 struct Rect  { top_left: Point, bottom_right: Point }
 
-fun area(r: Rect) -> Int {
+fun area(r: Rect) -> i64 {
     let w = r.bottom_right.x - r.top_left.x;
     let h = r.bottom_right.y - r.top_left.y;
     w * h
 }
 
-fun translate_rect(r: Rect, dx: Int, dy: Int) -> Rect {
+fun translate_rect(r: Rect, dx: i64, dy: i64) -> Rect {
     Rect {
         top_left:     Point { x: r.top_left.x     + dx, y: r.top_left.y     + dy },
         bottom_right: Point { x: r.bottom_right.x + dx, y: r.bottom_right.y + dy },

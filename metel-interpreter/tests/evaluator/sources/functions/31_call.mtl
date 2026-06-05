@@ -1,10 +1,10 @@
-fun add(a: Int, b: Int) -> Int {
+fun add(a: i64, b: i64) -> i64 {
     a + b
 }
-fun square(x: Int) -> Int {
+fun square(x: i64) -> i64 {
     x * x
 }
-fun identity(x: Int) -> Int {
+fun identity(x: i64) -> i64 {
     x
 }
 fun main() {

@@ -8,6 +8,6 @@ fun maybe_head<T>(items: T[]) {
 }
 
 fun main() {
-    let a: Perhaps<Int> = maybe_head([1, 2, 3]);
-    let b: Perhaps<Int> = maybe_head([] : Int[]);
+    let a: Perhaps<i64> = maybe_head([1, 2, 3]);
+    let b: Perhaps<i64> = maybe_head([] : i64[]);
 }

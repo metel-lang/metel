@@ -18,7 +18,7 @@ fun main() {
     let r5 = match 5 { n if n < 3 => 0, n if n < 7 => 1, _ => 2, };
     assert(r5 == 1);
     // None pattern.
-    let maybe: Perhaps<Int> = None;
+    let maybe: Perhaps<i64> = None;
     let r6 = match maybe { None => 1, _ => 0, };
     assert(r6 == 1);
     // String literal pattern.
@@ -27,15 +27,15 @@ fun main() {
     // Bool literal patterns.
     assert(true);
     assert(!false);
-    // Float literal pattern.
+    // f64 literal pattern.
     let r8 = match 3.14 { 1.0 => 1, 3.14 => 2, _ => 3, };
     assert(r8 == 2);
     // Tuple pattern — binds elements.
-    let pair: (Int, Int) = (3, 4);
+    let pair: (i64, i64) = (3, 4);
     let r9 = match pair { (a, b) => a + b, };
     assert(r9 == 7);
     // Nested tuple pattern.
-    let nested: (Int, (Int, Int)) = (1, (2, 3));
+    let nested: (i64, (i64, i64)) = (1, (2, 3));
     let r10 = match nested { (a, (b, c)) => a + b + c, };
     assert(r10 == 6);
     // First arm wins when multiple arms match.

@@ -5,7 +5,7 @@ enum Maybe<T> {
     None {},
 }
 
-fun wrap_int(n: Int) -> Maybe<Int> {
+fun wrap_int(n: i64) -> Maybe<i64> {
     Maybe::Some { value: n }
 }
 
@@ -13,13 +13,13 @@ fun wrap_bool(b: Bool) -> Maybe<Bool> {
     Maybe::Some { value: b }
 }
 
-fun unwrap_or(m: Maybe<Int>, default: Int) -> Int {
+fun unwrap_or(m: Maybe<i64>, default: i64) -> i64 {
     match m {
         Maybe::Some { value } => value,
         _                     => default,
     }
 }
 
-fun use_none() -> Maybe<Int> {
+fun use_none() -> Maybe<i64> {
     Maybe::None
 }

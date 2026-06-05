@@ -1,7 +1,7 @@
-fun factorial(n: Int) -> Int {
+fun factorial(n: i64) -> i64 {
     if (n <= 1) { 1 } else { n * factorial(n - 1) }
 }
-fun fib(n: Int) -> Int {
+fun fib(n: i64) -> i64 {
     if (n <= 1) { n } else { fib(n - 1) + fib(n - 2) }
 }
 fun main() {

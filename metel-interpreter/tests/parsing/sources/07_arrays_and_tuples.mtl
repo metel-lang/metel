@@ -3,7 +3,7 @@
 //         array_push, array_len, for-in, tuple literals, tuple type syntax,
 //         positional access (.0 .1), tuple destructuring in match.
 
-fun sum(arr: Int[]) -> Int {
+fun sum(arr: i64[]) -> i64 {
     let mut total = 0;
     for (let n in arr) {
         total += n;
@@ -11,8 +11,8 @@ fun sum(arr: Int[]) -> Int {
     return total;
 }
 
-fun reverse(arr: Int[]) -> Int[] {
-    let mut result: Int[]  = [];
+fun reverse(arr: i64[]) -> i64[] {
+    let mut result: i64[]  = [];
     let mut i = array_len(arr) - 1;
     while (i >= 0) {
         array_push(result, arr[i]);
@@ -21,8 +21,8 @@ fun reverse(arr: Int[]) -> Int[] {
     return result;
 }
 
-fun zip_sum(a: Int[], b: Int[]) -> Int[] {
-    let mut result: Int[]  = [];
+fun zip_sum(a: i64[], b: i64[]) -> i64[] {
+    let mut result: i64[]  = [];
     let mut i = 0;
     let len = array_len(a);
     while (i < len) {
@@ -32,7 +32,7 @@ fun zip_sum(a: Int[], b: Int[]) -> Int[] {
     return result;
 }
 
-fun min_max(arr: Int[]) -> (Int, Int) {
+fun min_max(arr: i64[]) -> (i64, i64) {
     let mut lo = arr[0];
     let mut hi = arr[0];
     for (let n in arr) {
@@ -44,7 +44,7 @@ fun min_max(arr: Int[]) -> (Int, Int) {
 
 fun main() {
     // --- array literal and T[] type ---
-    let nums: Int[] = [5, 3, 8, 1, 9, 2];
+    let nums: i64[] = [5, 3, 8, 1, 9, 2];
     println(int_to_string(array_len(nums)));   // 6
     println(int_to_string(nums[0]));           // 5
     println(int_to_string(nums[4]));           // 9
@@ -55,7 +55,7 @@ fun main() {
     println(int_to_string(array_len(words)));  // 3
 
     // --- array_push ---
-    let mut growing: Int[]  = [];
+    let mut growing: i64[]  = [];
     array_push(growing, 10);
     array_push(growing, 20);
     array_push(growing, 30);
@@ -72,8 +72,8 @@ fun main() {
     println("");
 
     // --- zip_sum ---
-    let a: Int[] = [1, 2, 3];
-    let b: Int[] = [4, 5, 6];
+    let a: i64[] = [1, 2, 3];
+    let b: i64[] = [4, 5, 6];
     let zipped = zip_sum(a, b);
     for (let n in zipped) {
         print(int_to_string(n) + " ");          // 5 7 9
@@ -81,11 +81,11 @@ fun main() {
     println("");
 
     // --- tuples ---
-    let coord: (Int, Int) = (10, 20);
+    let coord: (i64, i64) = (10, 20);
     println(int_to_string(coord.0));            // 10
     println(int_to_string(coord.1));            // 20
 
-    let triple: (String, Int, Bool) = ("yes", 42, true);
+    let triple: (String, i64, Bool) = ("yes", 42, true);
     println(triple.0);                          // yes
     println(int_to_string(triple.1));           // 42
     println(bool_to_string(triple.2));          // true

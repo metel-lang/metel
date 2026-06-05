@@ -54,7 +54,7 @@ fn multi_file_program_loads_declared_modules() {
     let dir = fixture_dir("multi");
     let main = dir.join("main.mtl");
     write(&main, "import parser::Token;\nfun main() { }\n");
-    write(&dir.join("parser.mtl"), "pub struct Token { pub value: Int }\n");
+    write(&dir.join("parser.mtl"), "pub struct Token { pub value: i64 }\n");
 
     let graph = module_loader::load_root(&main).unwrap_or_else(|e| panic!("{e}"));
 
@@ -66,8 +66,8 @@ fn multi_file_program_loads_declared_modules() {
 fn multi_file_program_runs_after_module_loading() {
     let dir = fixture_dir("run_multi");
     let main = dir.join("main.mtl");
-    write(&main, "import helper::answer;\nfun main() -> Int { return answer(); }\n");
-    write(&dir.join("helper.mtl"), "pub fun answer() -> Int { return 42; }\n");
+    write(&main, "import helper::answer;\nfun main() -> i64 { return answer(); }\n");
+    write(&dir.join("helper.mtl"), "pub fun answer() -> i64 { return 42; }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -78,9 +78,9 @@ fn facade_module_alongside_directory() {
     let main = dir.join("main.mtl");
     write(&main, "import parser::Token;\nfun main() { }\n");
     // parser.mtl is the facade; parser/ is the namespace — both can coexist
-    write(&dir.join("parser.mtl"), "struct Token { value: Int }\n");
+    write(&dir.join("parser.mtl"), "struct Token { value: i64 }\n");
     fs::create_dir_all(dir.join("parser")).unwrap();
-    write(&dir.join("parser").join("ast.mtl"), "pub struct Ast { pub value: Int }\n");
+    write(&dir.join("parser").join("ast.mtl"), "pub struct Ast { pub value: i64 }\n");
 
     let graph = module_loader::load_root(&main).unwrap_or_else(|e| panic!("{e}"));
 
@@ -113,13 +113,13 @@ fn accepts_root_self_super_std_and_child_roots_in_non_root_modules() {
 import self::child::Thing;
 import root::child::Thing;
 import super::child::Thing;
-import std::core::Int;
+import std::core::i64;
 import child::Thing;
 
-struct Token { value: Int }
+struct Token { value: i64 }
 "#,
     );
-    write(&dir.join("child.mtl"), "struct Thing { value: Int }\n");
+    write(&dir.join("child.mtl"), "struct Thing { value: i64 }\n");
 
     let graph = module_loader::load_root(&main).unwrap_or_else(|e| panic!("{e}"));
 
@@ -151,8 +151,8 @@ fn qualified_function_call_via_module_handle() {
     let main = dir.join("main.mtl");
     // import helper::* loads helper.mtl into the graph.
     // helper::answer() uses a qualified path; the path normalizer rewrites it to "answer".
-    write(&main, "import helper::*;\nfun main() -> Int { return helper::answer(); }\n");
-    write(&dir.join("helper.mtl"), "pub fun answer() -> Int { return 42; }\n");
+    write(&main, "import helper::*;\nfun main() -> i64 { return helper::answer(); }\n");
+    write(&dir.join("helper.mtl"), "pub fun answer() -> i64 { return 42; }\n");
 
     let graph = module_loader::load_root(&main).unwrap_or_else(|e| panic!("{e}"));
     let names = name_resolver::resolve(&graph).unwrap_or_else(|e| panic!("{e}"));
@@ -167,8 +167,8 @@ fn qualified_type_in_return_signature_typechecks() {
     let dir = fixture_dir("qual_type");
     let main = dir.join("main.mtl");
     // Import Token from helper and use the bare name in the return annotation.
-    write(&main, "import helper::*;\nfun wrap(v: Int) -> Token { return Token { value: v }; }\nfun main() -> Int { let t = wrap(7); return t.value; }\n");
-    write(&dir.join("helper.mtl"), "pub struct Token { pub value: Int }\n");
+    write(&main, "import helper::*;\nfun wrap(v: i64) -> Token { return Token { value: v }; }\nfun main() -> i64 { let t = wrap(7); return t.value; }\n");
+    write(&dir.join("helper.mtl"), "pub struct Token { pub value: i64 }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -178,7 +178,7 @@ fn self_qualified_path_in_expression_resolves() {
     let dir = fixture_dir("self_path");
     let main = dir.join("main.mtl");
     // self::answer() — Path(["self","answer"]); the path normalizer rewrites it to "answer".
-    write(&main, "fun answer() -> Int { return 99; }\nfun main() -> Int { return self::answer(); }\n");
+    write(&main, "fun answer() -> i64 { return 99; }\nfun main() -> i64 { return self::answer(); }\n");
 
     let graph = module_loader::load_root(&main).unwrap_or_else(|e| panic!("{e}"));
     let names = name_resolver::resolve(&graph).unwrap_or_else(|e| panic!("{e}"));
@@ -198,7 +198,7 @@ fn pub_enum_imported_and_matched() {
         &main,
         r#"
 import color::*;
-fun main() -> Int {
+fun main() -> i64 {
     let c = Color::Red;
     match c {
         Color::Red   => { return 1; },
@@ -221,12 +221,12 @@ fn group_import_makes_both_names_accessible() {
         &main,
         r#"
 import math::{add, mul};
-fun main() -> Int { return add(mul(2, 3), 1); }
+fun main() -> i64 { return add(mul(2, 3), 1); }
 "#,
     );
     write(
         &dir.join("math.mtl"),
-        "pub fun add(a: Int, b: Int) -> Int { return a + b; }\npub fun mul(a: Int, b: Int) -> Int { return a * b; }\n",
+        "pub fun add(a: i64, b: i64) -> i64 { return a + b; }\npub fun mul(a: i64, b: i64) -> i64 { return a * b; }\n",
     );
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
@@ -237,7 +237,7 @@ fn import_with_alias_loads_module_into_graph() {
     let dir = fixture_dir("alias_load");
     let main = dir.join("main.mtl");
     write(&main, "import helper::answer as compute;\nfun main() { }\n");
-    write(&dir.join("helper.mtl"), "pub fun answer() -> Int { return 42; }\n");
+    write(&dir.join("helper.mtl"), "pub fun answer() -> i64 { return 42; }\n");
 
     let graph = module_loader::load_root(&main).unwrap_or_else(|e| panic!("{e}"));
 
@@ -250,13 +250,13 @@ fn import_with_alias_loads_module_into_graph() {
 fn transitive_dependency_loaded_via_facade() {
     let dir = fixture_dir("transitive");
     let main = dir.join("main.mtl");
-    write(&main, "import parser::*;\nfun main() -> Int { return parse(); }\n");
+    write(&main, "import parser::*;\nfun main() -> i64 { return parse(); }\n");
     // parser imports (and thereby loads) lexer; exposes parse() which delegates to tokenize()
     write(
         &dir.join("parser.mtl"),
-        "import lexer::*;\npub fun parse() -> Int { return tokenize(); }\n",
+        "import lexer::*;\npub fun parse() -> i64 { return tokenize(); }\n",
     );
-    write(&dir.join("lexer.mtl"), "pub fun tokenize() -> Int { return 1; }\n");
+    write(&dir.join("lexer.mtl"), "pub fun tokenize() -> i64 { return 1; }\n");
 
     let graph = module_loader::load_root(&main).unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(graph.modules.len(), 3);
@@ -271,7 +271,7 @@ fn import_nonexistent_module_is_a_load_error() {
     let main = dir.join("main.mtl");
     write(
         &main,
-        "import nonexistent::Thing;\nfun main() -> Int { return Thing(); }\n",
+        "import nonexistent::Thing;\nfun main() -> i64 { return Thing(); }\n",
     );
 
     let err = module_loader::load_root(&main).expect_err("missing module should fail at load time");
@@ -290,13 +290,13 @@ fn struct_field_access_across_modules() {
         &main,
         r#"
 import point::*;
-fun main() -> Int {
+fun main() -> i64 {
     let p = Point { x: 3, y: 4 };
     return p.x;
 }
 "#,
     );
-    write(&dir.join("point.mtl"), "pub struct Point { pub x: Int, pub y: Int }\n");
+    write(&dir.join("point.mtl"), "pub struct Point { pub x: i64, pub y: i64 }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }

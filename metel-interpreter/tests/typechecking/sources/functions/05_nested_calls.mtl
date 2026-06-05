@@ -5,22 +5,22 @@
 // constraints that must all be satisfiable simultaneously.
 //
 // Expected inferred types:
-//   double(Int) -> Int
-//   square(Int) -> Int
-//   is_positive(Int) -> Bool
-//   a : Int   (double(3) -> Int)
-//   b : Int   (square(double(2)) — inner returns Int, outer takes Int -> Int)
-//   c : Bool  (is_positive(square(3)) — inner Int fed to Bool-returning fun)
+//   double(i64) -> i64
+//   square(i64) -> i64
+//   is_positive(i64) -> Bool
+//   a : i64   (double(3) -> i64)
+//   b : i64   (square(double(2)) — inner returns i64, outer takes i64 -> i64)
+//   c : Bool  (is_positive(square(3)) — inner i64 fed to Bool-returning fun)
 
-fun double(x: Int) -> Int {
+fun double(x: i64) -> i64 {
     x + x
 }
 
-fun square(x: Int) -> Int {
+fun square(x: i64) -> i64 {
     x * x
 }
 
-fun is_positive(x: Int) -> Bool {
+fun is_positive(x: i64) -> Bool {
     x > 0
 }
 

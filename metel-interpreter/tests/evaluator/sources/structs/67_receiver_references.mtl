@@ -1,5 +1,5 @@
 struct Counter {
-    value: Int,
+    value: i64,
 }
 
 impl Counter {
@@ -7,7 +7,7 @@ impl Counter {
         self.value += 1;
     }
 
-    fun current(&self) -> Int {
+    fun current(&self) -> i64 {
         self.value
     }
 }

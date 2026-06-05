@@ -80,7 +80,7 @@ fun main() {
 fn pointer_and_receiver_syntax_parses() {
     let source = r#"
 struct Counter {
-    value: Int,
+    value: i64,
 }
 
 impl Counter {
@@ -88,16 +88,16 @@ impl Counter {
         self.value += 1;
     }
 
-    fun current(&self) -> Int {
+    fun current(&self) -> i64 {
         self.value
     }
 }
 
 fun main() {
     let mut value = 0;
-    let ptr: *mut Int = &mut value;
+    let ptr: *mut i64 = &mut value;
     *ptr += 1;
-    let read_only: *Int = ptr;
+    let read_only: *i64 = ptr;
     let _snapshot = *read_only;
 }
 "#;
@@ -270,7 +270,7 @@ fn rejects_mod_after_declaration() {
 fn rejects_old_fun_closure_syntax_in_expression_position() {
     let source = r#"
 fun main() {
-    let f = fun(x: Int) -> Int { return x + 1; };
+    let f = fun(x: i64) -> i64 { return x + 1; };
 }
 "#;
 
@@ -284,7 +284,7 @@ fun main() {
 fn rejects_closure_without_arrow() {
     let source = r#"
 fun main() {
-    let f = (x: Int) { return x + 1; };
+    let f = (x: i64) { return x + 1; };
 }
 "#;
 
@@ -297,12 +297,12 @@ fun main() {
 #[test]
 fn parses_zero_arg_function_type_and_zero_arg_closure_together() {
     let source = r#"
-fun takes_zero(f: () -> Int) -> Int {
+fun takes_zero(f: () -> i64) -> i64 {
     return f();
 }
 
-fun main() -> Int {
-    return takes_zero(() -> Int { return 42; });
+fun main() -> i64 {
+    return takes_zero(() -> i64 { return 42; });
 }
 "#;
 

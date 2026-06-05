@@ -4,7 +4,7 @@
 fun main() {
     let x = 10;
     let f = () -> {
-        let p: *mut Int = &mut x;
+        let p: *mut i64 = &mut x;
         *p = 42;
     };
     f();

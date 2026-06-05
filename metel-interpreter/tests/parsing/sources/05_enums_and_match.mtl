@@ -31,13 +31,13 @@ impl Direction {
 }
 
 enum Shape {
-    Circle { radius: Float },
-    Rectangle { width: Float, height: Float },
-    Triangle { base: Float, height: Float },
+    Circle { radius: f64 },
+    Rectangle { width: f64, height: f64 },
+    Triangle { base: f64, height: f64 },
 }
 
 impl Shape {
-    fun area(self) -> Float {
+    fun area(self) -> f64 {
         match self {
             Shape::Circle { radius } => 3.14159 * radius * radius,
             Shape::Rectangle { width, height } => width * height,
@@ -57,7 +57,7 @@ impl Shape {
     }
 }
 
-fun classify(n: Int) -> String {
+fun classify(n: i64) -> String {
     match n {
         0       => "zero",
         1       => "one",
@@ -66,14 +66,14 @@ fun classify(n: Int) -> String {
     }
 }
 
-fun safe_head(arr: Int[]) -> Perhaps<Int> {
+fun safe_head(arr: i64[]) -> Perhaps<i64> {
     if (array_len(arr) == 0) {
         return nope;
     }
     return arr[0];
 }
 
-fun safe_div(a: Int, b: Int) -> Result<Int, String> {
+fun safe_div(a: i64, b: i64) -> Result<i64, String> {
     if (b == 0) {
         return Result::Err { error: "division by zero" };
     }
@@ -102,8 +102,8 @@ fun main() {
     println(classify(99));    // large
 
     // --- Perhaps<T> ---
-    let full: Int[] = [10, 20, 30];
-    let empty: Int[] = [];
+    let full: i64[] = [10, 20, 30];
+    let empty: i64[] = [];
 
     match safe_head(full) {
         Perhaps::Some { value } => println(int_to_string(value)),  // 10

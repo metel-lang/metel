@@ -1,24 +1,24 @@
 // Integration Test 1 — Statistical Analysis
 //
 // Feature coverage:
-//   arrays, structs/impl, Float arithmetic, bubble sort, binary search,
+//   arrays, structs/impl, f64 arithmetic, bubble sort, binary search,
 //   for-in (array + range), while, C-style for, higher-order closures,
 //   Perhaps<T>, Result<T,E>, ? operator, match-with-blocks (RFC-0018),
-//   return None / return Err (RFC-0019), Int-as-Float casting, tuples,
+//   return None / return Err (RFC-0019), i64-as-f64 casting, tuples,
 //   string operations, recursive functions.
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
-fun abs_float(x: Float) -> Float {
+fun abs_float(x: f64) -> f64 {
     if (x < 0.0) { 0.0 - x } else { x }
 }
 
-fun float_eq(a: Float, b: Float) -> Bool {
+fun float_eq(a: f64, b: f64) -> Bool {
     abs_float(a - b) < 0.0001
 }
 
 // Newton-Raphson square root — converges in ~20 iterations.
-fun sqrt_approx(x: Float) -> Float {
+fun sqrt_approx(x: f64) -> f64 {
     if (x <= 0.0) {
         0.0
     } else {
@@ -32,15 +32,15 @@ fun sqrt_approx(x: Float) -> Float {
     }
 }
 
-fun int_max(a: Int, b: Int) -> Int {
+fun int_max(a: i64, b: i64) -> i64 {
     if (a >= b) { a } else { b }
 }
 
 // ── Sorting ───────────────────────────────────────────────────────────────────
 
 // Bubble sort — returns a sorted copy of the input array.
-fun sort_floats(arr: Float[]) -> Float[] {
-    let mut s: Float[]  = [];
+fun sort_floats(arr: f64[]) -> f64[] {
+    let mut s: f64[]  = [];
     for (let x in arr) { array_push(s, x); }
     let n = array_len(s);
     let mut i = 0;
@@ -62,8 +62,8 @@ fun sort_floats(arr: Float[]) -> Float[] {
 
 // ── Searching ─────────────────────────────────────────────────────────────────
 
-// Binary search in a sorted Float[].  Returns Perhaps<Int> with the index.
-fun binary_search(sorted: Float[], target: Float) -> Perhaps<Int> {
+// Binary search in a sorted f64[].  Returns Perhaps<i64> with the index.
+fun binary_search(sorted: f64[], target: f64) -> Perhaps<i64> {
     if (array_len(sorted) == 0) { return None; }
     let mut lo = 0;
     let mut hi = array_len(sorted) - 1;
@@ -83,20 +83,20 @@ fun binary_search(sorted: Float[], target: Float) -> Perhaps<Int> {
 // ── Stats struct ──────────────────────────────────────────────────────────────
 
 struct Stats {
-    count:    Int,
-    sum:      Float,
-    mean:     Float,
-    variance: Float,
-    min:      Float,
-    max:      Float,
+    count:    i64,
+    sum:      f64,
+    mean:     f64,
+    variance: f64,
+    min:      f64,
+    max:      f64,
 }
 
 impl Stats {
-    fun range(self) -> Float {
+    fun range(self) -> f64 {
         self.max - self.min
     }
 
-    fun std_dev(self) -> Float {
+    fun std_dev(self) -> f64 {
         sqrt_approx(self.variance)
     }
 
@@ -109,7 +109,7 @@ impl Stats {
 }
 
 // Compute descriptive statistics.  Returns Err for empty input (RFC-0019).
-fun compute_stats(data: Float[]) -> Result<Stats, String> {
+fun compute_stats(data: f64[]) -> Result<Stats, String> {
     let n = array_len(data);
     if (n == 0) {
         return Result::Err { error: "empty dataset" };
@@ -125,7 +125,7 @@ fun compute_stats(data: Float[]) -> Result<Stats, String> {
         if (x > mx) { mx = x; }
         i += 1;
     }
-    let mean = total / (n as Float);
+    let mean = total / (n as f64);
     let mut var_sum = 0.0;
     let mut j = 0;
     while (j < n) {
@@ -134,13 +134,13 @@ fun compute_stats(data: Float[]) -> Result<Stats, String> {
         var_sum += d * d;
         j += 1;
     }
-    let variance = var_sum / (n as Float);
+    let variance = var_sum / (n as f64);
     Result::Ok { value: Stats { count: n, sum: total, mean: mean, variance: variance, min: mn, max: mx } }
 }
 
-// Median of a Float[].  Returns None for empty input (RFC-0019: types None as
-// Perhaps<Float> from the return annotation).
-fun median(data: Float[]) -> Perhaps<Float> {
+// Median of a f64[].  Returns None for empty input (RFC-0019: types None as
+// Perhaps<f64> from the return annotation).
+fun median(data: f64[]) -> Perhaps<f64> {
     let n = array_len(data);
     if (n == 0) { return None; }
     let sorted = sort_floats(data);
@@ -157,7 +157,7 @@ fun median(data: Float[]) -> Perhaps<Float> {
 
 // Compute z-score: how many std-deviations `value` is from the mean.
 // Uses ? to propagate errors from compute_stats (exact error type match).
-fun z_score(data: Float[], value: Float) -> Result<Float, String> {
+fun z_score(data: f64[], value: f64) -> Result<f64, String> {
     let stats = compute_stats(data)?;
     let sd = stats.std_dev();
     if (float_eq(sd, 0.0)) {
@@ -168,13 +168,13 @@ fun z_score(data: Float[], value: Float) -> Result<Float, String> {
 
 // ── Higher-order functions ────────────────────────────────────────────────────
 
-fun sum_floats(data: Float[]) -> Float {
+fun sum_floats(data: f64[]) -> f64 {
     let mut acc = 0.0;
     for (let x in data) { acc += x; }
     acc
 }
 
-fun count_if(data: Float[], pred: (Float) -> Bool) -> Int {
+fun count_if(data: f64[], pred: (f64) -> Bool) -> i64 {
     let mut cnt = 0;
     for (let x in data) {
         if (pred(x)) { cnt += 1; }
@@ -182,14 +182,14 @@ fun count_if(data: Float[], pred: (Float) -> Bool) -> Int {
     cnt
 }
 
-fun map_floats(data: Float[], f: (Float) -> Float) -> Float[] {
-    let mut out: Float[]  = [];
+fun map_floats(data: f64[], f: (f64) -> f64) -> f64[] {
+    let mut out: f64[]  = [];
     for (let x in data) { array_push(out, f(x)); }
     out
 }
 
-fun filter_floats(data: Float[], pred: (Float) -> Bool) -> Float[] {
-    let mut out: Float[]  = [];
+fun filter_floats(data: f64[], pred: (f64) -> Bool) -> f64[] {
+    let mut out: f64[]  = [];
     for (let x in data) {
         if (pred(x)) { array_push(out, x); }
     }
@@ -197,8 +197,8 @@ fun filter_floats(data: Float[], pred: (Float) -> Bool) -> Float[] {
 }
 
 // Prefix sums: out[i] = data[0] + ... + data[i].
-fun running_sums(data: Float[]) -> Float[] {
-    let mut out: Float[]  = [];
+fun running_sums(data: f64[]) -> f64[] {
+    let mut out: f64[]  = [];
     let mut acc = 0.0;
     for (let x in data) {
         acc += x;
@@ -207,9 +207,9 @@ fun running_sums(data: Float[]) -> Float[] {
     out
 }
 
-// Build an Int[] of squares using a C-style for loop.
-fun squares_up_to(n: Int) -> Int[] {
-    let mut out: Int[]  = [];
+// Build an i64[] of squares using a C-style for loop.
+fun squares_up_to(n: i64) -> i64[] {
+    let mut out: i64[]  = [];
     for (let mut i = 1; i <= n; i += 1) {
         array_push(out, i * i);
     }
@@ -220,7 +220,7 @@ fun squares_up_to(n: Int) -> Int[] {
 
 fun main() {
     // 1. Bubble sort.
-    let raw: Float[] = [3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0, 6.0];
+    let raw: f64[] = [3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0, 6.0];
     let srt = sort_floats(raw);
     // Expected: [1.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 9.0]
     assert(srt[0] == 1.0);
@@ -239,12 +239,12 @@ fun main() {
     let miss = binary_search(srt, 7.0);
     match miss { Perhaps::Some { value } => assert_msg(false, "expected None"), None => (), };
     // Searching an empty array returns None.
-    let empty_f: Float[] = [];
+    let empty_f: f64[] = [];
     let empty_srch = binary_search(empty_f, 1.0);
     match empty_srch { Perhaps::Some { value } => assert_msg(false, "expected None"), None => (), };
 
     // 3. Descriptive statistics — match with blocks (RFC-0018).
-    let d5: Float[] = [1.0, 2.0, 3.0, 4.0, 5.0];
+    let d5: f64[] = [1.0, 2.0, 3.0, 4.0, 5.0];
     let r5 = compute_stats(d5);
     match r5 {
         Result::Ok { value } => {
@@ -264,7 +264,7 @@ fun main() {
 
     // 4. Error case: empty input returns Err (RFC-0019 constructs Err with
     //    the Stats type param inferred from the return annotation).
-    let empty: Float[] = [];
+    let empty: f64[] = [];
     let rerr = compute_stats(empty);
     match rerr {
         Result::Ok  { value } => assert_msg(false, "expected Err"),
@@ -277,7 +277,7 @@ fun main() {
         Perhaps::Some { value } => assert(value == 3.0),
         None => assert_msg(false, "expected Some"),
     };
-    let d4: Float[] = [4.0, 1.0, 3.0, 2.0];
+    let d4: f64[] = [4.0, 1.0, 3.0, 2.0];
     let med4 = median(d4);
     match med4 {
         Perhaps::Some { value } => assert(value == 2.5),
@@ -303,19 +303,19 @@ fun main() {
     };
 
     // 7. Higher-order functions with closures.
-    let d8: Float[] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+    let d8: f64[] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
 
     assert(sum_floats(d8) == 36.0);
 
-    let above4 = count_if(d8, (x: Float) -> Bool { x > 4.0 });
+    let above4 = count_if(d8, (x: f64) -> Bool { x > 4.0 });
     assert(above4 == 4);
 
-    let squares = map_floats(d8, (x: Float) -> Float { x * x });
+    let squares = map_floats(d8, (x: f64) -> f64 { x * x });
     assert(squares[0]  == 1.0);
     assert(squares[3]  == 16.0);
     assert(squares[7]  == 64.0);
 
-    let big = filter_floats(d8, (x: Float) -> Bool { x > 5.0 });
+    let big = filter_floats(d8, (x: f64) -> Bool { x > 5.0 });
     assert(array_len(big) == 3);
     assert(big[0] == 6.0);
     assert(big[2] == 8.0);
@@ -327,7 +327,7 @@ fun main() {
     assert(rsums[7] == 36.0);
 
     // 8. Composing higher-order functions: sum of squares.
-    let sq_sum = sum_floats(map_floats(d5, (x: Float) -> Float { x * x }));
+    let sq_sum = sum_floats(map_floats(d5, (x: f64) -> f64 { x * x }));
     // 1 + 4 + 9 + 16 + 25 = 55
     assert(sq_sum == 55.0);
 
@@ -346,7 +346,7 @@ fun main() {
     };
 
     // 10. Tuple: capture (min, max) of the sorted array as a pair.
-    let extremes: (Float, Float) = (srt[0], srt[7]);
+    let extremes: (f64, f64) = (srt[0], srt[7]);
     assert(extremes.0 == 1.0);
     assert(extremes.1 == 9.0);
 
@@ -363,7 +363,7 @@ fun main() {
 
     // 13. Closure capturing an outer variable.
     let threshold = 3.0;
-    let above_threshold = count_if(d5, (x: Float) -> Bool { x > threshold });
+    let above_threshold = count_if(d5, (x: f64) -> Bool { x > threshold });
     assert(above_threshold == 2);
 
     // 14. Stats description as string (exercises to_str method).
@@ -374,7 +374,7 @@ fun main() {
     assert(string_len(desc) > 0);
 
     // 15. Single-element dataset: mean == value, variance == 0, range == 0.
-    let single: Float[] = [42.0];
+    let single: f64[] = [42.0];
     let single_stats = compute_stats(single);
     match single_stats {
         Result::Ok { value } => {

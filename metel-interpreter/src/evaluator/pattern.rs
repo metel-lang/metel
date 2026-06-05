@@ -12,8 +12,8 @@ pub(super) fn match_pattern(pattern: &Pattern, value: &Value, out: &mut HashMap<
             Value::Enum { name, variant, .. } if name == "Perhaps" && variant == "None"),
 
         Pattern::Literal(lit, _) => match (lit, value) {
-            (Literal::Int(a),   Value::Int(b))   => a == b,
-            (Literal::Float(a), Value::Float(b)) => a == b,
+            (Literal::Int(a),   Value::I64(b))   => a == b,
+            (Literal::Float(a), Value::F64(b)) => a == b,
             (Literal::Bool(a),  Value::Bool(b))  => a == b,
             (Literal::Str(a),   Value::Str(b))   => a == b,
             (Literal::Unit,     Value::Unit)      => true,
@@ -25,7 +25,7 @@ pub(super) fn match_pattern(pattern: &Pattern, value: &Value, out: &mut HashMap<
                     IntKind::I8  => matches!(v, Value::I8(b)  if *b == *a as i8),
                     IntKind::I16 => matches!(v, Value::I16(b) if *b == *a as i16),
                     IntKind::I32 => matches!(v, Value::I32(b) if *b == *a as i32),
-                    IntKind::I64 => matches!(v, Value::Int(b) if *b == *a as i64),
+                    IntKind::I64 => matches!(v, Value::I64(b) if *b == *a as i64),
                     IntKind::U8  => matches!(v, Value::U8(b)  if *b == *a as u8),
                     IntKind::U16 => matches!(v, Value::U16(b) if *b == *a as u16),
                     IntKind::U32 => matches!(v, Value::U32(b) if *b == *a as u32),
@@ -36,7 +36,7 @@ pub(super) fn match_pattern(pattern: &Pattern, value: &Value, out: &mut HashMap<
                 use crate::ast::FloatKind;
                 match kind {
                     FloatKind::F32 => matches!(v, Value::F32(b) if *b == *a as f32),
-                    FloatKind::F64 => matches!(v, Value::Float(b) if *b == *a),
+                    FloatKind::F64 => matches!(v, Value::F64(b) if *b == *a),
                 }
             }
             _ => false,

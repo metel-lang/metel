@@ -3,11 +3,11 @@
 // Tuples collect heterogeneous element types. The type of the tuple is
 // Tuple(t1, t2, ...) where each ti is independently inferred.
 
-fun pair(a: Int, b: Bool) -> (Int, Bool) {
-    let t: (Int, Bool) = (a, b);
+fun pair(a: i64, b: Bool) -> (i64, Bool) {
+    let t: (i64, Bool) = (a, b);
     t
 }
 
-let p: (Int, Bool) = (42, true);
-let q: (Int, Int) = (1, 2);
-let nested: ((Int, Bool), Int) = ((0, false), 99);
+let p: (i64, Bool) = (42, true);
+let q: (i64, i64) = (1, 2);
+let nested: ((i64, Bool), i64) = ((0, false), 99);

@@ -1,25 +1,25 @@
 // Stage 6: break nested inside if branches is visible to find_loop_break_type.
 
 // break inside if-then branch only
-let _a: Int = loop {
+let _a: i64 = loop {
     if (true) { break 42; }
 };
 
 // break in both then and else branches
-let _b: Int = loop {
+let _b: i64 = loop {
     if (true) { break 42; } else { break 0; }
 };
 
 // inner loop break does not escape to outer loop; outer diverges (Never).
 // Both trailing-semicolon and no-semicolon forms are valid in statement position.
-fun diverge_outer_with_semi() -> Int {
+fun diverge_outer_with_semi() -> i64 {
     loop {
         loop { break "inner"; };
         loop { break "inner"; };
     }
 }
 
-fun diverge_outer_no_semi() -> Int {
+fun diverge_outer_no_semi() -> i64 {
     loop {
         loop { break "inner"; }
         loop { break "inner"; }

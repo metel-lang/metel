@@ -100,8 +100,8 @@ pub enum InferType {
 }
 
 impl InferType {
-    pub fn int() -> Self { InferType::Concrete(Type::Int) }
-    pub fn float() -> Self { InferType::Concrete(Type::Float) }
+    pub fn int() -> Self { InferType::Concrete(Type::I64) }
+    pub fn float() -> Self { InferType::Concrete(Type::F64) }
     pub fn bool() -> Self { InferType::Concrete(Type::Bool) }
     pub fn str() -> Self { InferType::Concrete(Type::Str) }
     pub fn unit() -> Self { InferType::Concrete(Type::Unit) }
@@ -528,7 +528,7 @@ pub struct TypeDefinitionRegistry {
     /// aspect name → full declared methods, including default bodies.
     aspect_method_defs: HashMap<String, Vec<AspectMethod>>,
     /// (target_type_name, aspect_name) → list of type-arg vectors, one per registered impl.
-    /// E.g. ("Int", "From") → [[Type::Float]] means `impl From<Float> for Int`.
+    /// E.g. ("Int", "From") → [[Type::F64]] means `impl From<Float> for Int`.
     impl_aspect_env: HashMap<(String, String), Vec<Vec<Type>>>,
 }
 

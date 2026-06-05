@@ -8,7 +8,7 @@ struct Pair<A, B> {
 }
 
 fun main() {
-    // Box<Int>
+    // Box<i64>
     let b_int = Box { value: 42 };
     assert(b_int.value == 42);
 
@@ -20,12 +20,12 @@ fun main() {
     let b_str = Box { value: "hello" };
     assert(b_str.value == "hello");
 
-    // Pair<Int, Bool>
+    // Pair<i64, Bool>
     let p = Pair { first: 10, second: false };
     assert(p.first == 10);
     assert(!p.second);
 
-    // Pair<Bool, Int>
+    // Pair<Bool, i64>
     let q = Pair { first: true, second: 99 };
     assert(q.first);
     assert(q.second == 99);

@@ -1,19 +1,19 @@
-struct Vec2 { x: Int, y: Int }
+struct Vec2 { x: i64, y: i64 }
 
 impl Vec2 {
     fun add(self, other: Vec2) -> Vec2 {
         Vec2 { x: self.x + other.x, y: self.y + other.y }
     }
-    fun scale(self, factor: Int) -> Vec2 {
+    fun scale(self, factor: i64) -> Vec2 {
         Vec2 { x: self.x * factor, y: self.y * factor }
     }
     fun negate(self) -> Vec2 {
         Vec2 { x: -self.x, y: -self.y }
     }
-    fun length_sq(self) -> Int {
+    fun length_sq(self) -> i64 {
         self.x * self.x + self.y * self.y
     }
-    fun dot(self, other: Vec2) -> Int {
+    fun dot(self, other: Vec2) -> i64 {
         self.x * other.x + self.y * other.y
     }
 }

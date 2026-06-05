@@ -1,4 +1,4 @@
-struct Counter { value: Int, step: Int }
+struct Counter { value: i64, step: i64 }
 
 fun main() {
     // Plain field assignment.

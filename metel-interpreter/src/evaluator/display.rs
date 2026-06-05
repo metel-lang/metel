@@ -10,8 +10,8 @@ pub(super) fn format_float(f: f64) -> String {
 
 pub(super) fn value_to_display_string(v: &Value) -> Option<String> {
     match v {
-        Value::Int(n)   => Some(n.to_string()),
-        Value::Float(f) => Some(format_float(*f)),
+        Value::I64(n)   => Some(n.to_string()),
+        Value::F64(f) => Some(format_float(*f)),
         Value::Bool(b)  => Some(if *b { "true" } else { "false" }.to_string()),
         Value::Str(s)   => Some(s.clone()),
         Value::I8(n)    => Some(n.to_string()),
@@ -28,8 +28,8 @@ pub(super) fn value_to_display_string(v: &Value) -> Option<String> {
 
 pub(super) fn format_value(val: &Value) -> String {
     match val {
-        Value::Int(n)   => n.to_string(),
-        Value::Float(f) => f.to_string(),
+        Value::I64(n)   => n.to_string(),
+        Value::F64(f) => f.to_string(),
         Value::Bool(b)  => b.to_string(),
         Value::Str(s)   => format!("{:?}", s),
         Value::Unit     => "()".to_string(),

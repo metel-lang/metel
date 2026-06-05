@@ -4,7 +4,7 @@ let id = (x) -> { x };
 let swap_vals = (a) -> { (b) -> { (b, a) } };
 
 fun main() {
-    // id used at Int, Bool, String.
+    // id used at i64, Bool, String.
     assert(id(42) == 42);
     assert(id(true));
     assert(id("hello") == "hello");
@@ -16,7 +16,7 @@ fun main() {
     assert(id(id(99)) == 99);
 
     // Two independent let-poly closures.
-    let double = (n: Int) -> Int { n * 2 };
+    let double = (n: i64) -> i64 { n * 2 };
     let negate = (b: Bool) -> Bool { !b };
     assert(double(5) == 10);
     assert(negate(false));

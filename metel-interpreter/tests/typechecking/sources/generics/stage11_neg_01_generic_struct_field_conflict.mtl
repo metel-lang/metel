@@ -5,6 +5,6 @@ struct Box<T> {
     value: T,
 }
 
-fun bad() -> Box<Int> { // ERROR[T0001]
+fun bad() -> Box<i64> { // ERROR[T0001]
     Box { value: true }
 }

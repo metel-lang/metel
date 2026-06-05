@@ -1,10 +1,10 @@
 // Shorthand field initialisation: `Point { x, y }` desugars to `Point { x: x, y: y }`.
 
-struct Point { x: Int, y: Int }
+struct Point { x: i64, y: i64 }
 
-struct Named { name: String, value: Int }
+struct Named { name: String, value: i64 }
 
-fun make_point(x: Int, y: Int) -> Point {
+fun make_point(x: i64, y: i64) -> Point {
     Point { x, y }
 }
 

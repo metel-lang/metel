@@ -4,20 +4,20 @@
 //   user aspect declaration (Measurable, Describable),
 //   impl Aspect for Type and method dispatch on multiple types,
 //   both aspects implemented on the same type (Circle, Rectangle),
-//   to_string on Int / Float / Bool / String (all four built-in Display types),
+//   to_string on i64 / f64 / Bool / String (all four built-in Display types),
 //   polymorphic print / println,
-//   user-defined Iterable<Float> (AreaList) — stateful forward scan,
+//   user-defined Iterable<f64> (AreaList) — stateful forward scan,
 //   empty Iterable guard (loop body skipped),
 //   From<Celsius> for Fahrenheit / From<Fahrenheit> for Celsius,
 //   Celsius→Fahrenheit→Celsius round-trip (numeric stability),
-//   built-in From: Int as Float, Float as Int (truncation),
+//   built-in From: i64 as f64, f64 as i64 (truncation),
 //   ? operator with From coercion: ParseError → ShapeError.
 
 // ── Aspects ────────────────────────────────────────────────────────────────────
 
 aspect Measurable {
-    fun area(self) -> Float;
-    fun perimeter(self) -> Float;
+    fun area(self) -> f64;
+    fun perimeter(self) -> f64;
 }
 
 aspect Describable {
@@ -34,9 +34,9 @@ aspect From<T> {
 
 // ── Utilities ──────────────────────────────────────────────────────────────────
 
-fun pi() -> Float { 3.14159 }
+fun pi() -> f64 { 3.14159 }
 
-fun approx(a: Float, b: Float) -> Bool {
+fun approx(a: f64, b: f64) -> Bool {
     let d = a - b;
     let abs_d = if (d < 0.0) { 0.0 - d } else { d };
     abs_d < 0.01
@@ -44,16 +44,16 @@ fun approx(a: Float, b: Float) -> Bool {
 
 // ── Shape types ────────────────────────────────────────────────────────────────
 
-struct Circle    { radius: Int }
-struct Rectangle { width: Int, height: Int }
+struct Circle    { radius: i64 }
+struct Rectangle { width: i64, height: i64 }
 
 impl Measurable for Circle {
-    fun area(self) -> Float {
-        let r = self.radius as Float;
+    fun area(self) -> f64 {
+        let r = self.radius as f64;
         pi() * r * r
     }
-    fun perimeter(self) -> Float {
-        2.0 * pi() * (self.radius as Float)
+    fun perimeter(self) -> f64 {
+        2.0 * pi() * (self.radius as f64)
     }
 }
 
@@ -64,11 +64,11 @@ impl Describable for Circle {
 }
 
 impl Measurable for Rectangle {
-    fun area(self) -> Float {
-        (self.width * self.height) as Float
+    fun area(self) -> f64 {
+        (self.width * self.height) as f64
     }
-    fun perimeter(self) -> Float {
-        (2 * (self.width + self.height)) as Float
+    fun perimeter(self) -> f64 {
+        (2 * (self.width + self.height)) as f64
     }
 }
 
@@ -81,15 +81,15 @@ impl Describable for Rectangle {
 
 // ── User-defined Iterable ──────────────────────────────────────────────────────
 
-struct AreaList { data: Float[], pos: Int }
+struct AreaList { data: f64[], pos: i64 }
 
 impl AreaList {
-    fun new(data: Float[]) -> AreaList { AreaList { data: data, pos: 0 } }
-    fun len(self) -> Int { array_len(self.data) }
+    fun new(data: f64[]) -> AreaList { AreaList { data: data, pos: 0 } }
+    fun len(self) -> i64 { array_len(self.data) }
 }
 
-impl Iterable<Float> for AreaList {
-    fun next(&mut self) -> Perhaps<Float> {
+impl Iterable<f64> for AreaList {
+    fun next(&mut self) -> Perhaps<f64> {
         if (self.pos < array_len(self.data)) {
             let v = self.data[self.pos as u64];
             self.pos = self.pos + 1;
@@ -102,8 +102,8 @@ impl Iterable<Float> for AreaList {
 
 // ── Temperature — user-defined From ───────────────────────────────────────────
 
-struct Celsius    { degrees: Float }
-struct Fahrenheit { degrees: Float }
+struct Celsius    { degrees: f64 }
+struct Fahrenheit { degrees: f64 }
 
 impl From<Celsius> for Fahrenheit {
     fun from(value: Celsius) -> Fahrenheit {
@@ -128,7 +128,7 @@ impl From<ParseError> for ShapeError {
     }
 }
 
-fun parse_radius(s: String) -> Result<Int, ParseError> {
+fun parse_radius(s: String) -> Result<i64, ParseError> {
     if (s == "5") {
         Result::Ok { value: 5 }
     } else if (s == "10") {
@@ -139,7 +139,7 @@ fun parse_radius(s: String) -> Result<Int, ParseError> {
 }
 
 // cross-type match + as-cast (? cross-type deferred to #13).
-fun circle_area_from_str(s: String) -> Result<Float, ShapeError> {
+fun circle_area_from_str(s: String) -> Result<f64, ShapeError> {
     let r = match parse_radius(s) {
         Result::Ok { value } => value,
         Result::Err { error } => { return Result::Err { error: error as ShapeError }; },
@@ -175,17 +175,17 @@ fun main() {
     assert(c5.describe() == "Circle(r=5)");
     assert(c5.area() > 0.0);
 
-    // to_string on Int: positive, zero, multi-digit
-    let n42: Int = 42;
-    let nz: Int = 0;
-    let big: Int = 1000;
+    // to_string on i64: positive, zero, multi-digit
+    let n42: i64 = 42;
+    let nz: i64 = 0;
+    let big: i64 = 1000;
     assert(n42.to_string() == "42");
     assert(nz.to_string() == "0");
     assert(big.to_string() == "1000");
 
-    // to_string on Float: whole number → no decimal, fractional → keeps decimal
-    let f5: Float = 5.0;
-    let frac: Float = 3.14;
+    // to_string on f64: whole number → no decimal, fractional → keeps decimal
+    let f5: f64 = 5.0;
+    let frac: f64 = 3.14;
     assert(f5.to_string() == "5");
     assert(frac.to_string() == "3.14");
 
@@ -204,7 +204,7 @@ fun main() {
     println("done");
 
     // User-defined Iterable: collect all areas into a total
-    let areas: Float[] = [c5.area(), r34.area(), c10.area()];
+    let areas: f64[] = [c5.area(), r34.area(), c10.area()];
     let seq = AreaList::new(areas);
     assert(seq.len() == 3);
     let mut total_area = 0.0;
@@ -214,7 +214,7 @@ fun main() {
 
     // Empty Iterable: loop body never runs
     let mut body_ran: Bool  = false;
-    let empty_areas: Float[] = [];
+    let empty_areas: f64[] = [];
     for (let _a in AreaList::new(empty_areas)) { body_ran = true; }
     assert(!body_ran);
 
@@ -235,14 +235,14 @@ fun main() {
     let body_back = body_f as Celsius;
     assert(approx(body_back.degrees, 37.0));
 
-    // Built-in From: Int as Float (exact)
-    let seven: Int = 7;
-    let seven_f = seven as Float;
+    // Built-in From: i64 as f64 (exact)
+    let seven: i64 = 7;
+    let seven_f = seven as f64;
     assert(seven_f == 7.0);
 
-    // Built-in From: Float as Int (truncation toward zero)
-    let pi_approx: Float = 3.9;
-    let pi_int = pi_approx as Int;
+    // Built-in From: f64 as i64 (truncation toward zero)
+    let pi_approx: f64 = 3.9;
+    let pi_int = pi_approx as i64;
     assert(pi_int == 3);
 
     // ? success path: parse "5", build Circle, return area

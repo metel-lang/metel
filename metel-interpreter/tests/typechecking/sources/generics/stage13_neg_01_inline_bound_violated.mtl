@@ -10,7 +10,7 @@ struct Wrapper<T: Printable> {
 }
 
 struct Plain {
-    x: Int,
+    x: i64,
 }
 
 // Plain does not implement Printable.

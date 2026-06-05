@@ -13,6 +13,6 @@ impl Stack<T> {
     }
 }
 
-fun run(s: Stack<Int>) -> Int {
+fun run(s: Stack<i64>) -> i64 {
     s.peek(0)
 }

@@ -83,8 +83,8 @@ mod phase_2_infer_types {
 
     #[test]
     fn test_concrete_variants() {
-        assert_eq!(InferType::int(), InferType::Concrete(Type::Int));
-        assert_eq!(InferType::float(), InferType::Concrete(Type::Float));
+        assert_eq!(InferType::int(), InferType::Concrete(Type::I64));
+        assert_eq!(InferType::float(), InferType::Concrete(Type::F64));
         assert_eq!(InferType::bool(), InferType::Concrete(Type::Bool));
         assert_eq!(InferType::str(), InferType::Concrete(Type::Str));
         assert_eq!(InferType::unit(), InferType::Concrete(Type::Unit));
@@ -98,8 +98,8 @@ mod phase_2_infer_types {
 
     #[test]
     fn test_display_concrete() {
-        assert_eq!(format!("{}", InferType::int()), "Int");
-        assert_eq!(format!("{}", InferType::float()), "Float");
+        assert_eq!(format!("{}", InferType::int()), "i64");
+        assert_eq!(format!("{}", InferType::float()), "f64");
         assert_eq!(format!("{}", InferType::bool()), "Bool");
         assert_eq!(format!("{}", InferType::str()), "String");
         assert_eq!(format!("{}", InferType::unit()), "()");
@@ -117,7 +117,7 @@ mod phase_2_infer_types {
             vec![InferType::int(), InferType::bool()],
             Box::new(InferType::str()),
         );
-        assert_eq!(format!("{}", ty), "(Int, Bool) -> String");
+        assert_eq!(format!("{}", ty), "(i64, Bool) -> String");
     }
 
     #[test]
@@ -129,13 +129,13 @@ mod phase_2_infer_types {
     #[test]
     fn test_display_tuple() {
         let ty = InferType::Tuple(vec![InferType::int(), InferType::bool()]);
-        assert_eq!(format!("{}", ty), "(Int, Bool)");
+        assert_eq!(format!("{}", ty), "(i64, Bool)");
     }
 
     #[test]
     fn test_display_array() {
         let ty = InferType::Array(Box::new(InferType::int()));
-        assert_eq!(format!("{}", ty), "Int[]");
+        assert_eq!(format!("{}", ty), "i64[]");
     }
 
     #[test]
@@ -147,7 +147,7 @@ mod phase_2_infer_types {
     #[test]
     fn test_display_named_with_args() {
         let ty = InferType::Named("Map".to_string(), vec![InferType::str(), InferType::int()]);
-        assert_eq!(format!("{}", ty), "Map<String, Int>");
+        assert_eq!(format!("{}", ty), "Map<String, i64>");
     }
 
     #[test]
@@ -161,12 +161,12 @@ mod phase_2_infer_types {
 
     #[test]
     fn test_nested_types() {
-        // Array of functions: (Int) -> Bool []
+        // Array of functions: (i64) -> Bool []
         let ty = InferType::Array(Box::new(InferType::Fun(
             vec![InferType::int()],
             Box::new(InferType::bool()),
         )));
-        assert_eq!(format!("{}", ty), "(Int) -> Bool[]");
+        assert_eq!(format!("{}", ty), "(i64) -> Bool[]");
     }
 
     #[test]
@@ -221,7 +221,7 @@ mod phase_3_substitution {
 
     #[test]
     fn test_apply_chains_transitively() {
-        // ?t0 → ?t1, ?t1 → Int  ⟹  apply(?t0) = Int
+        // ?t0 → ?t1, ?t1 → i64  ⟹  apply(?t0) = i64
         let mut s = Substitution::new();
         s.bind(TypeVar(0), InferType::var(TypeVar(1)));
         s.bind(TypeVar(1), InferType::int());
@@ -230,7 +230,7 @@ mod phase_3_substitution {
 
     #[test]
     fn test_apply_nested_fun() {
-        // (?t0) -> ?t1  with { ?t0→Bool, ?t1→Int }  ⟹  (Bool) -> Int
+        // (?t0) -> ?t1  with { ?t0→Bool, ?t1→i64 }  ⟹  (Bool) -> i64
         let mut s = Substitution::new();
         s.bind(TypeVar(0), InferType::bool());
         s.bind(TypeVar(1), InferType::int());
@@ -269,8 +269,8 @@ mod phase_3_substitution {
 
     #[test]
     fn test_compose_applies_other_to_self_values() {
-        // s1: { ?t0 → ?t1 },  s2: { ?t1 → Int }
-        // compose(s1, s2) should resolve ?t0 all the way to Int
+        // s1: { ?t0 → ?t1 },  s2: { ?t1 → i64 }
+        // compose(s1, s2) should resolve ?t0 all the way to i64
         let mut s1 = Substitution::new();
         s1.bind(TypeVar(0), InferType::var(TypeVar(1)));
         let mut s2 = Substitution::new();
@@ -284,8 +284,8 @@ mod phase_3_substitution {
     #[test]
     fn test_compose_self_wins_on_overlap() {
         // compose(s1, s2) means "apply s1 first, then s2".
-        // s1: { ?t0 → Int },  s2: { ?t0 → Bool }
-        // ?t0 → s2(s1(?t0)) = s2(Int) = Int  (s2 only binds vars, not concrete types)
+        // s1: { ?t0 → i64 },  s2: { ?t0 → Bool }
+        // ?t0 → s2(s1(?t0)) = s2(i64) = i64  (s2 only binds vars, not concrete types)
         let mut s1 = Substitution::new();
         s1.bind(TypeVar(0), InferType::int());
         let mut s2 = Substitution::new();
@@ -342,7 +342,7 @@ mod phase_4_unification {
 
     #[test]
     fn test_unify_function_types() {
-        // (?t0) -> ?t0  with  (Int) -> Int  => ?t0 = Int
+        // (?t0) -> ?t0  with  (i64) -> i64  => ?t0 = i64
         let a = InferType::Fun(
             vec![InferType::var(TypeVar(0))],
             Box::new(InferType::var(TypeVar(0))),
@@ -364,7 +364,7 @@ mod phase_4_unification {
 
     #[test]
     fn test_unify_function_return_type() {
-        // (Int) -> ?t0  with  (Int) -> Bool  => ?t0 = Bool
+        // (i64) -> ?t0  with  (i64) -> Bool  => ?t0 = Bool
         let a = InferType::Fun(vec![InferType::int()], Box::new(InferType::var(TypeVar(0))));
         let b = InferType::Fun(vec![InferType::int()], Box::new(InferType::bool()));
         let s = unify(&a, &b).unwrap();
@@ -373,7 +373,7 @@ mod phase_4_unification {
 
     #[test]
     fn test_unify_array_types() {
-        // ?t0[]  with  Int[]  => ?t0 = Int
+        // ?t0[]  with  i64[]  => ?t0 = i64
         let a = InferType::Array(Box::new(InferType::var(TypeVar(0))));
         let b = InferType::Array(Box::new(InferType::int()));
         let s = unify(&a, &b).unwrap();
@@ -389,7 +389,7 @@ mod phase_4_unification {
 
     #[test]
     fn test_unify_tuple_types() {
-        // (?t0, Bool)  with  (Int, Bool)  => ?t0 = Int
+        // (?t0, Bool)  with  (i64, Bool)  => ?t0 = i64
         let a = InferType::Tuple(vec![InferType::var(TypeVar(0)), InferType::bool()]);
         let b = InferType::Tuple(vec![InferType::int(), InferType::bool()]);
         let s = unify(&a, &b).unwrap();
@@ -405,7 +405,7 @@ mod phase_4_unification {
 
     #[test]
     fn test_unify_named_types() {
-        // List<?t0>  with  List<Int>  => ?t0 = Int
+        // List<?t0>  with  List<i64>  => ?t0 = i64
         let a = InferType::Named("List".to_string(), vec![InferType::var(TypeVar(0))]);
         let b = InferType::Named("List".to_string(), vec![InferType::int()]);
         let s = unify(&a, &b).unwrap();
@@ -444,7 +444,7 @@ mod phase_4_unification {
 
     #[test]
     fn test_occurs_check_function() {
-        // ?t0 = (?t0) -> Int  — should fail
+        // ?t0 = (?t0) -> i64  — should fail
         let a = InferType::var(TypeVar(0));
         let b = InferType::Fun(vec![InferType::var(TypeVar(0))], Box::new(InferType::int()));
         assert!(unify(&a, &b).is_err());
@@ -452,7 +452,7 @@ mod phase_4_unification {
 
     #[test]
     fn test_unify_multi_var_function() {
-        // (?t0, ?t1) -> ?t0  with  (Int, Bool) -> Int  => ?t0=Int, ?t1=Bool
+        // (?t0, ?t1) -> ?t0  with  (i64, Bool) -> i64  => ?t0=i64, ?t1=Bool
         let a = InferType::Fun(
             vec![InferType::var(TypeVar(0)), InferType::var(TypeVar(1))],
             Box::new(InferType::var(TypeVar(0))),
@@ -478,7 +478,7 @@ mod phase_5_constraints {
 
     #[test]
     fn test_single_constraint_var_concrete() {
-        // ?t0 = Int  =>  { ?t0 → Int }
+        // ?t0 = i64  =>  { ?t0 → i64 }
         let cs = vec![Constraint::new(InferType::var(TypeVar(0)), InferType::int(), span())];
         let s = solve_constraints(cs).unwrap();
         assert_eq!(s.apply(&InferType::var(TypeVar(0))), InferType::int());
@@ -486,7 +486,7 @@ mod phase_5_constraints {
 
     #[test]
     fn test_multiple_independent_constraints() {
-        // ?t0 = Int, ?t1 = Bool  =>  { ?t0 → Int, ?t1 → Bool }
+        // ?t0 = i64, ?t1 = Bool  =>  { ?t0 → i64, ?t1 → Bool }
         let cs = vec![
             Constraint::new(InferType::var(TypeVar(0)), InferType::int(), span()),
             Constraint::new(InferType::var(TypeVar(1)), InferType::bool(), span()),
@@ -498,7 +498,7 @@ mod phase_5_constraints {
 
     #[test]
     fn test_transitive_constraints() {
-        // ?t0 = ?t1, ?t1 = Int  =>  ?t0 resolves to Int
+        // ?t0 = ?t1, ?t1 = i64  =>  ?t0 resolves to i64
         let cs = vec![
             Constraint::new(InferType::var(TypeVar(0)), InferType::var(TypeVar(1)), span()),
             Constraint::new(InferType::var(TypeVar(1)), InferType::int(), span()),
@@ -510,7 +510,7 @@ mod phase_5_constraints {
 
     #[test]
     fn test_conflicting_constraints_error() {
-        // ?t0 = Int, ?t0 = Bool  =>  error
+        // ?t0 = i64, ?t0 = Bool  =>  error
         let cs = vec![
             Constraint::new(InferType::var(TypeVar(0)), InferType::int(), span()),
             Constraint::new(InferType::var(TypeVar(0)), InferType::bool(), span()),
@@ -536,7 +536,7 @@ mod phase_5_constraints {
 
     #[test]
     fn test_constraint_with_function_type() {
-        // ?t0 = (Int) -> Bool
+        // ?t0 = (i64) -> Bool
         let fun_ty = InferType::Fun(vec![InferType::int()], Box::new(InferType::bool()));
         let cs = vec![Constraint::new(InferType::var(TypeVar(0)), fun_ty.clone(), span())];
         let s = solve_constraints(cs).unwrap();
@@ -545,7 +545,7 @@ mod phase_5_constraints {
 
     #[test]
     fn test_earlier_bindings_propagate() {
-        // ?t0 = Int, (?t0) -> Bool = (?t1) -> Bool  =>  ?t1 = Int
+        // ?t0 = i64, (?t0) -> Bool = (?t1) -> Bool  =>  ?t1 = i64
         let cs = vec![
             Constraint::new(InferType::var(TypeVar(0)), InferType::int(), span()),
             Constraint::new(
@@ -580,7 +580,7 @@ mod phase_6_type_schemes {
 
     #[test]
     fn test_free_vars_fun() {
-        // (?t0, Int) -> ?t1  =>  { ?t0, ?t1 }
+        // (?t0, i64) -> ?t1  =>  { ?t0, ?t1 }
         let ty = InferType::Fun(
             vec![InferType::var(TypeVar(0)), InferType::int()],
             Box::new(InferType::var(TypeVar(1))),
@@ -688,7 +688,7 @@ mod phase_6_type_schemes {
     #[test]
     fn test_display_mono() {
         let scheme = TypeScheme::mono(InferType::int());
-        assert_eq!(format!("{}", scheme), "Int");
+        assert_eq!(format!("{}", scheme), "i64");
     }
 
     #[test]
@@ -797,7 +797,7 @@ mod phase_7_infer_context {
             param_names: vec![],
             ty: v,
         });
-        // Poly env wins — result is a fresh Var, not Int
+        // Poly env wins — result is a fresh Var, not i64
         let result = ctx.lookup("f").unwrap();
         assert!(matches!(result, InferType::Var(_)));
     }
@@ -837,14 +837,14 @@ mod phase_7_infer_context {
         let scheme = generalize(fun_ty, &HashSet::new());
         ctx.bind_poly("id", scheme);
 
-        // Step 3: call id(42) — instantiate id, unify with (Int) -> ?ret
+        // Step 3: call id(42) — instantiate id, unify with (i64) -> ?ret
         let id_ty = ctx.lookup("id").unwrap();  // (?t1) -> ?t1
         let ret_ty = ctx.fresh_var();           // ?t2
         let call_ty = InferType::Fun(vec![InferType::int()], Box::new(ret_ty.clone()));
         ctx.add_constraint(id_ty, call_ty, span());
 
         let subst = ctx.solve().unwrap();
-        // ret_ty should resolve to Int
+        // ret_ty should resolve to i64
         assert_eq!(subst.apply(&ret_ty), InferType::int());
     }
 
@@ -983,11 +983,11 @@ mod phase_8_known_limitations {
     /// See: typechecker.md § "Rank-1 Limitation"
     #[test]
     fn test_rank1_fn_arg_monotype_conflicts() {
-        // fun apply_both(f, x: Int, y: Bool) { f(x); f(y) }
-        //   f(x) emits: ?t0 = (Int) -> ?t1
+        // fun apply_both(f, x: i64, y: Bool) { f(x); f(y) }
+        //   f(x) emits: ?t0 = (i64) -> ?t1
         //   f(y) emits: ?t0 = (Bool) -> ?t2
-        // After binding ?t0 = (Int) -> ?t1, the second constraint becomes
-        // (Int) -> ?t1 = (Bool) -> ?t2 → Int ≠ Bool → error
+        // After binding ?t0 = (i64) -> ?t1, the second constraint becomes
+        // (i64) -> ?t1 = (Bool) -> ?t2 → i64 ≠ Bool → error
         let cs = vec![
             Constraint::new(
                 InferType::var(TypeVar(0)),
@@ -1015,8 +1015,8 @@ mod phase_8_known_limitations {
     #[test]
     fn test_let_closure_monomorphic_conflicts_at_two_types() {
         // let identity = (x) { x }  →  identity : Fun([?t0], ?t0)
-        // identity(42)   emits: Fun([?t0], ?t0) = Fun([Int], ?t1)  → ?t0 = Int
-        // identity(true) emits: Fun([?t0], ?t0) = Fun([Bool], ?t2) → Int ≠ Bool → error
+        // identity(42)   emits: Fun([?t0], ?t0) = Fun([i64], ?t1)  → ?t0 = i64
+        // identity(true) emits: Fun([?t0], ?t0) = Fun([Bool], ?t2) → i64 ≠ Bool → error
         let cs = vec![
             Constraint::new(
                 InferType::Fun(vec![InferType::var(TypeVar(0))], Box::new(InferType::var(TypeVar(0)))),
@@ -1061,7 +1061,7 @@ mod phase_8_known_limitations {
             Constraint::new(inst1, InferType::Fun(vec![InferType::int()],  Box::new(ret1)), span()),
             Constraint::new(inst2, InferType::Fun(vec![InferType::bool()], Box::new(ret2)), span()),
         ];
-        assert!(solve_constraints(cs).is_ok(), "generalized scheme can be instantiated independently at Int and Bool");
+        assert!(solve_constraints(cs).is_ok(), "generalized scheme can be instantiated independently at i64 and Bool");
     }
 
     /// Eager partial solve limitation: field access requires the receiver type

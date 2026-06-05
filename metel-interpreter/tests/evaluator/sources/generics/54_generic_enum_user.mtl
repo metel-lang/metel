@@ -3,7 +3,7 @@ enum Maybe<T> {
     None {},
 }
 
-fun unwrap_or_int(m: Maybe<Int>, default: Int) -> Int {
+fun unwrap_or_int(m: Maybe<i64>, default: i64) -> i64 {
     match m {
         Maybe::Some { value } => value,
         _                     => default,
@@ -21,7 +21,7 @@ fun main() {
     let some_int = Maybe::Some { value: 42 };
     assert(unwrap_or_int(some_int, 0) == 42);
 
-    let none_int: Maybe<Int> = Maybe::None;
+    let none_int: Maybe<i64> = Maybe::None;
     assert(unwrap_or_int(none_int, 99) == 99);
 
     let some_bool = Maybe::Some { value: true };

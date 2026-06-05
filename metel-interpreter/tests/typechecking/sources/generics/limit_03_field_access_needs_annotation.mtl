@@ -11,7 +11,7 @@
 //
 // See: typechecker.md § "Pass 1 — Eager Partial Solves"
 
-struct Point { x: Int, y: Int }
+struct Point { x: i64, y: i64 }
 
 fun get_x(p) {
     p.x  // ERROR[T0002]

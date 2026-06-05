@@ -4,7 +4,7 @@ struct Box<T> {
     value: T,
 }
 
-fun make_int_box(v: Int) -> Box<Int> {
+fun make_int_box(v: i64) -> Box<i64> {
     Box { value: v }
 }
 
@@ -12,6 +12,6 @@ fun make_bool_box(v: Bool) -> Box<Bool> {
     Box { value: v }
 }
 
-fun unbox_int(b: Box<Int>) -> Int {
+fun unbox_int(b: Box<i64>) -> i64 {
     b.value
 }

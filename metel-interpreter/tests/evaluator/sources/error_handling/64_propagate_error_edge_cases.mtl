@@ -48,40 +48,40 @@ fun read_file(path: String) -> Result<String, IoError> {
     else { Result::Err { error: IoError { msg: string_concat("no file: ", path) } } }
 }
 
-fun parse_int(s: String) -> Result<Int, ParseError> {
+fun parse_int(s: String) -> Result<i64, ParseError> {
     if (s == "42") { Result::Ok  { value: 42 } }
     else if (s == "0") { Result::Ok { value: 0 } }
     else { Result::Err { error: ParseError { msg: string_concat("bad int: ", s) } } }
 }
 
 // same-type ?: ParseError stays ParseError
-fun parse_checked(s: String) -> Result<Int, ParseError> {
+fun parse_checked(s: String) -> Result<i64, ParseError> {
     let n = parse_int(s)?;
     Result::Ok { value: n }
 }
 
 // multi-step: cross-type ? coercion
-fun load_and_parse(path: String) -> Result<Int, AppError> {
+fun load_and_parse(path: String) -> Result<i64, AppError> {
     let contents = read_file(path)?;
     let n = parse_int(contents)?;
     Result::Ok { value: n }
 }
 
 // ? on first statement
-fun first_stmt(path: String) -> Result<Int, AppError> {
+fun first_stmt(path: String) -> Result<i64, AppError> {
     let contents = read_file(path)?;
     Result::Ok { value: 1 }
 }
 
 // ? on last statement
-fun last_stmt(s: String) -> Result<Int, AppError> {
+fun last_stmt(s: String) -> Result<i64, AppError> {
     let doubled = 2;
     let n = parse_int(s)?;
     Result::Ok { value: n * doubled }
 }
 
 // multiple cross-type ? conversions in one function
-fun multi_q(path: String) -> Result<Int, AppError> {
+fun multi_q(path: String) -> Result<i64, AppError> {
     let a = read_file(path)?;
     let b = parse_int(a)?;
     let c = parse_int("42")?;
@@ -90,14 +90,14 @@ fun multi_q(path: String) -> Result<Int, AppError> {
 
 // ── Counter Iterable ──────────────────────────────────────────────────────────
 
-struct Counter { current: Int, limit: Int }
+struct Counter { current: i64, limit: i64 }
 
 impl Counter {
-    fun new(limit: Int) -> Counter { Counter { current: 0, limit: limit } }
+    fun new(limit: i64) -> Counter { Counter { current: 0, limit: limit } }
 }
 
-impl Iterable<Int> for Counter {
-    fun next(&mut self) -> Perhaps<Int> {
+impl Iterable<i64> for Counter {
+    fun next(&mut self) -> Perhaps<i64> {
         if (self.current < self.limit) {
             let v = self.current;
             self.current = self.current + 1;

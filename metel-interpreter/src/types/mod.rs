@@ -2,10 +2,6 @@
 /// No type variables exist here; generics have been monomorphised.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
-    /// Ergonomic alias for `i64`. Plain integer literals and `Int` annotations use this.
-    Int,
-    /// Ergonomic alias for `f64`. Plain float literals and `Float` annotations use this.
-    Float,
     Bool,
     Str,
     Unit,
@@ -13,10 +9,10 @@ pub enum Type {
     /// loops with no reachable `break`, `return`, `panic!`). Coerces to any type.
     Never,
     // ── Sized integer types ───────────────────────────────────────────────────
-    I8, I16, I32,
+    I8, I16, I32, I64,
     U8, U16, U32, U64,
-    // ── Sized float type ──────────────────────────────────────────────────────
-    F32,
+    // ── Sized float types ─────────────────────────────────────────────────────
+    F32, F64,
     // ─────────────────────────────────────────────────────────────────────────
     Tuple(Vec<Type>),
     Array(Box<Type>),
@@ -31,13 +27,13 @@ pub enum Type {
 impl Type {
     /// Returns true if this is any integer type (signed or unsigned, any width).
     pub fn is_integer(&self) -> bool {
-        matches!(self, Type::Int | Type::I8 | Type::I16 | Type::I32
+        matches!(self, Type::I64 | Type::I8 | Type::I16 | Type::I32
                      | Type::U8 | Type::U16 | Type::U32 | Type::U64)
     }
 
     /// Returns true if this is any float type.
     pub fn is_float(&self) -> bool {
-        matches!(self, Type::Float | Type::F32)
+        matches!(self, Type::F64 | Type::F32)
     }
 
     /// Returns true if this is any numeric type (integer or float).
@@ -49,8 +45,8 @@ impl Type {
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Type::Int => write!(f, "Int"),
-            Type::Float => write!(f, "Float"),
+            Type::I64 => write!(f, "i64"),
+            Type::F64 => write!(f, "f64"),
             Type::Bool => write!(f, "Bool"),
             Type::Str => write!(f, "String"),
             Type::Unit => write!(f, "()"),

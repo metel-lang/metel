@@ -1,12 +1,12 @@
 // Integration Test 6 — Display and Text Rendering
 //
 // Feature coverage (v0.4):
-//   to_string on all built-in Display types (Int, Float, Bool, String),
+//   to_string on all built-in Display types (i64, f64, Bool, String),
 //   print / println accept any Display type,
-//   Float whole-number formatting (5.0 → "5") vs fractional (3.14 → "3.14"),
+//   f64 whole-number formatting (5.0 → "5") vs fractional (3.14 → "3.14"),
 //   user aspect Printable with format() method,
-//   From<Int> for Score — user-defined wrap,
-//   From<Float> for Temperature — user-defined wrap,
+//   From<i64> for Score — user-defined wrap,
+//   From<f64> for Temperature — user-defined wrap,
 //   string_concat in combination with to_string,
 //   Iterable<String> (StringBag) — walk labels,
 //   ? with From in a display-building context.
@@ -27,15 +27,15 @@ aspect Iterable<T> {
 
 // ── Wrapper types ──────────────────────────────────────────────────────────────
 
-struct Score       { points: Int }
-struct Temperature { celsius: Float }
+struct Score       { points: i64 }
+struct Temperature { celsius: f64 }
 
-impl From<Int> for Score {
-    fun from(value: Int) -> Score { Score { points: value } }
+impl From<i64> for Score {
+    fun from(value: i64) -> Score { Score { points: value } }
 }
 
-impl From<Float> for Temperature {
-    fun from(value: Float) -> Temperature { Temperature { celsius: value } }
+impl From<f64> for Temperature {
+    fun from(value: f64) -> Temperature { Temperature { celsius: value } }
 }
 
 impl Printable for Score {
@@ -52,11 +52,11 @@ impl Printable for Temperature {
 
 // ── StringBag Iterable ─────────────────────────────────────────────────────────
 
-struct StringBag { items: String[], pos: Int }
+struct StringBag { items: String[], pos: i64 }
 
 impl StringBag {
     fun new(items: String[]) -> StringBag { StringBag { items: items, pos: 0 } }
-    fun len(self) -> Int { array_len(self.items) }
+    fun len(self) -> i64 { array_len(self.items) }
 }
 
 impl Iterable<String> for StringBag {
@@ -100,20 +100,20 @@ fun render_score(s: String) -> Result<String, RenderError> {
 // ── main ───────────────────────────────────────────────────────────────────────
 
 fun main() {
-    // to_string on Int: multiple values
+    // to_string on i64: multiple values
     assert(0.to_string()    == "0");
     assert(1.to_string()    == "1");
     assert(42.to_string()   == "42");
     assert(999.to_string()  == "999");
     assert((-1).to_string() == "-1");
 
-    // to_string on Float: whole-number formatting
+    // to_string on f64: whole-number formatting
     assert(0.0.to_string()   == "0");
     assert(1.0.to_string()   == "1");
     assert(5.0.to_string()   == "5");
     assert(100.0.to_string() == "100");
 
-    // to_string on Float: fractional
+    // to_string on f64: fractional
     assert(3.14.to_string()  == "3.14");
     assert(0.5.to_string()   == "0.5");
     assert(1.25.to_string()  == "1.25");
@@ -137,19 +137,19 @@ fun main() {
     println(2.0);
     println("done");
 
-    // From<Int> for Score
-    let seven: Int = 7;
+    // From<i64> for Score
+    let seven: i64 = 7;
     let s7 = seven as Score;
     assert(s7.points == 7);
     assert(s7.format() == "Score(7)");
 
-    // From<Float> for Temperature
-    let boiling: Float = 100.0;
+    // From<f64> for Temperature
+    let boiling: f64 = 100.0;
     let t100 = boiling as Temperature;
     assert(t100.celsius == 100.0);
     assert(t100.format() == "Temp(100)");
 
-    let body_temp: Float = 37.5;
+    let body_temp: f64 = 37.5;
     let t37 = body_temp as Temperature;
     assert(t37.celsius == 37.5);
     assert(t37.format() == "Temp(37.5)");
@@ -197,11 +197,11 @@ fun main() {
     };
 
     // string_concat + to_string composition
-    let n: Int = 99;
+    let n: i64 = 99;
     let composed = string_concat("value=", n.to_string());
     assert(composed == "value=99");
 
-    let f: Float = 1.5;
+    let f: f64 = 1.5;
     let composed2 = string_concat("f=", f.to_string());
     assert(composed2 == "f=1.5");
 }

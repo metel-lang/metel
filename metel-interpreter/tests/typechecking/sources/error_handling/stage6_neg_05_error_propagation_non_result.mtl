@@ -1,4 +1,4 @@
 // ? on a non-Result type should fail.
-fun might_fail() -> Int {
+fun might_fail() -> i64 {
     42? // ERROR[T0001]
 }

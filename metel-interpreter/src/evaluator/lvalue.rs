@@ -177,19 +177,19 @@ macro_rules! int_arith {
 pub(super) fn eval_binop(op: &BinOp, lv: Value, rv: Value, span: &Span) -> Result<Signal, MetelError> {
     let result = match (op, lv, rv) {
         // ── Int (i64) arithmetic — overflow panics ─────────────────────────────
-        (BinOp::Add, Value::Int(a), Value::Int(b)) =>
-            Value::Int(a.checked_add(b).ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0007, "integer overflow", span))?),
-        (BinOp::Sub, Value::Int(a), Value::Int(b)) =>
-            Value::Int(a.checked_sub(b).ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0007, "integer overflow", span))?),
-        (BinOp::Mul, Value::Int(a), Value::Int(b)) =>
-            Value::Int(a.checked_mul(b).ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0007, "integer overflow", span))?),
-        (BinOp::Div, Value::Int(a), Value::Int(b)) => {
+        (BinOp::Add, Value::I64(a), Value::I64(b)) =>
+            Value::I64(a.checked_add(b).ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0007, "integer overflow", span))?),
+        (BinOp::Sub, Value::I64(a), Value::I64(b)) =>
+            Value::I64(a.checked_sub(b).ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0007, "integer overflow", span))?),
+        (BinOp::Mul, Value::I64(a), Value::I64(b)) =>
+            Value::I64(a.checked_mul(b).ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0007, "integer overflow", span))?),
+        (BinOp::Div, Value::I64(a), Value::I64(b)) => {
             if b == 0 { return Err(MetelError::panic(RuntimeErrorCode::R0007, "division by zero", span)); }
-            Value::Int(a.checked_div(b).ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0007, "integer overflow", span))?)
+            Value::I64(a.checked_div(b).ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0007, "integer overflow", span))?)
         }
-        (BinOp::Rem, Value::Int(a), Value::Int(b)) => {
+        (BinOp::Rem, Value::I64(a), Value::I64(b)) => {
             if b == 0 { return Err(MetelError::panic(RuntimeErrorCode::R0007, "remainder by zero", span)); }
-            Value::Int(a % b)
+            Value::I64(a % b)
         }
 
         // ── i8 arithmetic ──────────────────────────────────────────────────────
@@ -305,11 +305,11 @@ pub(super) fn eval_binop(op: &BinOp, lv: Value, rv: Value, span: &Span) -> Resul
         }
 
         // ── Float arithmetic (no overflow semantics — IEEE 754) ────────────────
-        (BinOp::Add, Value::Float(a), Value::Float(b)) => Value::Float(a + b),
-        (BinOp::Sub, Value::Float(a), Value::Float(b)) => Value::Float(a - b),
-        (BinOp::Mul, Value::Float(a), Value::Float(b)) => Value::Float(a * b),
-        (BinOp::Div, Value::Float(a), Value::Float(b)) => Value::Float(a / b),
-        (BinOp::Rem, Value::Float(a), Value::Float(b)) => Value::Float(a % b),
+        (BinOp::Add, Value::F64(a), Value::F64(b)) => Value::F64(a + b),
+        (BinOp::Sub, Value::F64(a), Value::F64(b)) => Value::F64(a - b),
+        (BinOp::Mul, Value::F64(a), Value::F64(b)) => Value::F64(a * b),
+        (BinOp::Div, Value::F64(a), Value::F64(b)) => Value::F64(a / b),
+        (BinOp::Rem, Value::F64(a), Value::F64(b)) => Value::F64(a % b),
 
         (BinOp::Add, Value::F32(a), Value::F32(b)) => Value::F32(a + b),
         (BinOp::Sub, Value::F32(a), Value::F32(b)) => Value::F32(a - b),
@@ -321,12 +321,12 @@ pub(super) fn eval_binop(op: &BinOp, lv: Value, rv: Value, span: &Span) -> Resul
         (BinOp::Add, Value::Str(a), Value::Str(b)) => Value::Str(a + &b),
 
         // ── Integer comparisons ────────────────────────────────────────────────
-        (BinOp::Eq, Value::Int(a), Value::Int(b)) => Value::Bool(a == b),
-        (BinOp::Ne, Value::Int(a), Value::Int(b)) => Value::Bool(a != b),
-        (BinOp::Lt, Value::Int(a), Value::Int(b)) => Value::Bool(a <  b),
-        (BinOp::Le, Value::Int(a), Value::Int(b)) => Value::Bool(a <= b),
-        (BinOp::Gt, Value::Int(a), Value::Int(b)) => Value::Bool(a >  b),
-        (BinOp::Ge, Value::Int(a), Value::Int(b)) => Value::Bool(a >= b),
+        (BinOp::Eq, Value::I64(a), Value::I64(b)) => Value::Bool(a == b),
+        (BinOp::Ne, Value::I64(a), Value::I64(b)) => Value::Bool(a != b),
+        (BinOp::Lt, Value::I64(a), Value::I64(b)) => Value::Bool(a <  b),
+        (BinOp::Le, Value::I64(a), Value::I64(b)) => Value::Bool(a <= b),
+        (BinOp::Gt, Value::I64(a), Value::I64(b)) => Value::Bool(a >  b),
+        (BinOp::Ge, Value::I64(a), Value::I64(b)) => Value::Bool(a >= b),
 
         (BinOp::Eq, Value::I8(a),  Value::I8(b))  => Value::Bool(a == b),
         (BinOp::Ne, Value::I8(a),  Value::I8(b))  => Value::Bool(a != b),
@@ -378,12 +378,12 @@ pub(super) fn eval_binop(op: &BinOp, lv: Value, rv: Value, span: &Span) -> Resul
         (BinOp::Ge, Value::U64(a), Value::U64(b)) => Value::Bool(a >= b),
 
         // ── Float comparisons ──────────────────────────────────────────────────
-        (BinOp::Eq, Value::Float(a), Value::Float(b)) => Value::Bool(a == b),
-        (BinOp::Ne, Value::Float(a), Value::Float(b)) => Value::Bool(a != b),
-        (BinOp::Lt, Value::Float(a), Value::Float(b)) => Value::Bool(a <  b),
-        (BinOp::Le, Value::Float(a), Value::Float(b)) => Value::Bool(a <= b),
-        (BinOp::Gt, Value::Float(a), Value::Float(b)) => Value::Bool(a >  b),
-        (BinOp::Ge, Value::Float(a), Value::Float(b)) => Value::Bool(a >= b),
+        (BinOp::Eq, Value::F64(a), Value::F64(b)) => Value::Bool(a == b),
+        (BinOp::Ne, Value::F64(a), Value::F64(b)) => Value::Bool(a != b),
+        (BinOp::Lt, Value::F64(a), Value::F64(b)) => Value::Bool(a <  b),
+        (BinOp::Le, Value::F64(a), Value::F64(b)) => Value::Bool(a <= b),
+        (BinOp::Gt, Value::F64(a), Value::F64(b)) => Value::Bool(a >  b),
+        (BinOp::Ge, Value::F64(a), Value::F64(b)) => Value::Bool(a >= b),
 
         (BinOp::Eq, Value::F32(a), Value::F32(b)) => Value::Bool(a == b),
         (BinOp::Ne, Value::F32(a), Value::F32(b)) => Value::Bool(a != b),
@@ -401,21 +401,21 @@ pub(super) fn eval_binop(op: &BinOp, lv: Value, rv: Value, span: &Span) -> Resul
         (BinOp::Ne, Value::Str(a), Value::Str(b)) => Value::Bool(a != b),
 
         // Range — produce a Struct value understood by for-in (issue #55)
-        (BinOp::Range, Value::Int(a), Value::Int(b)) => Value::Struct {
+        (BinOp::Range, Value::I64(a), Value::I64(b)) => Value::Struct {
             name: "Range".to_string(),
             fields: {
                 let mut m = HashMap::new();
-                m.insert("start".to_string(), Value::Int(a));
-                m.insert("end".to_string(),   Value::Int(b));
+                m.insert("start".to_string(), Value::I64(a));
+                m.insert("end".to_string(),   Value::I64(b));
                 m
             },
         },
-        (BinOp::RangeInclusive, Value::Int(a), Value::Int(b)) => Value::Struct {
+        (BinOp::RangeInclusive, Value::I64(a), Value::I64(b)) => Value::Struct {
             name: "RangeInclusive".to_string(),
             fields: {
                 let mut m = HashMap::new();
-                m.insert("start".to_string(), Value::Int(a));
-                m.insert("end".to_string(),   Value::Int(b));
+                m.insert("start".to_string(), Value::I64(a));
+                m.insert("end".to_string(),   Value::I64(b));
                 m
             },
         },

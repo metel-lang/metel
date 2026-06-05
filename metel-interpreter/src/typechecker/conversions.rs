@@ -27,15 +27,15 @@ fn type_expr_to_infer_in_context(
                 .map(|a| type_expr_to_infer_in_context(a, generics, self_ty_name))
                 .collect();
             match (name.as_str(), arg_tys.len()) {
-                ("Int",    0) | ("i64", 0) => InferType::int(),
-                ("Float",  0) | ("f64", 0) => InferType::float(),
+                ("i64", 0) => InferType::int(),
+                ("f64", 0) => InferType::float(),
                 ("Bool",   0) => InferType::bool(),
                 ("String", 0) => InferType::str(),
                 ("Never",  0) => InferType::never(),
                 ("i8",  0) => InferType::Concrete(Type::I8),
                 ("i16", 0) => InferType::Concrete(Type::I16),
                 ("i32", 0) => InferType::Concrete(Type::I32),
-                ("u8",  0) | ("Byte", 0) => InferType::Concrete(Type::U8),
+                ("u8",  0) => InferType::Concrete(Type::U8),
                 ("u16", 0) => InferType::Concrete(Type::U16),
                 ("u32", 0) => InferType::Concrete(Type::U32),
                 ("u64", 0) => InferType::Concrete(Type::U64),

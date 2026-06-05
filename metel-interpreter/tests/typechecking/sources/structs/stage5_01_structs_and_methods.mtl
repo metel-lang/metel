@@ -1,20 +1,20 @@
 // Stage 5: struct instantiation, field access, methods, and field assignment.
 
 struct Point {
-    x: Float,
-    y: Float,
+    x: f64,
+    y: f64,
 }
 
 impl Point {
-    fun sum(self) -> Float {
+    fun sum(self) -> f64 {
         self.x + self.y
     }
 
-    fun translate(self, dx: Float, dy: Float) -> Point {
+    fun translate(self, dx: f64, dy: f64) -> Point {
         Point { x: self.x + dx, y: self.y + dy }
     }
 
-    fun scale(&mut self, factor: Float) {
+    fun scale(&mut self, factor: f64) {
         self.x = self.x * factor;
         self.y = self.y * factor;
     }
@@ -24,26 +24,26 @@ impl Point {
 let p = Point { x: 1.0, y: 2.0 };
 
 // Field access
-let x: Float = p.x;
+let x: f64 = p.x;
 
 // Method call with no extra args
-let s: Float = p.sum();
+let s: f64 = p.sum();
 
 // Method call with args, result is a struct
 let q = p.translate(3.0, 4.0);
-let qs: Float = q.sum();
+let qs: f64 = q.sum();
 
 // Two-struct method
 struct Counter {
-    value: Int,
+    value: i64,
 }
 
 impl Counter {
-    fun get(self) -> Int {
+    fun get(self) -> i64 {
         self.value
     }
 
-    fun add(self, other: Counter) -> Int {
+    fun add(self, other: Counter) -> i64 {
         self.value + other.value
     }
 
@@ -53,5 +53,5 @@ impl Counter {
 }
 
 let c = Counter { value: 5 };
-let v: Int = c.get();
-let total: Int = c.add(Counter { value: 10 });
+let v: i64 = c.get();
+let total: i64 = c.add(Counter { value: 10 });

@@ -1,15 +1,15 @@
 // Local struct declarations are scoped to their enclosing function body.
 // Two functions may declare structs with the same name independently.
 
-fun make_point() -> Int {
-    struct Point { x: Int, y: Int }
+fun make_point() -> i64 {
+    struct Point { x: i64, y: i64 }
     let p = Point { x: 3, y: 4 };
     p.x + p.y
 }
 
 // Same struct name, different fields — no collision with make_point's Point.
-fun make_named() -> Int {
-    struct Point { label: Int }
+fun make_named() -> i64 {
+    struct Point { label: i64 }
     let p = Point { label: 99 };
     p.label
 }
@@ -19,7 +19,7 @@ fun main() {
     assert(make_named()  == 99);
 
     // Local struct usable inline within the same block.
-    struct Vec2 { dx: Int, dy: Int }
+    struct Vec2 { dx: i64, dy: i64 }
     let v = Vec2 { dx: 10, dy: 20 };
     assert(v.dx + v.dy == 30);
 }

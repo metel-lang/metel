@@ -9,15 +9,15 @@
 //   3. Infer `classify` body: calls is_nonzero(n), which returns Bool ✓
 //
 // Expected inferred types:
-//   is_nonzero(Int) -> Bool
-//   classify(Int) -> Bool
+//   is_nonzero(i64) -> Bool
+//   classify(i64) -> Bool
 //   result : Bool
 
-fun classify(n: Int) -> Bool {
+fun classify(n: i64) -> Bool {
     is_nonzero(n)
 }
 
-fun is_nonzero(n: Int) -> Bool {
+fun is_nonzero(n: i64) -> Bool {
     n > 0
 }
 

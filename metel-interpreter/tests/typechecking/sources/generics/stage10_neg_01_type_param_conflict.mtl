@@ -2,6 +2,6 @@
 
 fun first<T>(a: T, b: T) -> T { a }
 
-fun use_conflict() -> Int {
+fun use_conflict() -> i64 {
     first(1, true) // ERROR[T0001]
 }

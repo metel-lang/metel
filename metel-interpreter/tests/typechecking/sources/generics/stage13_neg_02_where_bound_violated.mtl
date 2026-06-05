@@ -11,11 +11,11 @@ struct Cache<K, V> where K: Serializable {
 }
 
 struct RawKey {
-    id: Int,
+    id: i64,
 }
 
 // RawKey does not implement Serializable.
 
-fun bad(k: RawKey, v: Int) -> Cache<RawKey, Int> {
+fun bad(k: RawKey, v: i64) -> Cache<RawKey, i64> {
     Cache { key: k, value: v } // ERROR[T0012]
 }

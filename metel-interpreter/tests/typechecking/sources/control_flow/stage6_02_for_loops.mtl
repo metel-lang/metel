@@ -1,39 +1,39 @@
 // Stage 6: for and for-in loops.
 
 // C-style for loop
-let mut sum: Int  = 0;
+let mut sum: i64  = 0;
 for (let mut i = 0; i < 10; i += 1) {
     sum += i;
 }
 
 // for-in over an array
-let arr: Int[] = [1, 2, 3];
-let mut total: Int  = 0;
+let arr: i64[] = [1, 2, 3];
+let mut total: i64  = 0;
 for (let x in arr) {
     total += x;
 }
 
 // for-in over a range
-let mut count: Int  = 0;
+let mut count: i64  = 0;
 for (let i in 0..5) {
     count += i;
 }
 
 // for-in over a range inclusive
-let mut count2: Int  = 0;
+let mut count2: i64  = 0;
 for (let i in 0..=4) {
     count2 += i;
 }
 
 // mutable for-in binding can be rebound locally
-let mut bumped: Int = 0;
+let mut bumped: i64 = 0;
 for (let mut item in arr) {
     item += 1;
     bumped += item;
 }
 
 // nested for loops
-let mut matrix_sum: Int  = 0;
+let mut matrix_sum: i64  = 0;
 for (let mut r = 0; r < 3; r += 1) {
     for (let mut c = 0; c < 3; c += 1) {
         matrix_sum += r + c;
@@ -41,7 +41,7 @@ for (let mut r = 0; r < 3; r += 1) {
 }
 
 // for with no init or step
-let mut x: Int  = 0;
+let mut x: i64  = 0;
 for (; x < 5; ) {
     x += 1;
 }

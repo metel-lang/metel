@@ -60,7 +60,7 @@ fn single_module_check_graph_runs() {
 fn single_module_with_arithmetic() {
     let dir = fixture_dir("arith");
     let main = dir.join("main.mtl");
-    write(&main, "fun main() -> Int { return 1 + 2; }\n");
+    write(&main, "fun main() -> i64 { return 1 + 2; }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -71,8 +71,8 @@ fn single_module_with_arithmetic() {
 fn two_module_function_call() {
     let dir = fixture_dir("two_mod");
     let main = dir.join("main.mtl");
-    write(&main, "import helper::*;\nfun main() -> Int { return answer(); }\n");
-    write(&dir.join("helper.mtl"), "pub fun answer() -> Int { return 42; }\n");
+    write(&main, "import helper::*;\nfun main() -> i64 { return answer(); }\n");
+    write(&dir.join("helper.mtl"), "pub fun answer() -> i64 { return 42; }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -81,8 +81,8 @@ fn two_module_function_call() {
 fn explicit_named_import_function_call() {
     let dir = fixture_dir("named_import");
     let main = dir.join("main.mtl");
-    write(&main, "import helper::answer;\nfun main() -> Int { return answer(); }\n");
-    write(&dir.join("helper.mtl"), "pub fun answer() -> Int { return 7; }\n");
+    write(&main, "import helper::answer;\nfun main() -> i64 { return answer(); }\n");
+    write(&dir.join("helper.mtl"), "pub fun answer() -> i64 { return 7; }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -95,13 +95,13 @@ fn struct_imported_via_glob() {
         &main,
         r#"
 import point::*;
-fun main() -> Int {
+fun main() -> i64 {
     let p = Point { x: 3, y: 4 };
     return p.x;
 }
 "#,
     );
-    write(&dir.join("point.mtl"), "pub struct Point { pub x: Int, pub y: Int }\n");
+    write(&dir.join("point.mtl"), "pub struct Point { pub x: i64, pub y: i64 }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -110,12 +110,12 @@ fun main() -> Int {
 fn transitive_dependency_via_graph_pipeline() {
     let dir = fixture_dir("transitive_graph");
     let main = dir.join("main.mtl");
-    write(&main, "import parser::*;\nfun main() -> Int { return parse(); }\n");
+    write(&main, "import parser::*;\nfun main() -> i64 { return parse(); }\n");
     write(
         &dir.join("parser.mtl"),
-        "import lexer::*;\npub fun parse() -> Int { return tokenize(); }\n",
+        "import lexer::*;\npub fun parse() -> i64 { return tokenize(); }\n",
     );
-    write(&dir.join("lexer.mtl"), "pub fun tokenize() -> Int { return 1; }\n");
+    write(&dir.join("lexer.mtl"), "pub fun tokenize() -> i64 { return 1; }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -126,8 +126,8 @@ fn transitive_dependency_via_graph_pipeline() {
 fn glob_import_makes_pub_items_accessible() {
     let dir = fixture_dir("glob_pub");
     let main = dir.join("main.mtl");
-    write(&main, "import helper::*;\nfun main() -> Int { return pub_fn(); }\n");
-    write(&dir.join("helper.mtl"), "pub fun pub_fn() -> Int { return 1; }\nfun private_fn() -> Int { return 2; }\n");
+    write(&main, "import helper::*;\nfun main() -> i64 { return pub_fn(); }\n");
+    write(&dir.join("helper.mtl"), "pub fun pub_fn() -> i64 { return 1; }\nfun private_fn() -> i64 { return 2; }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -137,8 +137,8 @@ fn glob_import_does_not_expose_private_items() {
     let dir = fixture_dir("glob_priv");
     let main = dir.join("main.mtl");
     // `private_fn` is not pub — should not be callable even after `import helper::*`
-    write(&main, "import helper::*;\nfun main() -> Int { return private_fn(); }\n");
-    write(&dir.join("helper.mtl"), "pub fun pub_fn() -> Int { return 1; }\nfun private_fn() -> Int { return 2; }\n");
+    write(&main, "import helper::*;\nfun main() -> i64 { return private_fn(); }\n");
+    write(&dir.join("helper.mtl"), "pub fun pub_fn() -> i64 { return 1; }\nfun private_fn() -> i64 { return 2; }\n");
 
     run_graph(&main).expect_err("private item via glob should fail");
 }
@@ -149,8 +149,8 @@ fn glob_import_does_not_expose_private_items() {
 fn alias_import_makes_alias_callable() {
     let dir = fixture_dir("alias_ok");
     let main = dir.join("main.mtl");
-    write(&main, "import helper::answer as compute;\nfun main() -> Int { return compute(); }\n");
-    write(&dir.join("helper.mtl"), "pub fun answer() -> Int { return 42; }\n");
+    write(&main, "import helper::answer as compute;\nfun main() -> i64 { return compute(); }\n");
+    write(&dir.join("helper.mtl"), "pub fun answer() -> i64 { return 42; }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -160,8 +160,8 @@ fn alias_import_original_name_not_in_scope() {
     // `answer` should not be resolvable after `import helper::answer as compute`
     let dir = fixture_dir("alias_orig_out");
     let main = dir.join("main.mtl");
-    write(&main, "import helper::answer as compute;\nfun main() -> Int { return answer(); }\n");
-    write(&dir.join("helper.mtl"), "pub fun answer() -> Int { return 42; }\n");
+    write(&main, "import helper::answer as compute;\nfun main() -> i64 { return answer(); }\n");
+    write(&dir.join("helper.mtl"), "pub fun answer() -> i64 { return 42; }\n");
 
     // `answer` is not imported — only `compute` is. Should fail (T0003 or unresolved).
     run_graph(&main).expect_err("original name should not be in scope");
@@ -175,10 +175,10 @@ fn facade_re_exports_item_and_consumer_can_use_it() {
     // main.mtl imports only from facade and calls `answer` without importing helper directly.
     let dir = fixture_dir("re_export");
     let main = dir.join("main.mtl");
-    write(&main, "import facade::answer;\nfun main() -> Int { return answer(); }\n");
+    write(&main, "import facade::answer;\nfun main() -> i64 { return answer(); }\n");
     // facade imports answer from helper (so helper is loaded) and re-exports it
     write(&dir.join("facade.mtl"), "import helper::answer;\nexport helper::answer;\n");
-    write(&dir.join("helper.mtl"), "pub fun answer() -> Int { return 42; }\n");
+    write(&dir.join("helper.mtl"), "pub fun answer() -> i64 { return 42; }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -190,9 +190,9 @@ fn two_explicit_imports_same_local_name_is_t0011() {
     let dir = fixture_dir("t0011_explicit");
     let main = dir.join("main.mtl");
     // Both `import a::foo` and `import b::foo` bind local name `foo` → conflict
-    write(&main, "import a::foo;\nimport b::foo;\nfun main() -> Int { return foo(); }\n");
-    write(&dir.join("a.mtl"), "pub fun foo() -> Int { return 1; }\n");
-    write(&dir.join("b.mtl"), "pub fun foo() -> Int { return 2; }\n");
+    write(&main, "import a::foo;\nimport b::foo;\nfun main() -> i64 { return foo(); }\n");
+    write(&dir.join("a.mtl"), "pub fun foo() -> i64 { return 1; }\n");
+    write(&dir.join("b.mtl"), "pub fun foo() -> i64 { return 2; }\n");
 
     let err = run_graph(&main).expect_err("expected T0011");
     let msg = format!("{err}");
@@ -203,9 +203,9 @@ fn two_explicit_imports_same_local_name_is_t0011() {
 fn two_glob_imports_same_name_is_t0011() {
     let dir = fixture_dir("t0011_glob");
     let main = dir.join("main.mtl");
-    write(&main, "import a::*;\nimport b::*;\nfun main() -> Int { return foo(); }\n");
-    write(&dir.join("a.mtl"), "pub fun foo() -> Int { return 1; }\n");
-    write(&dir.join("b.mtl"), "pub fun foo() -> Int { return 2; }\n");
+    write(&main, "import a::*;\nimport b::*;\nfun main() -> i64 { return foo(); }\n");
+    write(&dir.join("a.mtl"), "pub fun foo() -> i64 { return 1; }\n");
+    write(&dir.join("b.mtl"), "pub fun foo() -> i64 { return 2; }\n");
 
     let err = run_graph(&main).expect_err("expected T0011 on glob/glob conflict");
     let msg = format!("{err}");
@@ -217,9 +217,9 @@ fn explicit_import_wins_over_glob_same_name() {
     // Explicit import silently wins over glob that exports the same name.
     let dir = fixture_dir("t0011_explicit_wins");
     let main = dir.join("main.mtl");
-    write(&main, "import a::foo;\nimport b::*;\nfun main() -> Int { return foo(); }\n");
-    write(&dir.join("a.mtl"), "pub fun foo() -> Int { return 1; }\n");
-    write(&dir.join("b.mtl"), "pub fun foo() -> Int { return 2; }\n");
+    write(&main, "import a::foo;\nimport b::*;\nfun main() -> i64 { return foo(); }\n");
+    write(&dir.join("a.mtl"), "pub fun foo() -> i64 { return 1; }\n");
+    write(&dir.join("b.mtl"), "pub fun foo() -> i64 { return 2; }\n");
 
     // Should succeed — explicit import from `a` wins
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
@@ -243,8 +243,8 @@ fn user_glob_wins_over_std_glob_same_name_no_t0011() {
     // Placeholder: this test will be expanded to a real end-to-end case in #201.
     let dir = fixture_dir("tier_model_placeholder");
     let main = dir.join("main.mtl");
-    write(&main, "import a::*;\nfun main() -> Int { return foo(); }\n");
-    write(&dir.join("a.mtl"), "pub fun foo() -> Int { return 42; }\n");
+    write(&main, "import a::*;\nfun main() -> i64 { return foo(); }\n");
+    write(&dir.join("a.mtl"), "pub fun foo() -> i64 { return 42; }\n");
     // Single User glob — no conflict possible, must succeed.
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -274,7 +274,7 @@ fn local_function_shadows_std_core_auto_import() {
     // A user-defined `print` function must shadow the auto-imported std::core::print.
     let dir = fixture_dir("shadow_std_print");
     let main = dir.join("main.mtl");
-    write(&main, "fun print(x: Int) -> Int { return x + 1; }\nfun main() { print(1); }\n");
+    write(&main, "fun print(x: i64) -> i64 { return x + 1; }\nfun main() { print(1); }\n");
     run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
 }
 
@@ -322,8 +322,8 @@ fn programs_without_explicit_std_import_still_use_perhaps() {
 fn importing_private_item_is_t0009() {
     let dir = fixture_dir("t0009_private");
     let main = dir.join("main.mtl");
-    write(&main, "import helper::secret;\nfun main() -> Int { return secret(); }\n");
-    write(&dir.join("helper.mtl"), "fun secret() -> Int { return 42; }\n");
+    write(&main, "import helper::secret;\nfun main() -> i64 { return secret(); }\n");
+    write(&dir.join("helper.mtl"), "fun secret() -> i64 { return 42; }\n");
 
     let err = run_graph(&main).expect_err("expected T0009");
     let msg = format!("{err}");
@@ -334,8 +334,8 @@ fn importing_private_item_is_t0009() {
 fn importing_nonexistent_name_is_t0003() {
     let dir = fixture_dir("t0003_absent");
     let main = dir.join("main.mtl");
-    write(&main, "import helper::nonexistent;\nfun main() -> Int { return nonexistent(); }\n");
-    write(&dir.join("helper.mtl"), "pub fun answer() -> Int { return 42; }\n");
+    write(&main, "import helper::nonexistent;\nfun main() -> i64 { return nonexistent(); }\n");
+    write(&dir.join("helper.mtl"), "pub fun answer() -> i64 { return 42; }\n");
 
     let err = run_graph(&main).expect_err("expected T0003");
     let msg = format!("{err}");
@@ -346,8 +346,8 @@ fn importing_nonexistent_name_is_t0003() {
 fn importing_pub_item_is_accepted() {
     let dir = fixture_dir("t0009_pub_ok");
     let main = dir.join("main.mtl");
-    write(&main, "import helper::answer;\nfun main() -> Int { return answer(); }\n");
-    write(&dir.join("helper.mtl"), "pub fun answer() -> Int { return 42; }\n");
+    write(&main, "import helper::answer;\nfun main() -> i64 { return answer(); }\n");
+    write(&dir.join("helper.mtl"), "pub fun answer() -> i64 { return 42; }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -358,11 +358,11 @@ fn private_struct_field_access_across_modules_is_t0009() {
     let main = dir.join("main.mtl");
     write(
         &main,
-        "import token::make;\nfun main() -> Int { return make().offset; }\n",
+        "import token::make;\nfun main() -> i64 { return make().offset; }\n",
     );
     write(
         &dir.join("token.mtl"),
-        "pub struct Token { pub kind: Int, offset: Int }\npub fun make() -> Token { return Token { kind: 1, offset: 7 }; }\n",
+        "pub struct Token { pub kind: i64, offset: i64 }\npub fun make() -> Token { return Token { kind: 1, offset: 7 }; }\n",
     );
 
     let err = run_graph(&main).expect_err("expected T0009");
@@ -380,7 +380,7 @@ fn private_struct_field_construction_across_modules_is_t0009() {
     );
     write(
         &dir.join("token.mtl"),
-        "pub struct Token { pub kind: Int, offset: Int }\n",
+        "pub struct Token { pub kind: i64, offset: i64 }\n",
     );
 
     let err = run_graph(&main).expect_err("expected T0009");
@@ -394,11 +394,11 @@ fn private_struct_field_assignment_across_modules_is_t0009() {
     let main = dir.join("main.mtl");
     write(
         &main,
-        "import token::make;\nfun main() -> Int { let mut t = make(); t.offset = 9; return t.kind; }\n",
+        "import token::make;\nfun main() -> i64 { let mut t = make(); t.offset = 9; return t.kind; }\n",
     );
     write(
         &dir.join("token.mtl"),
-        "pub struct Token { pub kind: Int, offset: Int }\npub fun make() -> Token { return Token { kind: 1, offset: 7 }; }\n",
+        "pub struct Token { pub kind: i64, offset: i64 }\npub fun make() -> Token { return Token { kind: 1, offset: 7 }; }\n",
     );
 
     let err = run_graph(&main).expect_err("expected T0009");
@@ -412,11 +412,11 @@ fn mixed_visibility_struct_allows_public_field_access_across_modules() {
     let main = dir.join("main.mtl");
     write(
         &main,
-        "import token::make;\nfun main() -> Int { let t = make(); return t.kind; }\n",
+        "import token::make;\nfun main() -> i64 { let t = make(); return t.kind; }\n",
     );
     write(
         &dir.join("token.mtl"),
-        "pub struct Token { pub kind: Int, offset: Int }\npub fun make() -> Token { return Token { kind: 11, offset: 7 }; }\n",
+        "pub struct Token { pub kind: i64, offset: i64 }\npub fun make() -> Token { return Token { kind: 11, offset: 7 }; }\n",
     );
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
@@ -428,9 +428,9 @@ fn private_struct_fields_remain_accessible_inside_declaring_module() {
     let main = dir.join("main.mtl");
     write(
         &main,
-        "pub struct Token { pub kind: Int, offset: Int }\n\
-         fun offset_of(t: Token) -> Int { return t.offset; }\n\
-         fun main() -> Int { let t = Token { kind: 3, offset: 9 }; return offset_of(t); }\n",
+        "pub struct Token { pub kind: i64, offset: i64 }\n\
+         fun offset_of(t: Token) -> i64 { return t.offset; }\n\
+         fun main() -> i64 { let t = Token { kind: 3, offset: 9 }; return offset_of(t); }\n",
     );
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
@@ -442,7 +442,7 @@ fn private_struct_fields_remain_accessible_inside_declaring_module() {
 fn pub_fun_without_return_type_is_t0010() {
     let dir = fixture_dir("t0010_no_return");
     let main = dir.join("main.mtl");
-    write(&main, "import helper::*;\nfun main() -> Int { return answer(); }\n");
+    write(&main, "import helper::*;\nfun main() -> i64 { return answer(); }\n");
     write(&dir.join("helper.mtl"), "pub fun answer() { return 42; }\n");
 
     let err = run_graph(&main).expect_err("expected T0010 error");
@@ -454,8 +454,8 @@ fn pub_fun_without_return_type_is_t0010() {
 fn pub_fun_with_unannotated_param_is_t0010() {
     let dir = fixture_dir("t0010_no_param_ann");
     let main = dir.join("main.mtl");
-    write(&main, "import helper::*;\nfun main() -> Int { return double(2); }\n");
-    write(&dir.join("helper.mtl"), "pub fun double(x) -> Int { return x * 2; }\n");
+    write(&main, "import helper::*;\nfun main() -> i64 { return double(2); }\n");
+    write(&dir.join("helper.mtl"), "pub fun double(x) -> i64 { return x * 2; }\n");
 
     let err = run_graph(&main).expect_err("expected T0010 error");
     let msg = format!("{err}");
@@ -466,10 +466,10 @@ fn pub_fun_with_unannotated_param_is_t0010() {
 fn non_pub_fun_without_annotation_is_accepted() {
     let dir = fixture_dir("t0010_non_pub_ok");
     let main = dir.join("main.mtl");
-    write(&main, "import helper::*;\nfun main() -> Int { return call(); }\n");
+    write(&main, "import helper::*;\nfun main() -> i64 { return call(); }\n");
     write(
         &dir.join("helper.mtl"),
-        "fun internal() { }\npub fun call() -> Int { return 0; }\n",
+        "fun internal() { }\npub fun call() -> i64 { return 0; }\n",
     );
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
@@ -487,10 +487,10 @@ fn private_names_in_different_modules_do_not_collide() {
     let main = dir.join("main.mtl");
     write(
         &main,
-        "import a::pub_a;\nimport b::pub_b;\nfun main() -> Int { return pub_a() + pub_b(); }\n",
+        "import a::pub_a;\nimport b::pub_b;\nfun main() -> i64 { return pub_a() + pub_b(); }\n",
     );
-    write(&dir.join("a.mtl"), "pub fun pub_a() -> Int { return 1; }\nfun helper() -> Int { return 10; }\n");
-    write(&dir.join("b.mtl"), "pub fun pub_b() -> Int { return 2; }\nfun helper() -> Int { return 20; }\n");
+    write(&dir.join("a.mtl"), "pub fun pub_a() -> i64 { return 1; }\nfun helper() -> i64 { return 10; }\n");
+    write(&dir.join("b.mtl"), "pub fun pub_b() -> i64 { return 2; }\nfun helper() -> i64 { return 20; }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -502,8 +502,8 @@ fn qualified_call_normalized_to_bare_name() {
     // helper::answer() — the normalizer rewrites this to a bare `answer` lookup
     let dir = fixture_dir("qual_norm");
     let main = dir.join("main.mtl");
-    write(&main, "import helper::*;\nfun main() -> Int { return helper::answer(); }\n");
-    write(&dir.join("helper.mtl"), "pub fun answer() -> Int { return 99; }\n");
+    write(&main, "import helper::*;\nfun main() -> i64 { return helper::answer(); }\n");
+    write(&dir.join("helper.mtl"), "pub fun answer() -> i64 { return 99; }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -512,7 +512,7 @@ fn qualified_call_normalized_to_bare_name() {
 fn self_qualified_call_normalized() {
     let dir = fixture_dir("self_norm");
     let main = dir.join("main.mtl");
-    write(&main, "fun answer() -> Int { return 5; }\nfun main() -> Int { return self::answer(); }\n");
+    write(&main, "fun answer() -> i64 { return 5; }\nfun main() -> i64 { return self::answer(); }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -524,10 +524,10 @@ fn explicit_import_limits_scope_to_named_item() {
     // `import helper::answer` should make `answer` callable but not `other`.
     let dir = fixture_dir("explicit_scope_limit");
     let main = dir.join("main.mtl");
-    write(&main, "import helper::answer;\nfun main() -> Int { return other(); }\n");
+    write(&main, "import helper::answer;\nfun main() -> i64 { return other(); }\n");
     write(
         &dir.join("helper.mtl"),
-        "pub fun answer() -> Int { return 1; }\npub fun other() -> Int { return 2; }\n",
+        "pub fun answer() -> i64 { return 1; }\npub fun other() -> i64 { return 2; }\n",
     );
 
     run_graph(&main).expect_err("non-imported name should not be in scope");
@@ -539,12 +539,12 @@ fn transitive_item_not_accessible_without_direct_import() {
     // main should NOT be able to call tokenize() from lexer without importing lexer directly.
     let dir = fixture_dir("transitive_isolation");
     let main = dir.join("main.mtl");
-    write(&main, "import parser::*;\nfun main() -> Int { return tokenize(); }\n");
+    write(&main, "import parser::*;\nfun main() -> i64 { return tokenize(); }\n");
     write(
         &dir.join("parser.mtl"),
-        "import lexer::*;\npub fun parse() -> Int { return tokenize(); }\n",
+        "import lexer::*;\npub fun parse() -> i64 { return tokenize(); }\n",
     );
-    write(&dir.join("lexer.mtl"), "pub fun tokenize() -> Int { return 1; }\n");
+    write(&dir.join("lexer.mtl"), "pub fun tokenize() -> i64 { return 1; }\n");
 
     run_graph(&main).expect_err("transitive item should not be accessible without direct import");
 }
@@ -554,12 +554,12 @@ fn root_qualified_path_in_non_root_module() {
     // parser.mtl uses root::helper to resolve a sibling module from the root namespace.
     let dir = fixture_dir("root_path");
     let main = dir.join("main.mtl");
-    write(&main, "import parser::*;\nfun main() -> Int { return parse(); }\n");
+    write(&main, "import parser::*;\nfun main() -> i64 { return parse(); }\n");
     write(
         &dir.join("parser.mtl"),
-        "import root::helper::*;\npub fun parse() -> Int { return helper_fn(); }\n",
+        "import root::helper::*;\npub fun parse() -> i64 { return helper_fn(); }\n",
     );
-    write(&dir.join("helper.mtl"), "pub fun helper_fn() -> Int { return 7; }\n");
+    write(&dir.join("helper.mtl"), "pub fun helper_fn() -> i64 { return 7; }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -575,15 +575,15 @@ fn pub_alias_and_re_export_combined() {
     // main imports via alias AND via re-exported name from facade
     write(
         &main,
-        "import facade::compute;\nimport util::answer as get_answer;\nfun main() -> Int { return compute() + get_answer(); }\n",
+        "import facade::compute;\nimport util::answer as get_answer;\nfun main() -> i64 { return compute() + get_answer(); }\n",
     );
     // facade re-exports `compute` from impl module
     write(
         &dir.join("facade.mtl"),
         "import impl_mod::compute;\nexport impl_mod::compute;\n",
     );
-    write(&dir.join("impl_mod.mtl"), "pub fun compute() -> Int { return 10; }\n");
-    write(&dir.join("util.mtl"), "pub fun answer() -> Int { return 32; }\n");
+    write(&dir.join("impl_mod.mtl"), "pub fun compute() -> i64 { return 10; }\n");
+    write(&dir.join("util.mtl"), "pub fun answer() -> i64 { return 32; }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -595,11 +595,11 @@ fn glob_and_explicit_import_from_same_module() {
     let main = dir.join("main.mtl");
     write(
         &main,
-        "import a::*;\nimport a::pub_a;\nfun main() -> Int { return pub_a() + pub_b(); }\n",
+        "import a::*;\nimport a::pub_a;\nfun main() -> i64 { return pub_a() + pub_b(); }\n",
     );
     write(
         &dir.join("a.mtl"),
-        "pub fun pub_a() -> Int { return 1; }\npub fun pub_b() -> Int { return 2; }\n",
+        "pub fun pub_a() -> i64 { return 1; }\npub fun pub_b() -> i64 { return 2; }\n",
     );
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
@@ -613,9 +613,9 @@ fn t0010_pub_struct_requires_field_type_annotations() {
     let main = dir.join("main.mtl");
     write(
         &main,
-        "import point::Point;\nfun main() -> Int { let p = Point { x: 5, y: 3 }; return p.x; }\n",
+        "import point::Point;\nfun main() -> i64 { let p = Point { x: 5, y: 3 }; return p.x; }\n",
     );
-    write(&dir.join("point.mtl"), "pub struct Point { pub x: Int, pub y: Int }\n");
+    write(&dir.join("point.mtl"), "pub struct Point { pub x: i64, pub y: i64 }\n");
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -627,11 +627,11 @@ fn group_import_with_alias_subset() {
     let main = dir.join("main.mtl");
     write(
         &main,
-        "import math::{add, mul as multiply};\nfun main() -> Int { return add(multiply(3, 4), 10); }\n",
+        "import math::{add, mul as multiply};\nfun main() -> i64 { return add(multiply(3, 4), 10); }\n",
     );
     write(
         &dir.join("math.mtl"),
-        "pub fun add(a: Int, b: Int) -> Int { return a + b; }\npub fun mul(a: Int, b: Int) -> Int { return a * b; }\n",
+        "pub fun add(a: i64, b: i64) -> i64 { return a + b; }\npub fun mul(a: i64, b: i64) -> i64 { return a * b; }\n",
     );
 
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
@@ -647,7 +647,7 @@ fn std_core_builtins_available_in_each_module_without_import() {
     let main = dir.join("main.mtl");
     write(
         &dir.join("helper.mtl"),
-        "pub fun sum(arr: Int[]) -> Int {\
+        "pub fun sum(arr: i64[]) -> i64 {\
          \n    assert(array_len(arr) > 0);\
          \n    let mut total = 0;\
          \n    let mut i = 0;\
@@ -676,7 +676,7 @@ fn user_glob_overrides_std_core_same_name_in_multi_module() {
     let main = dir.join("main.mtl");
     write(
         &dir.join("mylib.mtl"),
-        "pub fun print(x: Int) -> Int { return x + 1; }\n",
+        "pub fun print(x: i64) -> i64 { return x + 1; }\n",
     );
     write(
         &main,
@@ -696,8 +696,8 @@ fn local_function_overrides_std_core_builtin() {
     let main = dir.join("main.mtl");
     write(
         &main,
-        "fun print(x: Int) -> Int { return x + 1; }\
-         \nfun main() -> Int { return print(41); }\n",
+        "fun print(x: i64) -> i64 { return x + 1; }\
+         \nfun main() -> i64 { return print(41); }\n",
     );
     run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
 }
@@ -710,7 +710,7 @@ fn multi_module_perhaps_and_result_without_explicit_std_import() {
     let main = dir.join("main.mtl");
     write(
         &dir.join("finder.mtl"),
-        "pub fun find_first_positive(arr: Int[]) -> Perhaps<Int> {\
+        "pub fun find_first_positive(arr: i64[]) -> Perhaps<i64> {\
          \n    let mut i = 0;\
          \n    while (i < array_len(arr)) {\
          \n        if (arr[i as u64] > 0) { return Perhaps::Some { value: arr[i as u64] }; }\
@@ -763,12 +763,12 @@ fn cross_module_closure_captures_imported_function() {
     // real value for the imported function (not a Unit placeholder).
     let dir = fixture_dir("closure_capture_import");
     let main = dir.join("main.mtl");
-    write(&dir.join("math.mtl"), "pub fun add(x: Int, y: Int) -> Int { return x + y; }\n");
+    write(&dir.join("math.mtl"), "pub fun add(x: i64, y: i64) -> i64 { return x + y; }\n");
     write(
         &dir.join("builder.mtl"),
         "import math::add;\
-         \npub fun make_adder(n: Int) -> (Int) -> Int {\
-         \n    return (x: Int) -> Int { return add(x, n); };\
+         \npub fun make_adder(n: i64) -> (i64) -> i64 {\
+         \n    return (x: i64) -> i64 { return add(x, n); };\
          \n}\n",
     );
     write(
@@ -792,7 +792,7 @@ fn intra_module_recursion_visible_after_cross_module_import() {
     let main = dir.join("main.mtl");
     write(
         &dir.join("recur.mtl"),
-        "pub fun count_down(n: Int) -> Int {\
+        "pub fun count_down(n: i64) -> i64 {\
          \n    if (n <= 0) { return 0; }\
          \n    return 1 + count_down(n - 1);\
          \n}\n",
@@ -816,14 +816,14 @@ fn two_same_tier_imports_both_captured_in_closure() {
     // placeholders — even though left and right are initialized in arbitrary order.
     let dir = fixture_dir("same_tier_closure");
     let main = dir.join("main.mtl");
-    write(&dir.join("left.mtl"), "pub fun left_val() -> Int { return 6; }\n");
-    write(&dir.join("right.mtl"), "pub fun right_val() -> Int { return 10; }\n");
+    write(&dir.join("left.mtl"), "pub fun left_val() -> i64 { return 6; }\n");
+    write(&dir.join("right.mtl"), "pub fun right_val() -> i64 { return 10; }\n");
     write(
         &main,
         "import left::left_val;\
          \nimport right::right_val;\
-         \nfun make_combiner() -> () -> Int {\
-         \n    return () -> Int { return left_val() + right_val(); };\
+         \nfun make_combiner() -> () -> i64 {\
+         \n    return () -> i64 { return left_val() + right_val(); };\
          \n}\
          \nfun main() {\
          \n    let f = make_combiner();\
@@ -844,15 +844,15 @@ fn diamond_dependency_shared_base_accessible_in_both_importers() {
     let main = dir.join("main.mtl");
     write(
         &dir.join("base.mtl"),
-        "pub fun shared() -> Int { return 42; }\n",
+        "pub fun shared() -> i64 { return 42; }\n",
     );
     write(
         &dir.join("left.mtl"),
-        "import base::shared;\npub fun left_answer() -> Int { return shared(); }\n",
+        "import base::shared;\npub fun left_answer() -> i64 { return shared(); }\n",
     );
     write(
         &dir.join("right.mtl"),
-        "import base::shared;\npub fun right_answer() -> Int { return shared() + 1; }\n",
+        "import base::shared;\npub fun right_answer() -> i64 { return shared() + 1; }\n",
     );
     write(
         &main,
@@ -882,7 +882,7 @@ fn complex_multi_module_task_system() {
         r#"
 pub enum Priority { High, Medium, Low }
 pub enum Status { Open, InProgress, Done }
-pub struct Task { pub title: String, pub priority: Priority, pub status: Status, pub effort: Int }
+pub struct Task { pub title: String, pub priority: Priority, pub status: Status, pub effort: i64 }
 pub struct ValidationError { pub message: String }
 "#,
     );
@@ -920,7 +920,7 @@ pub fun find_first<T>(arr: T[], pred: (T) -> Bool) -> Perhaps<T> {
     None
 }
 
-pub fun sum_ints(arr: Int[]) -> Int {
+pub fun sum_ints(arr: i64[]) -> i64 {
     let mut total = 0;
     for (let x in arr) { total += x; }
     total
@@ -935,7 +935,7 @@ pub fun sum_ints(arr: Int[]) -> Int {
 import types::*;
 import utils::*;
 
-pub fun validate_task(title: String, priority: Priority, status: Status, effort: Int) -> Result<Task, ValidationError> {
+pub fun validate_task(title: String, priority: Priority, status: Status, effort: i64) -> Result<Task, ValidationError> {
     if (string_len(title) == 0) {
         return Result::Err { error: ValidationError { message: "title cannot be empty" } };
     }
@@ -945,11 +945,11 @@ pub fun validate_task(title: String, priority: Priority, status: Status, effort:
     Result::Ok { value: Task { title: title, priority: priority, status: status, effort: effort } }
 }
 
-pub fun total_effort(tasks: Task[]) -> Int {
-    fold_left(tasks, 0, (acc: Int, t: Task) -> Int { acc + t.effort })
+pub fun total_effort(tasks: Task[]) -> i64 {
+    fold_left(tasks, 0, (acc: i64, t: Task) -> i64 { acc + t.effort })
 }
 
-pub fun open_task_count(tasks: Task[]) -> Int {
+pub fun open_task_count(tasks: Task[]) -> i64 {
     let mut count = 0;
     for (let t in tasks) {
         match t.status {
@@ -985,7 +985,7 @@ pub fun find_by_title(tasks: Task[], title: String) -> Perhaps<Task> {
     find_first(tasks, (t: Task) -> Bool { t.title == title })
 }
 
-pub fun compute_completion_pct(tasks: Task[]) -> Int {
+pub fun compute_completion_pct(tasks: Task[]) -> i64 {
     let n = array_len(tasks);
     if (n == 0) { return 0; }
     let mut done = 0;
@@ -1005,7 +1005,7 @@ import types::*;
 import utils::*;
 import tasks::*;
 
-fun fib(n: Int) -> Int {
+fun fib(n: i64) -> i64 {
     if (n <= 1) { n }
     else { fib(n - 1) + fib(n - 2) }
 }
@@ -1063,7 +1063,7 @@ fun main() {
     assert(array_len(done_list) == 1);
 
     // 7. map_array: extract efforts, sum via sum_ints
-    let efforts = map_array(tasks, (t: Task) -> Int { t.effort });
+    let efforts = map_array(tasks, (t: Task) -> i64 { t.effort });
     assert(sum_ints(efforts) == 15);
     assert(efforts[0] == 5);
     assert(efforts[4] == 1);
@@ -1094,8 +1094,8 @@ fun main() {
     assert(compute_completion_pct(empty_tasks) == 0);
 
     // 12. fold_left directly: product of [1,2,3,4] = 24
-    let small: Int[] = [1, 2, 3, 4];
-    let product = fold_left(small, 1, (acc: Int, x: Int) -> Int { acc * x });
+    let small: i64[] = [1, 2, 3, 4];
+    let product = fold_left(small, 1, (acc: i64, x: i64) -> i64 { acc * x });
     assert(product == 24);
 
     // 13. find_first: locate the Done task (Deploy, effort=2)
@@ -1133,19 +1133,19 @@ fun main() {
     for (let i in 0..5) { range_sum += i; }
     assert(range_sum == 10);
 
-    // 18. Type cast: total effort Int -> Float
-    let effort_f = total_effort(tasks) as Float;
+    // 18. Type cast: total effort i64 -> f64
+    let effort_f = total_effort(tasks) as f64;
     assert(effort_f == 15.0);
 
     // 19. Tuple: pack (task_count, total_effort)
-    let report: (Int, Int) = (array_len(tasks), total_effort(tasks));
+    let report: (i64, i64) = (array_len(tasks), total_effort(tasks));
     assert(report.0 == 5);
     assert(report.1 == 15);
 
     // 20. Chained map + filter across modules
     // doubled efforts: [10,6,4,8,2]; filter > 5: [10,6,8] = 3 items
-    let doubled = map_array(efforts, (x: Int) -> Int { x * 2 });
-    let big = filter_array(doubled, (x: Int) -> Bool { x > 5 });
+    let doubled = map_array(efforts, (x: i64) -> i64 { x * 2 });
+    let big = filter_array(doubled, (x: i64) -> Bool { x > 5 });
     assert(array_len(big) == 3);
 
     // 21. Let-polymorphism: identity closure used at two different types
@@ -1171,15 +1171,15 @@ fn cross_module_struct_field_type_from_indirect_dependency() {
     // Module C: defines Coords
     write(
         &dir.join("coords.mtl"),
-        "pub struct Coords { pub x: Int, pub y: Int }\n",
+        "pub struct Coords { pub x: i64, pub y: i64 }\n",
     );
 
     // Module A: defines Shape whose field type comes from C
     write(
         &dir.join("shape.mtl"),
         r#"import coords::Coords;
-pub struct Shape { pub origin: Coords, pub size: Int }
-pub fun make_shape(x: Int, y: Int, s: Int) -> Shape {
+pub struct Shape { pub origin: Coords, pub size: i64 }
+pub fun make_shape(x: i64, y: i64, s: i64) -> Shape {
     return Shape { origin: Coords { x: x, y: y }, size: s };
 }
 "#,
@@ -1190,7 +1190,7 @@ pub fun make_shape(x: Int, y: Int, s: Int) -> Shape {
         &dir.join("main.mtl"),
         r#"import shape::Shape;
 import shape::make_shape;
-fun main() -> Int {
+fun main() -> i64 {
     let s = make_shape(1, 2, 10);
     return s.size;
 }

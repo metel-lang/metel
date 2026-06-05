@@ -1,7 +1,7 @@
 // Stage 5: `Self` should resolve in ordinary struct and enum method signatures.
 
 struct Point {
-    x: Int,
+    x: i64,
 }
 
 impl Point {
@@ -15,7 +15,7 @@ impl Point {
 }
 
 enum Token {
-    Int { value: Int },
+    i64 { value: i64 },
 }
 
 impl Token {
@@ -28,5 +28,5 @@ let p = Point { x: 1 };
 let q: Point = p.clone();
 let same: Bool = p.same_as(q);
 
-let token = Token::Int { value: 7 };
+let token = Token::i64 { value: 7 };
 let token_copy: Token = token.identity();

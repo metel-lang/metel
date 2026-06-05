@@ -2,12 +2,12 @@
 // which unifies with any expected return type.
 
 // Single return — no tail expression
-fun double(x: Int) -> Int {
+fun double(x: i64) -> i64 {
     return x * 2;
 }
 
 // Multiple return paths — no tail expression
-fun sign(n: Int) -> String {
+fun sign(n: i64) -> String {
     if (n > 0) {
         return "positive";
     }
@@ -18,7 +18,7 @@ fun sign(n: Int) -> String {
 }
 
 // Early return + tail expression
-fun abs_val(x: Int) -> Int {
+fun abs_val(x: i64) -> i64 {
     if (x < 0) {
         return 0 - x;
     }

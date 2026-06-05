@@ -84,22 +84,22 @@ fn print_scheme(t: TypeVar) -> TypeScheme {
 fn register_builtin_aspect_impls(registry: &mut TypeDefinitionRegistry) {
     use crate::types::Type;
     // Iterable impls for built-in sequence types
-    registry.register_aspect_impl("Range".into(),          "Iterable".into(), vec![Type::Int]);
-    registry.register_aspect_impl("RangeInclusive".into(), "Iterable".into(), vec![Type::Int]);
+    registry.register_aspect_impl("Range".into(),          "Iterable".into(), vec![Type::I64]);
+    registry.register_aspect_impl("RangeInclusive".into(), "Iterable".into(), vec![Type::I64]);
     // From impls for numeric conversions
-    registry.register_aspect_impl("Int".into(),   "From".into(), vec![Type::Float]);
-    registry.register_aspect_impl("Float".into(), "From".into(), vec![Type::Int]);
-    // Sized integer ↔ Int / Float conversions
+    registry.register_aspect_impl("i64".into(), "From".into(), vec![Type::F64]);
+    registry.register_aspect_impl("f64".into(), "From".into(), vec![Type::I64]);
+    // Sized integer ↔ i64 / f64 conversions
     for sized in [Type::I8, Type::I16, Type::I32, Type::U8, Type::U16, Type::U32, Type::U64, Type::F32] {
         let name = sized.to_string();
-        registry.register_aspect_impl("Int".into(),   "From".into(), vec![sized.clone()]);
-        registry.register_aspect_impl("Float".into(), "From".into(), vec![sized.clone()]);
-        registry.register_aspect_impl(name.clone(),   "From".into(), vec![Type::Int]);
-        registry.register_aspect_impl(name.clone(),   "From".into(), vec![Type::Float]);
+        registry.register_aspect_impl("i64".into(), "From".into(), vec![sized.clone()]);
+        registry.register_aspect_impl("f64".into(), "From".into(), vec![sized.clone()]);
+        registry.register_aspect_impl(name.clone(), "From".into(), vec![Type::I64]);   // i64
+        registry.register_aspect_impl(name.clone(), "From".into(), vec![Type::F64]); // f64
     }
     // Display impls for built-in types (used by to_string method dispatch)
-    registry.register_aspect_impl("Int".into(),    "Display".into(), vec![]);
-    registry.register_aspect_impl("Float".into(),  "Display".into(), vec![]);
+    registry.register_aspect_impl("i64".into(),    "Display".into(), vec![]);
+    registry.register_aspect_impl("f64".into(),  "Display".into(), vec![]);
     registry.register_aspect_impl("Bool".into(),   "Display".into(), vec![]);
     registry.register_aspect_impl("String".into(), "Display".into(), vec![]);
 }
@@ -373,10 +373,10 @@ pub(super) fn register_builtins(ctx: &mut InferContext, prelude: &super::StdPrel
     }
 
     // Methods are not free functions; they're not in StdPrelude::schemes.
-    for type_name in &["Int", "Float", "Bool", "String"] {
+    for type_name in &["i64", "f64", "Bool", "String"] {
         let self_ty = match *type_name {
-            "Int"    => int_ty.clone(),
-            "Float"  => float_ty.clone(),
+            "i64"    => int_ty.clone(),
+            "f64"    => float_ty.clone(),
             "Bool"   => bool_ty.clone(),
             "String" => str_ty.clone(),
             _ => unreachable!(),

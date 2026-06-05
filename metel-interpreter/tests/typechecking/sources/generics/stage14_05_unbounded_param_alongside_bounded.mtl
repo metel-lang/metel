@@ -6,7 +6,7 @@ aspect Printable {
 }
 
 struct Label { text: String }
-struct Payload { data: Int }
+struct Payload { data: i64 }
 
 impl Printable for Label { fun print(self) {} }
 

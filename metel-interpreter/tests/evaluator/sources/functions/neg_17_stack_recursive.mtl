@@ -2,7 +2,7 @@
 // stack trace.  The name appears multiple times (once per live frame), so
 // checking for "in recurse" verifies at least one recursive frame was captured.
 
-fun recurse(n: Int) -> Int {
+fun recurse(n: i64) -> i64 {
     if (n == 0) {
         let _ = 1 / 0;
         0

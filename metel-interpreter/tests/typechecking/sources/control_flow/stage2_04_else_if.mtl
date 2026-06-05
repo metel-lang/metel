@@ -3,7 +3,7 @@
 // The else branch of an if_expr can be another if_expr (chaining).
 // Each condition must be Bool; the overall type is Unit when used as a statement.
 
-fun check_range(x: Int) {
+fun check_range(x: i64) {
     if (x < 0) {
         return;
     } else if (x > 100) {

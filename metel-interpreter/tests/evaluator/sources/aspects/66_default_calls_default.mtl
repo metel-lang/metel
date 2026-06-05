@@ -1,13 +1,13 @@
 // A default method that calls another default method on self.
 
 struct Measurement {
-    raw: Int,
+    raw: i64,
 }
 
 aspect Ops {
-    fun raw(self) -> Int;
+    fun raw(self) -> i64;
 
-    fun scaled(self) -> Int {
+    fun scaled(self) -> i64 {
         return self.raw() * 10;
     }
 
@@ -17,7 +17,7 @@ aspect Ops {
 }
 
 impl Ops for Measurement {
-    fun raw(self) -> Int {
+    fun raw(self) -> i64 {
         return self.raw;
     }
 }

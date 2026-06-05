@@ -11,7 +11,7 @@ fun dup_pair<T>(x: T) -> (T, T) { (x, x) }
 fun wrap<T>(a: T, b: T) -> (T, T) { (a, b) }
 
 fun main() {
-    // first/second at Int.
+    // first/second at i64.
     assert(first(10, 20) == 10);
     assert(second(10, 20) == 20);
 
@@ -32,7 +32,7 @@ fun main() {
     assert(p2.0);
     assert(p2.1);
 
-    // wrap at Int.
+    // wrap at i64.
     let w1 = wrap(3, 7);
     assert(w1.0 == 3);
     assert(w1.1 == 7);

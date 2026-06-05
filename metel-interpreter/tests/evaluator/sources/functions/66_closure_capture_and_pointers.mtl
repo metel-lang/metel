@@ -1,13 +1,13 @@
 fun main() {
     let mut value = 1;
-    let captured = () -> Int {
+    let captured = () -> i64 {
         value
     };
     value = 9;
 
     let mut shared = 0;
     let ptr = &mut shared;
-    let bump = () -> Int {
+    let bump = () -> i64 {
         *ptr += 1;
         *ptr
     };

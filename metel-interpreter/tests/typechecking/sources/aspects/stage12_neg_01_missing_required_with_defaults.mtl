@@ -2,7 +2,7 @@
 // the impl provides other methods that have defaults in the aspect.
 
 struct Widget {
-    id: Int,
+    id: i64,
 }
 
 aspect Render {

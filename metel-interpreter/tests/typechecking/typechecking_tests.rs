@@ -108,11 +108,11 @@ mod tests {
 struct ParseError { msg: String }
 struct AppError { msg: String }
 
-fun parse() -> Result<Int, ParseError> {
+fun parse() -> Result<i64, ParseError> {
     Result::Err { error: ParseError { msg: "bad" } }
 }
 
-fun load() -> Result<Int, AppError> {
+fun load() -> Result<i64, AppError> {
     let value = parse()?;
     Result::Ok { value: value }
 }
@@ -184,7 +184,7 @@ fun load() -> Result<Int, AppError> {
     fn ref_mut_receiver_requires_mutable_binding() {
         let source = r#"
 struct Counter {
-    value: Int,
+    value: i64,
 }
 
 impl Counter {

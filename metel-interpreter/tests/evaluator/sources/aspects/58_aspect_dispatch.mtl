@@ -5,29 +5,29 @@ aspect Describable {
 }
 
 aspect Scalable {
-    fun scale(self, factor: Int) -> Int;
+    fun scale(self, factor: i64) -> i64;
 }
 
 struct Circle {
-    radius: Int,
+    radius: i64,
 }
 
 struct Rectangle {
-    width: Int,
-    height: Int,
+    width: i64,
+    height: i64,
 }
 
 impl Circle {
-    fun new(r: Int) -> Circle {
+    fun new(r: i64) -> Circle {
         return Circle { radius: r };
     }
-    fun area(self) -> Int {
+    fun area(self) -> i64 {
         return self.radius * self.radius;
     }
 }
 
 impl Rectangle {
-    fun new(w: Int, h: Int) -> Rectangle {
+    fun new(w: i64, h: i64) -> Rectangle {
         return Rectangle { width: w, height: h };
     }
 }
@@ -45,13 +45,13 @@ impl Describable for Rectangle {
 }
 
 impl Scalable for Circle {
-    fun scale(self, factor: Int) -> Int {
+    fun scale(self, factor: i64) -> i64 {
         return self.radius * factor;
     }
 }
 
 impl Scalable for Rectangle {
-    fun scale(self, factor: Int) -> Int {
+    fun scale(self, factor: i64) -> i64 {
         return self.width * self.height * factor;
     }
 }

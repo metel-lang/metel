@@ -1,4 +1,4 @@
-fun bad_condition(x: Int) {
+fun bad_condition(x: i64) {
     if (x) {  // ERROR[T0001]
     }
 }

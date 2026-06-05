@@ -3,10 +3,10 @@
 // With if_stmt removed from the grammar, if_expr can now appear as the
 // trailing expression in a block. Both branches must unify.
 
-fun max(a: Int, b: Int) -> Int {
+fun max(a: i64, b: i64) -> i64 {
     if (a > b) { a } else { b }
 }
 
-fun abs_val(x: Int) -> Int {
+fun abs_val(x: i64) -> i64 {
     if (x < 0) { 0 - x } else { x }
 }

@@ -1,7 +1,7 @@
 // Stage 8 negative: interpolation requires Display via .to_string().
 
 struct Point {
-    x: Int,
+    x: i64,
 }
 
 fun main() {

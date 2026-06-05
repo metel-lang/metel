@@ -1,5 +1,5 @@
-// Float as Int is valid via impl From<Float> for Int (added in v0.4).
+// f64 as i64 is valid via impl From<f64> for i64 (added in v0.4).
 fun main() {
-    let x = 3.9 as Int;
+    let x = 3.9 as i64;
     assert(x == 3);
 }

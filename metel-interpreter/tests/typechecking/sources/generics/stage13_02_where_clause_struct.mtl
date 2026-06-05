@@ -19,6 +19,6 @@ impl Serializable for Key {
     }
 }
 
-fun make_cache(k: Key, v: Int) -> Cache<Key, Int> {
+fun make_cache(k: Key, v: i64) -> Cache<Key, i64> {
     Cache { key: k, value: v }
 }

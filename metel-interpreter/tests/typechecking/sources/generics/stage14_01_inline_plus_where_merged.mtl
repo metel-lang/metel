@@ -6,11 +6,11 @@ aspect Printable {
 }
 
 aspect Comparable {
-    fun compare(self, other: Self) -> Int;
+    fun compare(self, other: Self) -> i64;
 }
 
 struct Entry {
-    value: Int,
+    value: i64,
 }
 
 impl Printable for Entry {
@@ -18,7 +18,7 @@ impl Printable for Entry {
 }
 
 impl Comparable for Entry {
-    fun compare(self, other: Entry) -> Int {
+    fun compare(self, other: Entry) -> i64 {
         self.value - other.value
     }
 }

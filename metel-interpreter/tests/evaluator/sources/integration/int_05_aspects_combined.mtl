@@ -2,13 +2,13 @@
 //
 // Feature coverage (v0.4):
 //   multiple aspects on the same struct (Runnable, Describable),
-//   Countdown — user Iterable<Int> counting down,
+//   Countdown — user Iterable<i64> counting down,
 //   break / continue inside a for-in loop over user Iterable,
 //   ? with same-type error (no From needed),
 //   ? with From coercion (ConfigError → RunError),
 //   ? inside a for-in loop (early exit on first Err),
 //   nested for-in loops,
-//   to_string on Int / Bool.
+//   to_string on i64 / Bool.
 
 // ── Aspects ────────────────────────────────────────────────────────────────────
 
@@ -62,14 +62,14 @@ impl Describable for Task {
 
 // ── Countdown Iterable ─────────────────────────────────────────────────────────
 
-struct Countdown { current: Int }
+struct Countdown { current: i64 }
 
 impl Countdown {
-    fun new(start: Int) -> Countdown { Countdown { current: start } }
+    fun new(start: i64) -> Countdown { Countdown { current: start } }
 }
 
-impl Iterable<Int> for Countdown {
-    fun next(&mut self) -> Perhaps<Int> {
+impl Iterable<i64> for Countdown {
+    fun next(&mut self) -> Perhaps<i64> {
         if (self.current > 0) {
             let v = self.current;
             self.current = self.current - 1;
@@ -186,7 +186,7 @@ fun main() {
     assert(true.to_string()  == "true");
     assert(false.to_string() == "false");
 
-    // to_string on Int
+    // to_string on i64
     assert(100.to_string() == "100");
     assert(0.to_string()   == "0");
 

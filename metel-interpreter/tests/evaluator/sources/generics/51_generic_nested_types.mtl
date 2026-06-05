@@ -14,7 +14,7 @@ fun snd<A, B>(pair: (A, B)) -> B { pair.1 }
 fun swap<A, B>(pair: (A, B)) -> (B, A) { (pair.1, pair.0) }
 
 fun main() {
-    // array_first / array_second at Int.
+    // array_first / array_second at i64.
     let ints = [10, 20, 30];
     assert(array_first(ints) == 10);
     assert(array_second(ints) == 20);
@@ -24,22 +24,22 @@ fun main() {
     assert(!array_first(bools));
     assert(array_second(bools));
 
-    // fst / snd on (Int, Bool).
+    // fst / snd on (i64, Bool).
     let p1 = (42, true);
     assert(fst(p1) == 42);
     assert(snd(p1));
 
-    // fst / snd on (Bool, Int).
+    // fst / snd on (Bool, i64).
     let p2 = (false, 99);
     assert(!fst(p2));
     assert(snd(p2) == 99);
 
-    // swap (Int, Bool) → (Bool, Int).
+    // swap (i64, Bool) → (Bool, i64).
     let s1 = swap((7, true));
     assert(s1.0);
     assert(s1.1 == 7);
 
-    // swap (String, Int).
+    // swap (String, i64).
     let s2 = swap(("hi", 5));
     assert(s2.0 == 5);
     assert(s2.1 == "hi");

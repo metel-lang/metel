@@ -1,11 +1,11 @@
 // Param types from the callee signature flow into argument construction,
 // so bare `None` resolves without requiring ascription.
 
-fun first_or_default(items: Int[], fallback: Perhaps<Int>) -> Int {
+fun first_or_default(items: i64[], fallback: Perhaps<i64>) -> i64 {
     match fallback {
         Perhaps::Some { value } => value,
         None => if (array_len(items) > 0) { items[0] } else { 0 },
     }
 }
 
-let _: Int = first_or_default([1, 2, 3], None);
+let _: i64 = first_or_default([1, 2, 3], None);

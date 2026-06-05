@@ -1,29 +1,29 @@
 // Positive: multiple default methods can all be inherited by a single impl.
 
 struct Value {
-    n: Int,
+    n: i64,
 }
 
 aspect Ops {
-    fun get(self) -> Int;
+    fun get(self) -> i64;
 
-    fun doubled(self) -> Int {
+    fun doubled(self) -> i64 {
         return self.get() * 2;
     }
 
-    fun tripled(self) -> Int {
+    fun tripled(self) -> i64 {
         return self.get() * 3;
     }
 }
 
 impl Ops for Value {
-    fun get(self) -> Int {
+    fun get(self) -> i64 {
         return self.n;
     }
 }
 
 fun main() {
     let v = Value { n: 4 };
-    let _: Int = v.doubled();
-    let _: Int = v.tripled();
+    let _: i64 = v.doubled();
+    let _: i64 = v.tripled();
 }

@@ -4,15 +4,15 @@
 //   user aspect declaration (Transformable, Summarizable),
 //   From<LexError> for AppError and From<ParseError> for AppError,
 //   ? coercion across multiple error types → common AppError,
-//   user-defined Iterable<Int> (NumberList) with stateful scan,
+//   user-defined Iterable<i64> (NumberList) with stateful scan,
 //   batch ? inside a for-in loop,
 //   result accumulation and error short-circuit.
 
 // ── Aspects ────────────────────────────────────────────────────────────────────
 
 aspect Transformable {
-    fun double(self) -> Int;
-    fun negate(self) -> Int;
+    fun double(self) -> i64;
+    fun negate(self) -> i64;
 }
 
 aspect Summarizable {
@@ -47,12 +47,12 @@ impl From<ParseError> for AppError {
 
 // ── Data types ─────────────────────────────────────────────────────────────────
 
-struct Token  { kind: String, value: Int }
-struct Number { raw: Int }
+struct Token  { kind: String, value: i64 }
+struct Number { raw: i64 }
 
 impl Transformable for Number {
-    fun double(self) -> Int { self.raw * 2 }
-    fun negate(self) -> Int { 0 - self.raw }
+    fun double(self) -> i64 { self.raw * 2 }
+    fun negate(self) -> i64 { 0 - self.raw }
 }
 
 impl Summarizable for Number {
@@ -63,15 +63,15 @@ impl Summarizable for Number {
 
 // ── Iterable over a fixed array of ints ────────────────────────────────────────
 
-struct NumberList { data: Int[], pos: Int }
+struct NumberList { data: i64[], pos: i64 }
 
 impl NumberList {
-    fun new(data: Int[]) -> NumberList { NumberList { data: data, pos: 0 } }
-    fun len(self) -> Int { array_len(self.data) }
+    fun new(data: i64[]) -> NumberList { NumberList { data: data, pos: 0 } }
+    fun len(self) -> i64 { array_len(self.data) }
 }
 
-impl Iterable<Int> for NumberList {
-    fun next(&mut self) -> Perhaps<Int> {
+impl Iterable<i64> for NumberList {
+    fun next(&mut self) -> Perhaps<i64> {
         if (self.pos < array_len(self.data)) {
             let v = self.data[self.pos as u64];
             self.pos = self.pos + 1;
@@ -125,11 +125,11 @@ fun main() {
     let n0 = Number { raw: 0 };
     assert(n0.summary() == "Number(0)");
 
-    // to_string on Int
+    // to_string on i64
     assert(42.to_string() == "42");
     assert(0.to_string() == "0");
 
-    // Iterable<Int>: sum of [1,2,3,4,5]
+    // Iterable<i64>: sum of [1,2,3,4,5]
     let list = NumberList::new([1, 2, 3, 4, 5]);
     assert(list.len() == 5);
     let mut total = 0;
@@ -138,7 +138,7 @@ fun main() {
 
     // Empty NumberList: loop body never runs
     let mut ran = false;
-    let empty_ints: Int[] = [];
+    let empty_ints: i64[] = [];
     for (let _x in NumberList::new(empty_ints)) { ran = true; }
     assert(!ran);
 
@@ -183,13 +183,13 @@ fun main() {
     for (let x in list2) { doubled_sum += x * 2; }
     assert(doubled_sum == 120);
 
-    // built-in Int as Float
-    let i: Int = 9;
-    let f = i as Float;
+    // built-in i64 as f64
+    let i: i64 = 9;
+    let f = i as f64;
     assert(f == 9.0);
 
-    // built-in Float as Int (truncation)
-    let fl: Float = 7.8;
-    let ii = fl as Int;
+    // built-in f64 as i64 (truncation)
+    let fl: f64 = 7.8;
+    let ii = fl as i64;
     assert(ii == 7);
 }

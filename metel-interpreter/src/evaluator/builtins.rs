@@ -37,16 +37,16 @@ pub(super) fn register_builtins(env: &mut Environment) {
     }));
 
     // to_string() methods for built-in Display types.
-    env.define("Int::to_string", Value::Builtin("Int::to_string".to_string(), |args, _span| {
+    env.define("i64::to_string", Value::Builtin("i64::to_string".to_string(), |args, _span| {
         match args.first() {
-            Some(Value::Int(n)) => Ok(Value::Str(n.to_string())),
-            _ => Err(MetelError::internal("Int::to_string: expected Int")),
+            Some(Value::I64(n)) => Ok(Value::Str(n.to_string())),
+            _ => Err(MetelError::internal("i64::to_string: expected i64")),
         }
     }));
-    env.define("Float::to_string", Value::Builtin("Float::to_string".to_string(), |args, _span| {
+    env.define("f64::to_string", Value::Builtin("f64::to_string".to_string(), |args, _span| {
         match args.first() {
-            Some(Value::Float(f)) => Ok(Value::Str(format_float(*f))),
-            _ => Err(MetelError::internal("Float::to_string: expected Float")),
+            Some(Value::F64(f)) => Ok(Value::Str(format_float(*f))),
+            _ => Err(MetelError::internal("f64::to_string: expected f64")),
         }
     }));
     env.define("Bool::to_string", Value::Builtin("Bool::to_string".to_string(), |args, _span| {
@@ -63,18 +63,18 @@ pub(super) fn register_builtins(env: &mut Environment) {
     }));
 
     // From impls for numeric conversions.
-    env.define("Int::from", Value::Builtin("Int::from".to_string(), |args, _span| {
+    env.define("i64::from", Value::Builtin("i64::from".to_string(), |args, _span| {
         match args.first() {
-            Some(Value::Float(f)) => Ok(Value::Int(*f as i64)),
-            Some(Value::Int(n))   => Ok(Value::Int(*n)),
-            _ => Err(MetelError::internal("Int::from: expected Float")),
+            Some(Value::F64(f)) => Ok(Value::I64(*f as i64)),
+            Some(Value::I64(n))   => Ok(Value::I64(*n)),
+            _ => Err(MetelError::internal("i64::from: expected f64")),
         }
     }));
-    env.define("Float::from", Value::Builtin("Float::from".to_string(), |args, _span| {
+    env.define("f64::from", Value::Builtin("f64::from".to_string(), |args, _span| {
         match args.first() {
-            Some(Value::Int(n))   => Ok(Value::Float(*n as f64)),
-            Some(Value::Float(f)) => Ok(Value::Float(*f)),
-            _ => Err(MetelError::internal("Float::from: expected Int")),
+            Some(Value::I64(n))   => Ok(Value::F64(*n as f64)),
+            Some(Value::F64(f)) => Ok(Value::F64(*f)),
+            _ => Err(MetelError::internal("f64::from: expected i64")),
         }
     }));
 
@@ -83,73 +83,73 @@ pub(super) fn register_builtins(env: &mut Environment) {
         ($key:expr, $pat:pat => $val:expr) => {
             env.define($key, Value::Builtin($key.to_string(), |args, _span| {
                 match args.first() {
-                    Some($pat) => Ok(Value::Int($val)),
+                    Some($pat) => Ok(Value::I64($val)),
                     _ => Err(MetelError::internal(concat!($key, ": unexpected argument"))),
                 }
             }));
         };
     }
-    int_from!("Int::From<i8>::from",  Value::I8(n)  => *n as i64);
-    int_from!("Int::From<i16>::from", Value::I16(n) => *n as i64);
-    int_from!("Int::From<i32>::from", Value::I32(n) => *n as i64);
-    int_from!("Int::From<u8>::from",  Value::U8(n)  => *n as i64);
-    int_from!("Int::From<u16>::from", Value::U16(n) => *n as i64);
-    int_from!("Int::From<u32>::from", Value::U32(n) => *n as i64);
-    int_from!("Int::From<u64>::from", Value::U64(n) => *n as i64);
-    int_from!("Int::From<f32>::from", Value::F32(f) => *f as i64);
+    int_from!("i64::From<i8>::from",  Value::I8(n)  => *n as i64);
+    int_from!("i64::From<i16>::from", Value::I16(n) => *n as i64);
+    int_from!("i64::From<i32>::from", Value::I32(n) => *n as i64);
+    int_from!("i64::From<u8>::from",  Value::U8(n)  => *n as i64);
+    int_from!("i64::From<u16>::from", Value::U16(n) => *n as i64);
+    int_from!("i64::From<u32>::from", Value::U32(n) => *n as i64);
+    int_from!("i64::From<u64>::from", Value::U64(n) => *n as i64);
+    int_from!("i64::From<f32>::from", Value::F32(f) => *f as i64);
 
     // Sized integer / float → Float
     macro_rules! float_from {
         ($key:expr, $pat:pat => $val:expr) => {
             env.define($key, Value::Builtin($key.to_string(), |args, _span| {
                 match args.first() {
-                    Some($pat) => Ok(Value::Float($val)),
+                    Some($pat) => Ok(Value::F64($val)),
                     _ => Err(MetelError::internal(concat!($key, ": unexpected argument"))),
                 }
             }));
         };
     }
-    float_from!("Float::From<i8>::from",  Value::I8(n)  => *n as f64);
-    float_from!("Float::From<i16>::from", Value::I16(n) => *n as f64);
-    float_from!("Float::From<i32>::from", Value::I32(n) => *n as f64);
-    float_from!("Float::From<u8>::from",  Value::U8(n)  => *n as f64);
-    float_from!("Float::From<u16>::from", Value::U16(n) => *n as f64);
-    float_from!("Float::From<u32>::from", Value::U32(n) => *n as f64);
-    float_from!("Float::From<u64>::from", Value::U64(n) => *n as f64);
-    float_from!("Float::From<f32>::from", Value::F32(f) => *f as f64);
+    float_from!("f64::From<i8>::from",  Value::I8(n)  => *n as f64);
+    float_from!("f64::From<i16>::from", Value::I16(n) => *n as f64);
+    float_from!("f64::From<i32>::from", Value::I32(n) => *n as f64);
+    float_from!("f64::From<u8>::from",  Value::U8(n)  => *n as f64);
+    float_from!("f64::From<u16>::from", Value::U16(n) => *n as f64);
+    float_from!("f64::From<u32>::from", Value::U32(n) => *n as f64);
+    float_from!("f64::From<u64>::from", Value::U64(n) => *n as f64);
+    float_from!("f64::From<f32>::from", Value::F32(f) => *f as f64);
 
     // Int / Float → sized integer types (truncating / wrapping)
     macro_rules! sized_from {
         ($key:expr, Int => $cast:expr) => {
             env.define($key, Value::Builtin($key.to_string(), |args, _span| {
                 match args.first() {
-                    Some(Value::Int(n))   => Ok($cast(*n as i128)),
-                    Some(Value::Float(f)) => Ok($cast(*f as i128)),
+                    Some(Value::I64(n))   => Ok($cast(*n as i128)),
+                    Some(Value::F64(f)) => Ok($cast(*f as i128)),
                     _ => Err(MetelError::internal(concat!($key, ": unexpected argument"))),
                 }
             }));
         };
     }
-    sized_from!("u64::From<Int>::from",   Int => |n: i128| Value::U64(n as u64));
-    sized_from!("u64::From<Float>::from", Int => |n: i128| Value::U64(n as u64));
-    sized_from!("i8::From<Int>::from",    Int => |n: i128| Value::I8(n as i8));
-    sized_from!("i8::From<Float>::from",  Int => |n: i128| Value::I8(n as i8));
-    sized_from!("i16::From<Int>::from",   Int => |n: i128| Value::I16(n as i16));
-    sized_from!("i16::From<Float>::from", Int => |n: i128| Value::I16(n as i16));
-    sized_from!("i32::From<Int>::from",   Int => |n: i128| Value::I32(n as i32));
-    sized_from!("i32::From<Float>::from", Int => |n: i128| Value::I32(n as i32));
-    sized_from!("u8::From<Int>::from",    Int => |n: i128| Value::U8(n as u8));
-    sized_from!("u8::From<Float>::from",  Int => |n: i128| Value::U8(n as u8));
-    sized_from!("u16::From<Int>::from",   Int => |n: i128| Value::U16(n as u16));
-    sized_from!("u16::From<Float>::from", Int => |n: i128| Value::U16(n as u16));
-    sized_from!("u32::From<Int>::from",   Int => |n: i128| Value::U32(n as u32));
-    sized_from!("u32::From<Float>::from", Int => |n: i128| Value::U32(n as u32));
-    sized_from!("f32::From<Int>::from",   Int => |n: i128| Value::F32(n as f32));
-    sized_from!("f32::From<Float>::from", Int => |n: i128| Value::F32(n as f32));
+    sized_from!("u64::From<i64>::from",   Int => |n: i128| Value::U64(n as u64));
+    sized_from!("u64::From<f64>::from",   Int => |n: i128| Value::U64(n as u64));
+    sized_from!("i8::From<i64>::from",    Int => |n: i128| Value::I8(n as i8));
+    sized_from!("i8::From<f64>::from",    Int => |n: i128| Value::I8(n as i8));
+    sized_from!("i16::From<i64>::from",   Int => |n: i128| Value::I16(n as i16));
+    sized_from!("i16::From<f64>::from",   Int => |n: i128| Value::I16(n as i16));
+    sized_from!("i32::From<i64>::from",   Int => |n: i128| Value::I32(n as i32));
+    sized_from!("i32::From<f64>::from",   Int => |n: i128| Value::I32(n as i32));
+    sized_from!("u8::From<i64>::from",    Int => |n: i128| Value::U8(n as u8));
+    sized_from!("u8::From<f64>::from",    Int => |n: i128| Value::U8(n as u8));
+    sized_from!("u16::From<i64>::from",   Int => |n: i128| Value::U16(n as u16));
+    sized_from!("u16::From<f64>::from",   Int => |n: i128| Value::U16(n as u16));
+    sized_from!("u32::From<i64>::from",   Int => |n: i128| Value::U32(n as u32));
+    sized_from!("u32::From<f64>::from",   Int => |n: i128| Value::U32(n as u32));
+    sized_from!("f32::From<i64>::from",   Int => |n: i128| Value::F32(n as f32));
+    sized_from!("f32::From<f64>::from",   Int => |n: i128| Value::F32(n as f32));
 
     env.define("string_len", Value::Builtin("string_len".to_string(), |args, _span| {
         if let Some(Value::Str(s)) = args.first() {
-            Ok(Value::Int(s.chars().count() as i64))
+            Ok(Value::I64(s.chars().count() as i64))
         } else {
             Err(MetelError::internal("string_len: expected String argument"))
         }
@@ -177,7 +177,7 @@ pub(super) fn register_builtins(env: &mut Environment) {
 
     env.define("array_len", Value::Builtin("array_len".to_string(), |args, _span| {
         if let Some(Value::Array(arr)) = args.first() {
-            Ok(Value::Int(arr.borrow().len() as i64))
+            Ok(Value::I64(arr.borrow().len() as i64))
         } else {
             Err(MetelError::internal("array_len: expected Array argument"))
         }
@@ -189,7 +189,7 @@ pub(super) fn register_builtins(env: &mut Environment) {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_millis() as i64;
-        Ok(Value::Int(ms))
+        Ok(Value::I64(ms))
     }));
 
     env.define("assert", Value::Builtin("assert".to_string(), |args, span| {

@@ -8,17 +8,17 @@
 //      and use the return type as the call expression's type
 //
 // Expected inferred types:
-//   add(Int, Int) -> Int
+//   add(i64, i64) -> i64
 //   negate(Bool) -> Bool
-//   to_string(Int) -> String  (uses a built-in)
-//   a : Int    (call to add)
+//   to_string(i64) -> String  (uses a built-in)
+//   a : i64    (call to add)
 //   b : Bool   (call to negate)
 //
 // The body of each function is also type-checked:
-//   add body:    x + y  infers Int — must unify with declared return Int ✓
+//   add body:    x + y  infers i64 — must unify with declared return i64 ✓
 //   negate body: !b     infers Bool — must unify with declared return Bool ✓
 
-fun add(x: Int, y: Int) -> Int {
+fun add(x: i64, y: i64) -> i64 {
     x + y
 }
 

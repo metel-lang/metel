@@ -5,14 +5,14 @@ struct Pair<A, B> {
     second: B,
 }
 
-fun make_pair(a: Int, b: Bool) -> Pair<Int, Bool> {
+fun make_pair(a: i64, b: Bool) -> Pair<i64, Bool> {
     Pair { first: a, second: b }
 }
 
-fun get_first(p: Pair<Int, Bool>) -> Int {
+fun get_first(p: Pair<i64, Bool>) -> i64 {
     p.first
 }
 
-fun get_second(p: Pair<Int, Bool>) -> Bool {
+fun get_second(p: Pair<i64, Bool>) -> Bool {
     p.second
 }

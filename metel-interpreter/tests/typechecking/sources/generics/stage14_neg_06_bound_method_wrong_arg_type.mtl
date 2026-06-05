@@ -1,15 +1,15 @@
 // Negative: calling a bound method with an argument of the wrong type.
-// serialize(self) -> String takes no args; validate(self, code: Int) takes an Int.
-// Passing a String where Int is expected should emit T0001.
+// serialize(self) -> String takes no args; validate(self, code: i64) takes an i64.
+// Passing a String where i64 is expected should emit T0001.
 
 aspect Validatable {
-    fun validate(self, code: Int) -> Bool;
+    fun validate(self, code: i64) -> Bool;
 }
 
-struct Item { value: Int }
+struct Item { value: i64 }
 
 impl Validatable for Item {
-    fun validate(self, code: Int) -> Bool { self.value == code }
+    fun validate(self, code: i64) -> Bool { self.value == code }
 }
 
 fun bad<T: Validatable>(x: T) -> Bool {

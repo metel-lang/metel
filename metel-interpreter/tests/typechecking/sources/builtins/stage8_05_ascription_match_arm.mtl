@@ -9,17 +9,17 @@
 // when the function's return type is known, it does not flow into arm bodies.
 // Ascription is the only way to type the literal without restructuring the arm.
 
-fun make_row(use_default: Bool, fallback: Int[]) -> Int[] {
+fun make_row(use_default: Bool, fallback: i64[]) -> i64[] {
     match use_default {
-        true  => [] : Int[],
+        true  => [] : i64[],
         false => fallback,
     }
 }
 
 // Alternative: block arm with a local binding — equivalent, but noisier.
-fun make_row_alt(use_default: Bool, fallback: Int[]) -> Int[] {
+fun make_row_alt(use_default: Bool, fallback: i64[]) -> i64[] {
     match use_default {
-        true  => { let xs: Int[] = []; xs },
+        true  => { let xs: i64[] = []; xs },
         false => fallback,
     }
 }

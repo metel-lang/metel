@@ -2,12 +2,12 @@
 // original field in place (METEL-112).
 
 struct Counter {
-    value: Int,
-    step:  Int,
+    value: i64,
+    step:  i64,
 }
 
 impl Counter {
-    fun new(step: Int) -> Counter {
+    fun new(step: i64) -> Counter {
         Counter { value: 0, step: step }
     }
 
@@ -15,7 +15,7 @@ impl Counter {
         self.value += self.step;
     }
 
-    fun get(&self) -> Int {
+    fun get(&self) -> i64 {
         self.value
     }
 

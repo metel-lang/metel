@@ -2,10 +2,10 @@
 // in a different function's body.
 
 fun declare_it() {
-    struct Local { x: Int }
+    struct Local { x: i64 }
 }
 
-fun use_it() -> Int {
+fun use_it() -> i64 {
     let v = Local { x: 1 };  // ERROR[T0003]
     v.x
 }

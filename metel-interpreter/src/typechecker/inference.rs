@@ -1076,8 +1076,8 @@ fn named_type_name(ty: &InferType) -> Option<String> {
         InferType::Named(name, _)         => Some(name.clone()),
         InferType::Pointer(inner) | InferType::MutPointer(inner) => named_type_name(inner),
         InferType::Concrete(Type::Str)    => Some("String".to_string()),
-        InferType::Concrete(Type::Int)    => Some("Int".to_string()),
-        InferType::Concrete(Type::Float)  => Some("Float".to_string()),
+        InferType::Concrete(Type::I64)    => Some("i64".to_string()),
+        InferType::Concrete(Type::F64)  => Some("f64".to_string()),
         InferType::Concrete(Type::Bool)   => Some("Bool".to_string()),
         _ => None,
     }
@@ -1092,7 +1092,7 @@ fn infer_literal(lit: &Literal, ctx: &mut InferContext) -> InferType {
             IntKind::I8  => Type::I8,
             IntKind::I16 => Type::I16,
             IntKind::I32 => Type::I32,
-            IntKind::I64 => Type::Int,
+            IntKind::I64 => Type::I64,
             IntKind::U8  => Type::U8,
             IntKind::U16 => Type::U16,
             IntKind::U32 => Type::U32,
@@ -1100,7 +1100,7 @@ fn infer_literal(lit: &Literal, ctx: &mut InferContext) -> InferType {
         }),
         Literal::SizedFloat { kind, .. } => InferType::Concrete(match kind {
             FloatKind::F32 => Type::F32,
-            FloatKind::F64 => Type::Float,
+            FloatKind::F64 => Type::F64,
         }),
         Literal::Bool(_)  => InferType::bool(),
         Literal::Str(_)   => InferType::str(),
@@ -1141,7 +1141,7 @@ fn infer_binop(
                         return Err(MetelError::type_error(
                             TypeErrorCode::T0005,
                             format!(
-                                "`+` requires Int, Float, or String operands, got `{lhs_resolved}` and `{rhs_resolved}`"
+                                "`+` requires i64, f64, or String operands, got `{lhs_resolved}` and `{rhs_resolved}`"
                             ),
                             span,
                         ));
@@ -1567,8 +1567,8 @@ fn infer_to_type_for_from(ty: &InferType) -> Option<Type> {
 /// Extract the type name string from an `InferType` for registry lookups.
 fn infer_type_name(ty: &InferType) -> Option<&str> {
     match ty {
-        InferType::Concrete(Type::Int)   => Some("Int"),
-        InferType::Concrete(Type::Float) => Some("Float"),
+        InferType::Concrete(Type::I64)   => Some("i64"),
+        InferType::Concrete(Type::F64) => Some("f64"),
         InferType::Concrete(Type::Bool)  => Some("Bool"),
         InferType::Concrete(Type::Str)   => Some("String"),
         InferType::Concrete(Type::I8)    => Some("i8"),

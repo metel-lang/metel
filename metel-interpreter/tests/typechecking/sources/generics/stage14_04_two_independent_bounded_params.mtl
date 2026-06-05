@@ -9,7 +9,7 @@ aspect Serializable {
     fun serialize(self) -> String;
 }
 
-struct A { value: Int }
+struct A { value: i64 }
 struct B { name: String }
 
 impl Printable for A { fun print(self) {} }

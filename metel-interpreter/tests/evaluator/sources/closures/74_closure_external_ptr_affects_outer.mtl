@@ -4,7 +4,7 @@
 // must be visible in the outer scope.
 fun main() {
     let mut x = 10;
-    let p: *mut Int = &mut x;
+    let p: *mut i64 = &mut x;
 
     let f = () -> () {
         *p = 42;

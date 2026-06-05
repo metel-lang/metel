@@ -3,28 +3,28 @@
 //         mut capture, generic functions, higher-order functions, closure type signatures,
 //         unannotated parameters (types inferred from context).
 
-fun add(a: Int, b: Int) -> Int {
+fun add(a: i64, b: i64) -> i64 {
     return a + b;
 }
 
-fun apply(f: (Int) -> Int, x: Int) -> Int {
+fun apply(f: (i64) -> i64, x: i64) -> i64 {
     return f(x);
 }
 
-fun apply2(f: (Int, Int) -> Int, a: Int, b: Int) -> Int {
+fun apply2(f: (i64, i64) -> i64, a: i64, b: i64) -> i64 {
     return f(a, b);
 }
 
-fun make_adder(n: Int) -> (Int) -> Int {
-    return (x) -> { return x + n; };   // x inferred as Int from return type
+fun make_adder(n: i64) -> (i64) -> i64 {
+    return (x) -> { return x + n; };   // x inferred as i64 from return type
 }
 
 fun identity<T>(value: T) -> T {
     return value;
 }
 
-fun map_array(arr: Int[], f: (Int) -> Int) -> Int[] {
-    let mut result: Int[]  = [];
+fun map_array(arr: i64[], f: (i64) -> i64) -> i64[] {
+    let mut result: i64[]  = [];
     for (let item in arr) {
         array_push(result, f(item));
     }
@@ -69,7 +69,7 @@ fun main() {
     println(int_to_string(apply2(add, 8, 9)));  // 17
 
     // --- map_array (closure params inferred from map_array's signature) ---
-    let nums: Int[] = [1, 2, 3, 4, 5];
+    let nums: i64[] = [1, 2, 3, 4, 5];
     let squares = map_array(nums, (x) -> { return x * x; });
     for (let n in squares) {
         print(int_to_string(n) + " ");    // 1 4 9 16 25

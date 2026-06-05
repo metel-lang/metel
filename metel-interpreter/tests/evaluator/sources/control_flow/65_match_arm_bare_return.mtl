@@ -1,21 +1,21 @@
 // Bare `return` and `break` in match arm bodies (no surrounding braces).
 // Previously rejected by the grammar; fixed in #226.
 
-fun classify(n: Int) -> String {
+fun classify(n: i64) -> String {
     match n {
         0 => return "zero",
         _ => return "nonzero",
     }
 }
 
-fun sign(n: Int) -> Int {
+fun sign(n: i64) -> i64 {
     match n {
         0 => return 0,
         _ => if (n > 0) { return 1; } else { return -1; },
     }
 }
 
-fun first_err(xs: Int[]) -> Perhaps<Int> {
+fun first_err(xs: i64[]) -> Perhaps<i64> {
     let a = match xs[0] {
         0 => return None,
         n => n,
@@ -23,7 +23,7 @@ fun first_err(xs: Int[]) -> Perhaps<Int> {
     Perhaps::Some { value: a }
 }
 
-fun find_nonzero(arr: Int[]) -> Int {
+fun find_nonzero(arr: i64[]) -> i64 {
     let mut i = 0;
     loop {
         if (i >= array_len(arr)) { break -1; }

@@ -7,8 +7,8 @@
 //   multiple From targets for the same source,
 //   chained casts: A → B → C,
 //   round-trip casts: A → B → A,
-//   built-in Int as Float (exact, negative, zero),
-//   built-in Float as Int (truncation, negative truncation, exact).
+//   built-in i64 as f64 (exact, negative, zero),
+//   built-in f64 as i64 (truncation, negative truncation, exact).
 
 aspect From<T> {
     fun from(value: T) -> Self;
@@ -16,13 +16,13 @@ aspect From<T> {
 
 // ── Wrapper types ──────────────────────────────────────────────────────────────
 
-struct Meters    { value: Float }
-struct Feet      { value: Float }
-struct Inches    { value: Float }
+struct Meters    { value: f64 }
+struct Feet      { value: f64 }
+struct Inches    { value: f64 }
 
-struct Kelvin    { degrees: Float }
-struct Celsius   { degrees: Float }
-struct Fahrenheit{ degrees: Float }
+struct Kelvin    { degrees: f64 }
+struct Celsius   { degrees: f64 }
+struct Fahrenheit{ degrees: f64 }
 
 // Meters ↔ Feet
 impl From<Meters> for Feet {
@@ -62,7 +62,7 @@ impl From<Celsius> for Fahrenheit {
     }
 }
 
-fun approx(a: Float, b: Float) -> Bool {
+fun approx(a: f64, b: f64) -> Bool {
     let d = a - b;
     let abs_d = if (d < 0.0) { 0.0 - d } else { d };
     abs_d < 0.01
@@ -115,25 +115,25 @@ fun main() {
     let abs_c = abs_zero as Celsius;
     assert(approx(abs_c.degrees, -273.15));
 
-    // built-in Int as Float: exact
-    let i0: Int = 0;
-    assert((i0 as Float) == 0.0);
-    let i1: Int = 1;
-    assert((i1 as Float) == 1.0);
-    let ineg: Int = -5;
-    assert((ineg as Float) == -5.0);
-    let big: Int = 1000000;
-    assert((big as Float) == 1000000.0);
+    // built-in i64 as f64: exact
+    let i0: i64 = 0;
+    assert((i0 as f64) == 0.0);
+    let i1: i64 = 1;
+    assert((i1 as f64) == 1.0);
+    let ineg: i64 = -5;
+    assert((ineg as f64) == -5.0);
+    let big: i64 = 1000000;
+    assert((big as f64) == 1000000.0);
 
-    // built-in Float as Int: truncation toward zero
-    let f3_9: Float = 3.9;
-    assert((f3_9 as Int) == 3);
-    let f3_1: Float = 3.1;
-    assert((f3_1 as Int) == 3);
-    let fexact: Float = 5.0;
-    assert((fexact as Int) == 5);
-    let fneg: Float = -2.7;
-    assert((fneg as Int) == -2); // truncation toward zero
-    let f0: Float = 0.0;
-    assert((f0 as Int) == 0);
+    // built-in f64 as i64: truncation toward zero
+    let f3_9: f64 = 3.9;
+    assert((f3_9 as i64) == 3);
+    let f3_1: f64 = 3.1;
+    assert((f3_1 as i64) == 3);
+    let fexact: f64 = 5.0;
+    assert((fexact as i64) == 5);
+    let fneg: f64 = -2.7;
+    assert((fneg as i64) == -2); // truncation toward zero
+    let f0: f64 = 0.0;
+    assert((f0 as i64) == 0);
 }

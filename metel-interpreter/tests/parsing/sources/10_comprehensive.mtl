@@ -10,23 +10,23 @@ struct Stack<T> {
     items: T[],
 }
 
-impl Stack<Int> {
-    fun new() -> Stack<Int> {
+impl Stack<i64> {
+    fun new() -> Stack<i64> {
         return Stack { items: [] };
     }
 
-    fun push(&mut self, value: Int) {
+    fun push(&mut self, value: i64) {
         array_push(self.items, value);
     }
 
-    fun pop(&mut self) -> Perhaps<Int> {
+    fun pop(&mut self) -> Perhaps<i64> {
         let len = array_len(self.items);
         if (len == 0) {
             return nope;
         }
         let top = self.items[len - 1];
         // rebuild without last element
-        let mut new_items: Int[]  = [];
+        let mut new_items: i64[]  = [];
         let mut i = 0;
         while (i < len - 1) {
             array_push(new_items, self.items[i]);
@@ -36,7 +36,7 @@ impl Stack<Int> {
         return top;
     }
 
-    fun peek(self) -> Perhaps<Int> {
+    fun peek(self) -> Perhaps<i64> {
         let len = array_len(self.items);
         if (len == 0) {
             return nope;
@@ -44,7 +44,7 @@ impl Stack<Int> {
         return self.items[len - 1];
     }
 
-    fun size(self) -> Int {
+    fun size(self) -> i64 {
         return array_len(self.items);
     }
 
@@ -58,7 +58,7 @@ impl Stack<Int> {
 // -------------------------------------------------------------------------
 
 enum Token {
-    Number { value: Int },
+    Number { value: i64 },
     Plus,
     Minus,
     Times,
@@ -112,7 +112,7 @@ impl Task {
     }
 }
 
-fun count_done(tasks: Task[]) -> Int {
+fun count_done(tasks: Task[]) -> i64 {
     let mut n = 0;
     for (let t in tasks) {
         if (t.done) { n += 1; }
@@ -201,9 +201,9 @@ fun main() {
     println(int_to_string(done) + "/" + int_to_string(total) + " done");  // 2/4 done
 
     // --- closures + arrays together ---
-    let multipliers: Int[] = [1, 2, 3, 4, 5];
+    let multipliers: i64[] = [1, 2, 3, 4, 5];
     let base = 7;
-    let mut products: Int[]  = [];
+    let mut products: i64[]  = [];
     for (let m in multipliers) {
         array_push(products, m * base);
     }
@@ -214,7 +214,7 @@ fun main() {
 
     // --- as casting in a calculation ---
     let items_count = 3;
-    let total_score: Float = 10.0 + 20.0 + 30.0;
-    let average = total_score / (items_count as Float);
+    let total_score: f64 = 10.0 + 20.0 + 30.0;
+    let average = total_score / (items_count as f64);
     println(float_to_string(average));   // 20.0
 }

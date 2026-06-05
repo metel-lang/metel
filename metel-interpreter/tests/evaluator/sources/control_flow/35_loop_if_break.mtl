@@ -7,7 +7,7 @@ fun main() {
     assert(r2 == 42);
     let r3 = loop { if (false) { break 42; } else { break 0; } };
     assert(r3 == 0);
-    // Result is typed Int, not Never — arithmetic on it must work.
+    // Result is typed i64, not Never — arithmetic on it must work.
     let x = loop { if (true) { break 42; } };
     let r4 = x + 1;
     assert(r4 == 43);

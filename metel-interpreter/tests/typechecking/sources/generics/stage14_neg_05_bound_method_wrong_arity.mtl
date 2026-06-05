@@ -2,15 +2,15 @@
 // compare(self, other: Self) takes 1 argument; calling with 0 should emit T0004.
 
 aspect Comparable {
-    fun compare(self, other: Self) -> Int;
+    fun compare(self, other: Self) -> i64;
 }
 
-struct Num { value: Int }
+struct Num { value: i64 }
 
 impl Comparable for Num {
-    fun compare(self, other: Num) -> Int { self.value - other.value }
+    fun compare(self, other: Num) -> i64 { self.value - other.value }
 }
 
-fun bad<T: Comparable>(x: T) -> Int {
+fun bad<T: Comparable>(x: T) -> i64 {
     x.compare() // ERROR[T0004]
 }

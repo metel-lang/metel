@@ -5,25 +5,25 @@
 // 3. The bound's aspect methods are available in the method body
 
 aspect Comparable {
-    fun compare(self, other: Self) -> Int;
+    fun compare(self, other: Self) -> i64;
 }
 
 struct SortedList<T: Comparable> {
     items: T[],
 }
 
-struct Num { value: Int }
+struct Num { value: i64 }
 
 impl Comparable for Num {
-    fun compare(self, other: Num) -> Int { self.value - other.value }
+    fun compare(self, other: Num) -> i64 { self.value - other.value }
 }
 
 impl SortedList<T> {
-    fun rank(self, item: T, pivot: T) -> Int {
+    fun rank(self, item: T, pivot: T) -> i64 {
         item.compare(pivot)
     }
 }
 
-fun run(s: SortedList<Num>, a: Num, b: Num) -> Int {
+fun run(s: SortedList<Num>, a: Num, b: Num) -> i64 {
     s.rank(a, b)
 }

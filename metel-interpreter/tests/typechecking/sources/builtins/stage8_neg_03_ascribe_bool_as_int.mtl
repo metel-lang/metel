@@ -1,5 +1,5 @@
-// Stage 8 negative: Bool cannot be ascribed as Int.
+// Stage 8 negative: Bool cannot be ascribed as i64.
 
 fun main() {
-    let _: Int = true : Int; // ERROR[T0001]
+    let _: i64 = true : i64; // ERROR[T0001]
 }

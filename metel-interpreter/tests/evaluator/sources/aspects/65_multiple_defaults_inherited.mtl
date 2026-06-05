@@ -2,23 +2,23 @@
 // method and inherits all defaults.
 
 struct Counter {
-    count: Int,
+    count: i64,
 }
 
 aspect Stats {
-    fun value(self) -> Int;
+    fun value(self) -> i64;
 
-    fun doubled(self) -> Int {
+    fun doubled(self) -> i64 {
         return self.value() * 2;
     }
 
-    fun tripled(self) -> Int {
+    fun tripled(self) -> i64 {
         return self.value() * 3;
     }
 }
 
 impl Stats for Counter {
-    fun value(self) -> Int {
+    fun value(self) -> i64 {
         return self.count;
     }
 }

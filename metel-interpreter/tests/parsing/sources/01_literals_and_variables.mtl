@@ -11,7 +11,7 @@ fun main() {
     println(int_to_string(b));          // 1000000
 
     // --- float literals ---
-    let x: Float = 3.14;
+    let x: f64 = 3.14;
     let y = 2.0;
     println(float_to_string(x));        // 3.14
     println(float_to_string(y));        // 2.0
@@ -37,7 +37,7 @@ fun main() {
     println(plain_dollar);              // $5
 
     // --- None literal ---
-    let maybe: Perhaps<Int> = None;
+    let maybe: Perhaps<i64> = None;
     match maybe {
         Perhaps::Some { value } => println(int_to_string(value)),
         Perhaps::None => println("nope"),   // nope

@@ -2,7 +2,7 @@
 //
 // Condition must be Bool; body is inferred; no value is produced.
 
-fun abs_via_if(x: Int) -> Int {
+fun abs_via_if(x: i64) -> i64 {
     if (x < 0) {
         return 0 - x;
     }

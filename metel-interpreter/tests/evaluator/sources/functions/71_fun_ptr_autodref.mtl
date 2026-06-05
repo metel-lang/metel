@@ -18,7 +18,7 @@ fun test_mutable_fun_ptr_call() {
 }
 
 // Function taking *() -> T and calling it directly
-fun call_via_ptr(f: *() -> Int) -> Int {
+fun call_via_ptr(f: *() -> i64) -> i64 {
     return f();
 }
 

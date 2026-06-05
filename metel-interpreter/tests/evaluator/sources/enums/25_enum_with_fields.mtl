@@ -1,4 +1,4 @@
-enum Shape { Circle { radius: Int }, Rect { w: Int, h: Int } }
+enum Shape { Circle { radius: i64 }, Rect { w: i64, h: i64 } }
 
 fun main() {
     // Enum variant with fields.

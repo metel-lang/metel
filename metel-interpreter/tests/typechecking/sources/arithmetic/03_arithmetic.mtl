@@ -7,16 +7,16 @@
 // Logical operators require Bool operands and produce Bool.
 //
 // Expected inferred types:
-//   sum      : Int   (Int + Int -> Int)
-//   product  : Int   (Int * Int -> Int)
-//   diff     : Int   (Int - Int -> Int)
-//   quotient : Int   (Int / Int -> Int)
-//   fsum     : Float (Float + Float -> Float)
-//   eq_check : Bool  (Int == Int -> Bool)
-//   lt_check : Bool  (Int < Int -> Bool)
+//   sum      : i64   (i64 + i64 -> i64)
+//   product  : i64   (i64 * i64 -> i64)
+//   diff     : i64   (i64 - i64 -> i64)
+//   quotient : i64   (i64 / i64 -> i64)
+//   fsum     : f64 (f64 + f64 -> f64)
+//   eq_check : Bool  (i64 == i64 -> Bool)
+//   lt_check : Bool  (i64 < i64 -> Bool)
 //   and_expr : Bool  (Bool && Bool -> Bool)
 //   or_expr  : Bool  (Bool || Bool -> Bool)
-//   neg_int  : Int   (-Int -> Int)
+//   neg_int  : i64   (-i64 -> i64)
 //   neg_bool : Bool  (!Bool -> Bool)
 
 let sum      = 1 + 2;

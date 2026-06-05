@@ -9,8 +9,8 @@ aspect Serializable {
     fun serialize(self) -> String;
 }
 
-struct A { value: Int }
-struct B { value: Int }
+struct A { value: i64 }
+struct B { value: i64 }
 
 impl Printable for A { fun print(self) {} }
 

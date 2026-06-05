@@ -1,4 +1,4 @@
-// Positive: nested generic types — Box<Pair<Int, Bool>>.
+// Positive: nested generic types — Box<Pair<i64, Bool>>.
 
 struct Box<T> {
     value: T,
@@ -9,10 +9,10 @@ struct Pair<A, B> {
     second: B,
 }
 
-fun make_boxed_pair(a: Int, b: Bool) -> Box<Pair<Int, Bool>> {
+fun make_boxed_pair(a: i64, b: Bool) -> Box<Pair<i64, Bool>> {
     Box { value: Pair { first: a, second: b } }
 }
 
-fun get_pair(b: Box<Pair<Int, Bool>>) -> Pair<Int, Bool> {
+fun get_pair(b: Box<Pair<i64, Bool>>) -> Pair<i64, Bool> {
     b.value
 }

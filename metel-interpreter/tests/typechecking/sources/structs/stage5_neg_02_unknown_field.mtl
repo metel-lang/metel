@@ -1,7 +1,7 @@
 // Negative: unknown field name in a struct literal.
 
 struct Counter {
-    value: Int,
+    value: i64,
 }
 
 let c = Counter { value: 0, extra: 1 }; // ERROR[T0003]

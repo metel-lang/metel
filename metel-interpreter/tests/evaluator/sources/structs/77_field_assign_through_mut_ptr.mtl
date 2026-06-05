@@ -1,5 +1,5 @@
 // Field assignment through a *mut pointer — both auto-deref and explicit deref forms.
-struct Point { x: Int, y: Int }
+struct Point { x: i64, y: i64 }
 struct Outer { inner: Point }
 
 fun main() {

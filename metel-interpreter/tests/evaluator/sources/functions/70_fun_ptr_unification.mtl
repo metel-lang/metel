@@ -45,7 +45,7 @@ fun test_tuple_closure_type() {
 }
 
 // Test D: nested tuple — mirrors get_closure_sets pattern
-fun get_closures(ptr: *mut Int) {
+fun get_closures(ptr: *mut i64) {
     let a = () -> { *ptr += 1; };
     let b = () -> { *ptr += 2; };
     (a, b)
@@ -66,14 +66,14 @@ fun test_nested_tuple_into_array() {
 }
 
 // Test E: double-nested tuple access (mirrors 69_nice_closure_abuse pattern)
-fun get_closures2(ptr: *mut Int) {
+fun get_closures2(ptr: *mut i64) {
     let a = () -> { *ptr += 1; };
     let b = () -> { *ptr += 2; };
     let read = () -> { return *ptr; };
     (a, b, read)
 }
 
-fun get_closure_sets2(ptr: *mut Int) {
+fun get_closure_sets2(ptr: *mut i64) {
     let first = get_closures2(ptr);
     let second = get_closures2(ptr);
     (first, second)
@@ -95,14 +95,14 @@ fun test_double_nested_tuple() {
 }
 
 // Test F: exact mirror of test 69 (using `return` syntax and extra unused binding)
-fun get_closures_f(ptr: *mut Int) {
+fun get_closures_f(ptr: *mut i64) {
     let first_closure = () -> { *ptr += 1; };
     let second_closure = () -> { *ptr += 2; };
     let third_closure = () -> { return *ptr; };
     return (first_closure, second_closure, third_closure);
 }
 
-fun get_closure_sets_f(ptr: *mut Int) {
+fun get_closure_sets_f(ptr: *mut i64) {
     let mut shared_value = 0;
     let first_closure_set = get_closures_f(ptr);
     let second_closure_set = get_closures_f(ptr);

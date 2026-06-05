@@ -18,14 +18,14 @@ impl From<ParseError> for AppError {
     }
 }
 
-fun parse_int(s: String) -> Result<Int, ParseError> {
+fun parse_int(s: String) -> Result<i64, ParseError> {
     if (s == "42") {
         return Result::Ok { value: 42 };
     }
     return Result::Err { error: ParseError { msg: "invalid integer" } };
 }
 
-fun load(s: String) -> Result<Int, AppError> {
+fun load(s: String) -> Result<i64, AppError> {
     let n = parse_int(s)?;
     return Result::Ok { value: n * 2 };
 }

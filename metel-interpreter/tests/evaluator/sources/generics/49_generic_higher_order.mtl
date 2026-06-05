@@ -10,8 +10,8 @@ fun transform<A, B>(f: (A) -> B, x: A) -> B { f(x) }
 fun pipe<A, B, C>(f: (A) -> B, g: (B) -> C, x: A) -> C { g(f(x)) }
 
 fun main() {
-    // apply at Int.
-    let r1 = apply((n: Int) -> Int { n * 2 }, 5);
+    // apply at i64.
+    let r1 = apply((n: i64) -> i64 { n * 2 }, 5);
     assert(r1 == 10);
 
     // apply at Bool.
@@ -23,32 +23,32 @@ fun main() {
     assert(r3 == "hello");
 
     // Nested apply: apply applied to result of apply.
-    let r4 = apply((n: Int) -> Int { n + 1 }, apply((n: Int) -> Int { n * 3 }, 4));
+    let r4 = apply((n: i64) -> i64 { n + 1 }, apply((n: i64) -> i64 { n * 3 }, 4));
     assert(r4 == 13);
 
-    // transform: Int → Bool.
-    let r5 = transform((n: Int) -> Bool { n > 0 }, 3);
+    // transform: i64 → Bool.
+    let r5 = transform((n: i64) -> Bool { n > 0 }, 3);
     assert(r5);
 
-    let r6 = transform((n: Int) -> Bool { n > 0 }, 0);
+    let r6 = transform((n: i64) -> Bool { n > 0 }, 0);
     assert(!r6);
 
-    // transform: Bool → Int.
-    let r7 = transform((b: Bool) -> Int { if (b) 1 else 0 }, true);
+    // transform: Bool → i64.
+    let r7 = transform((b: Bool) -> i64 { if (b) 1 else 0 }, true);
     assert(r7 == 1);
 
-    // pipe: Int → Bool → Int.
+    // pipe: i64 → Bool → i64.
     let r8 = pipe(
-        (n: Int) -> Bool { n > 0 },
-        (b: Bool) -> Int { if (b) 10 else -1 },
+        (n: i64) -> Bool { n > 0 },
+        (b: Bool) -> i64 { if (b) 10 else -1 },
         5
     );
     assert(r8 == 10);
 
-    // pipe: Int → Int → Int (two arithmetic steps).
+    // pipe: i64 → i64 → i64 (two arithmetic steps).
     let r9 = pipe(
-        (n: Int) -> Int { n * 2 },
-        (n: Int) -> Int { n + 1 },
+        (n: i64) -> i64 { n * 2 },
+        (n: i64) -> i64 { n + 1 },
         7
     );
     assert(r9 == 15);

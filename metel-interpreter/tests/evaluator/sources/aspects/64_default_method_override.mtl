@@ -2,8 +2,8 @@
 // the impl body is used instead of the default.
 
 struct Point {
-    x: Int,
-    y: Int,
+    x: i64,
+    y: i64,
 }
 
 aspect Shape {

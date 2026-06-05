@@ -4,8 +4,8 @@
 // from the literal on the right-hand side alone.
 //
 // Expected inferred types:
-//   a : Int
-//   b : Float
+//   a : i64
+//   b : f64
 //   c : Bool
 //   d : String
 //   e : ()

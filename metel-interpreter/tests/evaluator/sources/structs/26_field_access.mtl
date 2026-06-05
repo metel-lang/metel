@@ -1,5 +1,5 @@
-struct Vec2 { x: Int, y: Int }
-enum Wrapper { Val { n: Int } }
+struct Vec2 { x: i64, y: i64 }
+enum Wrapper { Val { n: i64 } }
 
 fun main() {
     // Field access on struct.

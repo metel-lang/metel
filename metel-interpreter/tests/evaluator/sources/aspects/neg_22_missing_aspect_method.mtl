@@ -4,7 +4,7 @@ aspect Greet {
     fun farewell(self) -> String;
 }
 
-struct Person { name: Int }
+struct Person { name: i64 }
 
 impl Greet for Person {
     fun greet(self) -> String { return "hello"; }

@@ -1,5 +1,5 @@
 // 09 — Casting and generics
-// Covers: as (Int->Float, Float->Int truncation), generic structs,
+// Covers: as (i64->f64, f64->i64 truncation), generic structs,
 //         generic functions with multiple type params, where clauses,
 //         inline aspectbounds.
 
@@ -11,8 +11,8 @@ struct Box<T> {
     value: T,
 }
 
-impl Box<Int> {
-    fun new(v: Int) -> Box<Int> {
+impl Box<i64> {
+    fun new(v: i64) -> Box<i64> {
         return Box { value: v };
     }
 }
@@ -23,7 +23,7 @@ impl Box<String> {
     }
 }
 
-impl Display for Box<Int> {
+impl Display for Box<i64> {
     fun display(self) -> String {
         return "Box(" + int_to_string(self.value) + ")";
     }
@@ -40,14 +40,14 @@ struct Pair<A, B> {
     second: B,
 }
 
-impl Pair<Int, Float> {
-    fun new(a: Int, b: Float) -> Pair<Int, Float> {
+impl Pair<i64, f64> {
+    fun new(a: i64, b: f64) -> Pair<i64, f64> {
         return Pair { first: a, second: b };
     }
 
-    // cast first to Float for arithmetic
-    fun sum_as_float(self) -> Float {
-        let a_float: Float = self.first as Float;
+    // cast first to f64 for arithmetic
+    fun sum_as_float(self) -> f64 {
+        let a_float: f64 = self.first as f64;
         return a_float + self.second;
     }
 }
@@ -60,31 +60,31 @@ fun swap<A, B>(p: Pair<A, B>) -> Pair<B, A> {
     return Pair { first: p.second, second: p.first };
 }
 
-fun clamp(value: Float, lo: Float, hi: Float) -> Float {
+fun clamp(value: f64, lo: f64, hi: f64) -> f64 {
     if (value < lo) { return lo; }
     if (value > hi) { return hi; }
     return value;
 }
 
 fun main() {
-    // --- Int -> Float cast ---
+    // --- i64 -> f64 cast ---
     let i = 7;
-    let f: Float = i as Float;
+    let f: f64 = i as f64;
     println(float_to_string(f));          // 7.0
 
-    // --- Float -> Int cast (truncates toward zero) ---
-    let pi: Float = 3.99;
-    let truncated: Int = pi as Int;
+    // --- f64 -> i64 cast (truncates toward zero) ---
+    let pi: f64 = 3.99;
+    let truncated: i64 = pi as i64;
     println(int_to_string(truncated));    // 3
 
-    let neg: Float = -2.7;
-    let neg_int: Int = neg as Int;
+    let neg: f64 = -2.7;
+    let neg_int: i64 = neg as i64;
     println(int_to_string(neg_int));      // -2  (truncates toward zero)
 
     // --- as used in arithmetic ---
     let count = 3;
-    let total: Float = 10.0;
-    let avg = total / (count as Float);
+    let total: f64 = 10.0;
+    let avg = total / (count as f64);
     println(float_to_string(avg));        // 3.3333...
 
     // --- generic Box ---
@@ -97,8 +97,8 @@ fun main() {
     let p = Pair::new(3, 1.5);
     println(float_to_string(p.sum_as_float()));   // 4.5
 
-    // --- swap generic pair (Pair<String, Int>) ---
-    let sp: Pair<String, Int> = Pair { first: "world", second: 99 };
+    // --- swap generic pair (Pair<String, i64>) ---
+    let sp: Pair<String, i64> = Pair { first: "world", second: 99 };
     let swapped = swap(sp);
     println(int_to_string(swapped.first));   // 99
     println(swapped.second);                 // world

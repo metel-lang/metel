@@ -12,7 +12,7 @@ fun counter() {
     n %= 3;
 }
 
-fun accumulate(start: Int) -> Int {
+fun accumulate(start: i64) -> i64 {
     let mut total = start;
     total += 100;
     total += 200;

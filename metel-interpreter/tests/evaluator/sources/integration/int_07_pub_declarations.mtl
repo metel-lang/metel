@@ -1,11 +1,11 @@
 // Regression test for v0.5.0: pub annotations on declarations must be valid
 // in single-file programs (grammar change from sprint 9 / RFC-0030).
 
-pub struct Point { x: Int, y: Int }
+pub struct Point { x: i64, y: i64 }
 pub enum Direction { North, South, East, West }
-pub fun distance(p: Point) -> Int { return p.x + p.y; }
+pub fun distance(p: Point) -> i64 { return p.x + p.y; }
 
-fun classify(d: Direction) -> Int {
+fun classify(d: Direction) -> i64 {
     match d {
         Direction::North => { return 1; },
         Direction::South => { return 2; },

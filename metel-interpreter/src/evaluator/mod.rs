@@ -43,14 +43,12 @@ use crate::typed_ast::{FunBody, TypedBlock, TypedDecl, TypedExpr, TypedForInit, 
 #[derive(Debug, Clone)]
 pub enum Value {
     // ── Primitive types ───────────────────────────────────────────────────────
-    /// Int / i64 — ergonomic integer alias.
-    Int(i64),
+    I64(i64),
     /// Sized signed integers.
     I8(i8), I16(i16), I32(i32),
     /// Sized unsigned integers.
     U8(u8), U16(u16), U32(u32), U64(u64),
-    /// Float / f64 — ergonomic float alias.
-    Float(f64),
+    F64(f64),
     /// 32-bit float.
     F32(f32),
     Bool(bool),
@@ -692,12 +690,12 @@ fn eval_for_in(
         Value::Struct { name, fields } if name == "Range" => {
             let s = range_field(fields, "start", span)?;
             let e = range_field(fields, "end",   span)?;
-            Some((s..e).map(Value::Int).collect())
+            Some((s..e).map(Value::I64).collect())
         }
         Value::Struct { name, fields } if name == "RangeInclusive" => {
             let s = range_field(fields, "start", span)?;
             let e = range_field(fields, "end",   span)?;
-            Some((s..=e).map(Value::Int).collect())
+            Some((s..=e).map(Value::I64).collect())
         }
         _ => None,
     };
@@ -763,7 +761,7 @@ fn eval_for_in(
 
 fn range_field(fields: &HashMap<String, Value>, name: &str, _span: &Span) -> Result<i64, MetelError> {
     match fields.get(name) {
-        Some(Value::Int(n)) => Ok(*n),
+        Some(Value::I64(n)) => Ok(*n),
         _ => Err(MetelError::internal(format!("range: missing or non-Int field `{name}`"))),
     }
 }
@@ -778,13 +776,13 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
             let val = match lit {
                 // Plain int literal promoted to u64 at an index site by the construction pass.
                 Literal::Int(n) if ty == &crate::types::Type::U64 => Value::U64(*n as u64),
-                Literal::Int(n)   => Value::Int(*n),
-                Literal::Float(f) => Value::Float(*f),
+                Literal::Int(n)   => Value::I64(*n),
+                Literal::Float(f) => Value::F64(*f),
                 Literal::SizedInt { value, kind } => match kind {
                     IntKind::I8  => Value::I8(*value as i8),
                     IntKind::I16 => Value::I16(*value as i16),
                     IntKind::I32 => Value::I32(*value as i32),
-                    IntKind::I64 => Value::Int(*value as i64),
+                    IntKind::I64 => Value::I64(*value as i64),
                     IntKind::U8  => Value::U8(*value as u8),
                     IntKind::U16 => Value::U16(*value as u16),
                     IntKind::U32 => Value::U32(*value as u32),
@@ -792,7 +790,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                 },
                 Literal::SizedFloat { value, kind } => match kind {
                     FloatKind::F32 => Value::F32(*value as f32),
-                    FloatKind::F64 => Value::Float(*value),
+                    FloatKind::F64 => Value::F64(*value),
                 },
                 Literal::Bool(b)  => Value::Bool(*b),
                 Literal::Str(s)   => Value::Str(s.clone()),
@@ -901,11 +899,11 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
             }
             let v = eval_expr(operand, env)?.into_value();
             let result = match (op, v) {
-                (UnaryOp::Neg, Value::Int(n))   => Value::Int(n.wrapping_neg()),
+                (UnaryOp::Neg, Value::I64(n))   => Value::I64(n.wrapping_neg()),
                 (UnaryOp::Neg, Value::I8(n))    => Value::I8(n.wrapping_neg()),
                 (UnaryOp::Neg, Value::I16(n))   => Value::I16(n.wrapping_neg()),
                 (UnaryOp::Neg, Value::I32(n))   => Value::I32(n.wrapping_neg()),
-                (UnaryOp::Neg, Value::Float(f)) => Value::Float(-f),
+                (UnaryOp::Neg, Value::F64(f)) => Value::F64(-f),
                 (UnaryOp::Neg, Value::F32(f))   => Value::F32(-f),
                 (UnaryOp::Not, Value::Bool(b))  => Value::Bool(!b),
                 (UnaryOp::Deref, Value::Pointer(rc)) | (UnaryOp::Deref, Value::MutPointer(rc)) => rc.borrow().clone(),
@@ -925,7 +923,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
             if let crate::ast::TypeExpr::Named(target_name, _) = target_type {
                 let src_name = match &v {
                     Value::Struct { name, .. } => Some(name.as_str()),
-                    Value::Int(_)  => Some("Int"),
+                    Value::I64(_)  => Some("i64"),
                     Value::I8(_)   => Some("i8"),
                     Value::I16(_)  => Some("i16"),
                     Value::I32(_)  => Some("i32"),
@@ -933,7 +931,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                     Value::U16(_)  => Some("u16"),
                     Value::U32(_)  => Some("u32"),
                     Value::U64(_)  => Some("u64"),
-                    Value::Float(_) => Some("Float"),
+                    Value::F64(_) => Some("f64"),
                     Value::F32(_)   => Some("f32"),
                     Value::Bool(_)  => Some("Bool"),
                     Value::Str(_)   => Some("String"),
@@ -1191,15 +1189,15 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
 
             // Built-in type methods.
             if let (Value::Str(s), "len") = (&recv_val, method.as_str()) {
-                return Ok(Signal::Value(Value::Int(s.chars().count() as i64)));
+                return Ok(Signal::Value(Value::I64(s.chars().count() as i64)));
             }
 
             // User-defined struct/enum methods — looked up by "TypeName::method".
             let recv_type_view = read_pointer_value(&recv_val).unwrap_or_else(|| recv_val.clone());
             let type_name = match &recv_type_view {
                 Value::Struct { name, .. } | Value::Enum { name, .. } => name.clone(),
-                Value::Int(_)   => "Int".to_string(),
-                Value::Float(_) => "Float".to_string(),
+                Value::I64(_)   => "i64".to_string(),
+                Value::F64(_) => "f64".to_string(),
                 Value::Bool(_)  => "Bool".to_string(),
                 Value::Str(_)   => "String".to_string(),
                 _ => return Err(MetelError::panic(

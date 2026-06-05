@@ -1,4 +1,4 @@
-struct Point { x: Int }
+struct Point { x: i64 }
 
 impl Point {
     fun clone(self) -> Self {
@@ -11,7 +11,7 @@ impl Point {
 }
 
 enum Token {
-    Int { value: Int },
+    i64 { value: i64 },
 }
 
 impl Token {
@@ -26,9 +26,9 @@ fun main() {
     assert(q.x == 3);
     assert(p.same_as(q));
 
-    let token = Token::Int { value: 9 };
+    let token = Token::i64 { value: 9 };
     let token_copy = token.identity();
     match token_copy {
-        Token::Int { value } => assert(value == 9),
+        Token::i64 { value } => assert(value == 9),
     }
 }

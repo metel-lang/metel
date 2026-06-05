@@ -1,14 +1,14 @@
 // Stage 6: loop expressions with break.
 
 // Infinite loop — type is Never (diverges)
-fun diverge() -> Int {
+fun diverge() -> i64 {
     loop {
         // no break
     }
 }
 
 // Loop with break value
-let x: Int = loop {
+let x: i64 = loop {
     break 42;
 };
 
@@ -18,8 +18,8 @@ let s: String = loop {
 };
 
 // Loop with conditional break
-let mut i: Int  = 0;
-let result: Int = loop {
+let mut i: i64  = 0;
+let result: i64 = loop {
     i += 1;
     if (i == 5) {
         break i;
@@ -27,7 +27,7 @@ let result: Int = loop {
 };
 
 // while loop still works
-let mut n: Int  = 0;
+let mut n: i64  = 0;
 while (n < 10) {
     n += 1;
     if (n == 5) {

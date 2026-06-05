@@ -6,17 +6,17 @@
 //
 // Both branches must unify to the same type; that type is the result.
 
-fun max_int(a: Int, b: Int) -> Int {
-    let result: Int = if (a > b) { a } else { b };
+fun max_int(a: i64, b: i64) -> i64 {
+    let result: i64 = if (a > b) { a } else { b };
     result
 }
 
-fun to_int(b: Bool) -> Int {
-    let result: Int = if (b) { 1 } else { 0 };
+fun to_int(b: Bool) -> i64 {
+    let result: i64 = if (b) { 1 } else { 0 };
     result
 }
 
-fun if_expr_in_arithmetic(x: Int) -> Int {
-    let sign: Int = if (x >= 0) { 1 } else { 0 - 1 };
+fun if_expr_in_arithmetic(x: i64) -> i64 {
+    let sign: i64 = if (x >= 0) { 1 } else { 0 - 1 };
     sign
 }

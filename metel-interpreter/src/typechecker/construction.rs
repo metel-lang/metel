@@ -621,7 +621,7 @@ fn construct_stmt(stmt: &Stmt, ctx: &mut ConstructCtx) -> Result<TypedStmt, Mete
             let iterable = construct_expr(&fi.iterable, None, ctx)?;
             let elem_ty = match iterable.ty() {
                 Type::Array(elem) => *elem.clone(),
-                Type::Named(name, _) if name == "Range" => Type::Int,
+                Type::Named(name, _) if name == "Range" => Type::I64,
                 Type::Named(type_name, _) => {
                     // User-defined Iterable: derive elem type from next() -> Perhaps<T>.
                     let next_ret = ctx.method_env.get(type_name.as_str())
@@ -703,7 +703,7 @@ fn construct_expr(
         Expr::Call { callee, args, span } => construct_call(callee, args, span, ctx),
         Expr::Index { object, index, span } => {
             let typed_obj = construct_expr(object, None, ctx)?;
-            let typed_idx = construct_expr(index,  Some(&Type::U64), ctx)?;
+            let typed_idx = construct_expr(index, Some(&Type::U64), ctx)?;
             if typed_idx.ty() != &Type::U64 {
                 return Err(MetelError::type_error(
                     TypeErrorCode::T0001,
@@ -811,8 +811,8 @@ fn construct_expr(
                     )),
                 },
                 Type::Str   => ("String".to_string(), vec![]),
-                Type::Int   => ("Int".to_string(),    vec![]),
-                Type::Float => ("Float".to_string(),  vec![]),
+                Type::I64   => ("i64".to_string(), vec![]),
+                Type::F64 => ("f64".to_string(), vec![]),
                 Type::Bool  => ("Bool".to_string(),   vec![]),
                 t => return Err(MetelError::internal(
                     format!("method call on non-struct type {t}")
@@ -1552,7 +1552,6 @@ fn construct_literal_type(
 ) -> Result<Type, MetelError> {
     use crate::ast::{IntKind, FloatKind};
     match lit {
-        // Plain int literal: use expected_ty hint for u64 index context, otherwise Int.
         Literal::Int(n) => {
             if matches!(expected_ty, Some(Type::U64)) {
                 if *n < 0 {
@@ -1564,15 +1563,15 @@ fn construct_literal_type(
                 }
                 Ok(Type::U64)
             } else {
-                Ok(Type::Int)
+                Ok(Type::I64)
             }
         }
-        Literal::Float(_) => Ok(Type::Float),
+        Literal::Float(_) => Ok(Type::F64),
         Literal::SizedInt { kind, .. } => Ok(match kind {
             IntKind::I8  => Type::I8,
             IntKind::I16 => Type::I16,
             IntKind::I32 => Type::I32,
-            IntKind::I64 => Type::Int,
+            IntKind::I64 => Type::I64,
             IntKind::U8  => Type::U8,
             IntKind::U16 => Type::U16,
             IntKind::U32 => Type::U32,
@@ -1580,7 +1579,7 @@ fn construct_literal_type(
         }),
         Literal::SizedFloat { kind, .. } => Ok(match kind {
             FloatKind::F32 => Type::F32,
-            FloatKind::F64 => Type::Float,
+            FloatKind::F64 => Type::F64,
         }),
         Literal::Bool(_)  => Ok(Type::Bool),
         Literal::Str(_)   => Ok(Type::Str),
@@ -1642,7 +1641,7 @@ fn construct_binop(
         }
         BinOp::Eq | BinOp::Ne => Type::Bool,
         BinOp::And | BinOp::Or => Type::Bool,
-        BinOp::Range | BinOp::RangeInclusive => Type::Named("Range".to_string(), vec![Type::Int]),
+        BinOp::Range | BinOp::RangeInclusive => Type::Named("Range".to_string(), vec![Type::I64]),
     };
     Ok(TypedExpr::BinOp(Box::new(lhs), op.clone(), Box::new(rhs), ty, span.clone()))
 }
@@ -1650,8 +1649,8 @@ fn construct_binop(
 fn type_to_type_expr(ty: &Type) -> TypeExpr {
     let named = |s: &str| TypeExpr::Named(s.to_string(), vec![]);
     match ty {
-        Type::Int   => named("Int"),
-        Type::Float => named("Float"),
+        Type::I64   => named("i64"),
+        Type::F64 => named("f64"),
         Type::Bool  => named("Bool"),
         Type::Str   => named("String"),
         Type::Unit  => TypeExpr::Unit,
