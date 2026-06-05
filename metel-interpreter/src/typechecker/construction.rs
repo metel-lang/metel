@@ -1715,7 +1715,7 @@ fn construct_binop(
         }
         BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => {
             let t = lhs.ty();
-            if !matches!(t, Type::Str | Type::Never) && !t.is_numeric() {
+            if !matches!(t, Type::Str | Type::Char | Type::Never) && !t.is_numeric() {
                 return Err(MetelError::type_error(
                     TypeErrorCode::T0005,
                     format!("ordering comparison requires a numeric type or String operands, got `{t}`"),

@@ -1,0 +1,76 @@
+fun main() {
+    // ── Sized integer literals and equality ───────────────────────────────────
+    let a: i8  = 127i8;
+    let b: i16 = 32767i16;
+    let c: i32 = 2147483647i32;
+    let d: u8  = 255u8;
+    let e: u16 = 65535u16;
+    let f: u32 = 4294967295u32;
+    let g: u64 = 18446744073709551615u64;
+    let h: f32 = 1.5f32;
+
+    assert(a == 127i8);
+    assert(b == 32767i16);
+    assert(c == 2147483647i32);
+    assert(d == 255u8);
+    assert(e == 65535u16);
+    assert(f == 4294967295u32);
+    assert(g == 18446744073709551615u64);
+    assert(h == 1.5f32);
+
+    // ── Arithmetic preserves type ─────────────────────────────────────────────
+    let x: i32 = 10i32 + 5i32;
+    assert(x == 15i32);
+    let y: u8 = 200u8 - 100u8;
+    assert(y == 100u8);
+    let z: f32 = 2.0f32 * 3.0f32;
+    assert(z == 6.0f32);
+
+    // ── Comparison operators ──────────────────────────────────────────────────
+    assert(10i32 < 20i32);
+    assert(255u8 == 255u8);
+    assert(1.0f32 < 2.0f32);
+    assert(100u16 <= 100u16);
+    assert(5i8 != 6i8);
+
+    // ── From casts: sized → i64 / f64 ────────────────────────────────────────
+    let from_i8:  i64 = 42i8  as i64;
+    let from_i16: i64 = 1000i16 as i64;
+    let from_i32: i64 = 100000i32 as i64;
+    let from_u8:  i64 = 200u8  as i64;
+    let from_u16: i64 = 50000u16 as i64;
+    let from_u32: i64 = 123456u32 as i64;
+    let from_u64: i64 = 99u64 as i64;
+    let from_f32_to_i64: i64 = 7i8 as i64;
+
+    assert(from_i8  == 42);
+    assert(from_i16 == 1000);
+    assert(from_i32 == 100000);
+    assert(from_u8  == 200);
+    assert(from_u16 == 50000);
+    assert(from_u32 == 123456);
+    assert(from_u64 == 99);
+    assert(from_f32_to_i64 == 7);
+
+    let from_i8_f:  f64 = 42i8  as f64;
+    let from_f32_f: f64 = 1.5f32 as f64;
+    assert(from_i8_f == 42.0);
+    assert(from_f32_f == 1.5);
+
+    // ── From casts: i64 / f64 → sized ────────────────────────────────────────
+    let to_u8:  u8  = 200 as u8;
+    let to_i32: i32 = 42  as i32;
+    let to_u32: u32 = 999 as u32;
+    let to_u64: u64 = 0   as u64;
+
+    assert(to_u8  == 200u8);
+    assert(to_i32 == 42i32);
+    assert(to_u32 == 999u32);
+    assert(to_u64 == 0u64);
+
+    // ── Negation on signed types ──────────────────────────────────────────────
+    let neg_i8:  i8  = -42i8;
+    let neg_i32: i32 = -1000i32;
+    assert(neg_i8  == -42i8);
+    assert(neg_i32 == -1000i32);
+}

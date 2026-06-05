@@ -1,0 +1,64 @@
+fun main() {
+    // Literals and basic equality
+    let a: Char = 'A';
+    let z: Char = 'z';
+    let zero: Char = '0';
+    assert(a == 'A');
+    assert(z == 'z');
+    assert(zero == '0');
+    assert(a != z);
+
+    // Escape sequences
+    let newline: Char = '\n';
+    let tab: Char = '\t';
+    let backslash: Char = '\\';
+    let single_quote: Char = '\'';
+    assert(newline != tab);
+    assert(backslash == '\\');
+    assert(single_quote == '\'');
+
+    // Unicode escape
+    let smiley: Char = '\u{1F600}';
+    assert(smiley == '\u{1F600}');
+
+    // to_string
+    assert(a.to_string() == "A");
+    assert(zero.to_string() == "0");
+    assert(single_quote.to_string() == "'");
+
+    // Comparison operators (Unicode scalar order)
+    assert('A' < 'B');
+    assert('z' > 'a');
+    assert('0' < '9');
+    assert('A' <= 'A');
+    assert('B' >= 'A');
+
+    // Conversion to u32 (Unicode code point)
+    let code: u32 = a as u32;
+    assert(code == 65u32);
+
+    // Conversion from u32 back to Char
+    let back: Char = 65u32 as Char;
+    assert(back == 'A');
+
+    // Round-trip
+    let orig: Char = 'M';
+    let round: Char = (orig as u32) as Char;
+    assert(round == orig);
+
+    // Pattern matching
+    let greeting: String = match a {
+        'A' => "alpha",
+        'B' => "beta",
+        _   => "other",
+    };
+    assert(greeting == "alpha");
+
+    let category: String = match zero {
+        '0' => "digit",
+        'a' => "lower",
+        'A' => "upper",
+        _   => "other",
+    };
+    assert(category == "digit");
+}

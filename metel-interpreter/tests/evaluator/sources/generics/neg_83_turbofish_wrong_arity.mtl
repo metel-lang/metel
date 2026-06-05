@@ -1,0 +1,6 @@
+// TYPECHECK_ERROR[expected 1 type argument]
+fun identity<T>(x: T) -> T { x }
+
+fun main() {
+    let x = identity::<i64, Bool>(42);
+}

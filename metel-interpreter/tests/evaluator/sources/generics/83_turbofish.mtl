@@ -1,0 +1,43 @@
+fun identity<T>(x: T) -> T { x }
+fun first<A, B>(a: A, b: B) -> A { a }
+fun wrap<T>(x: T) -> T[] {
+    let mut arr: T[] = [];
+    array_push(arr, x);
+    arr
+}
+
+fun main() {
+    // Basic turbofish — explicit type matches inferred type
+    let x = identity::<i64>(42);
+    assert(x == 42);
+
+    let s = identity::<String>("hello");
+    assert(s == "hello");
+
+    let b = identity::<Bool>(true);
+    assert(b);
+
+    // Turbofish with two type parameters
+    let a = first::<i64, String>(10, "unused");
+    assert(a == 10);
+
+    let s2 = first::<String, i64>("kept", 99);
+    assert(s2 == "kept");
+
+    // Turbofish with compound types
+    let t = identity::<(i64, Bool)>((7, false));
+    assert(t.0 == 7);
+    assert(t.1 == false);
+
+    // Inference still works without turbofish
+    let y = identity(3.14);
+    assert(y == 3.14);
+
+    // Nested turbofish calls
+    let inner = identity::<i64>(identity::<i64>(5));
+    assert(inner == 5);
+
+    // Turbofish with array return type
+    let v = wrap::<i64>(99);
+    assert(array_len(v) == 1);
+}

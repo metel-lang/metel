@@ -400,6 +400,14 @@ pub(super) fn eval_binop(op: &BinOp, lv: Value, rv: Value, span: &Span) -> Resul
         (BinOp::Eq, Value::Str(a), Value::Str(b)) => Value::Bool(a == b),
         (BinOp::Ne, Value::Str(a), Value::Str(b)) => Value::Bool(a != b),
 
+        // Char equality and ordering (Unicode scalar order)
+        (BinOp::Eq, Value::Char(a), Value::Char(b)) => Value::Bool(a == b),
+        (BinOp::Ne, Value::Char(a), Value::Char(b)) => Value::Bool(a != b),
+        (BinOp::Lt, Value::Char(a), Value::Char(b)) => Value::Bool(a <  b),
+        (BinOp::Le, Value::Char(a), Value::Char(b)) => Value::Bool(a <= b),
+        (BinOp::Gt, Value::Char(a), Value::Char(b)) => Value::Bool(a >  b),
+        (BinOp::Ge, Value::Char(a), Value::Char(b)) => Value::Bool(a >= b),
+
         // Range — produce a Struct value understood by for-in (issue #55)
         (BinOp::Range, Value::I64(a), Value::I64(b)) => Value::Struct {
             name: "Range".to_string(),

@@ -163,6 +163,8 @@ mod tests {
 
     #[test]
     fn neg_cast_no_from() { check("types/neg_23_cast_no_from.mtl"); }
+    #[test]
+    fn sized_numeric_types() { check("types/82_sized_numeric_types.mtl"); }
 
     // ── Control flow ──────────────────────────────────────────────────────────
 
@@ -421,6 +423,10 @@ mod tests {
 
     #[test]
     fn generic_construction_at_calltime() { check("generics/80_generic_construction_at_calltime.mtl"); }
+    #[test]
+    fn turbofish() { check("generics/83_turbofish.mtl"); }
+    #[test]
+    fn neg_turbofish_wrong_arity() { check("generics/neg_83_turbofish_wrong_arity.mtl"); }
 
     // ── Aspects ───────────────────────────────────────────────────────────────
 
@@ -466,6 +472,8 @@ mod tests {
 
     #[test]
     fn builtins() { check("builtins/38_builtins.mtl"); }
+    #[test]
+    fn char_type() { check("builtins/81_char.mtl"); }
 
     // ── Integration ───────────────────────────────────────────────────────────
 
