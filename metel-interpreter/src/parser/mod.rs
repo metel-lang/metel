@@ -595,7 +595,8 @@ fn parse_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Expr,
         }
         // Terminals and composites reachable from primary_expr
         Rule::int_lit | Rule::float_lit | Rule::string_lit
-        | Rule::bool_lit | Rule::none_lit | Rule::unit_lit => parse_literal_expr(pair, filename),
+        | Rule::bool_lit | Rule::none_lit | Rule::unit_lit
+        | Rule::int_lit_suffixed | Rule::float_lit_suffixed => parse_literal_expr(pair, filename),
         Rule::path_expr     => parse_path_expr(pair, filename),
         Rule::tuple_or_paren => parse_tuple_or_paren(pair, filename),
         Rule::array_lit     => parse_array_lit(pair, filename),
@@ -609,6 +610,7 @@ fn parse_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Expr,
 }
 
 fn parse_literal_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Expr, MetelError> {
+    use crate::ast::{IntKind, FloatKind};
     let span = Span::of(&pair, filename);
     let text = pair.as_str();
     let lit = match pair.as_rule() {
@@ -628,6 +630,67 @@ fn parse_literal_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resu
                 line: span.line, col: span.col, source_line: None,
             })?
         ),
+        Rule::int_lit_suffixed => {
+            // Split digits from suffix: suffix is the longest matching type name at the end.
+            let (suffix, digits_end) = if let Some(pos) = text.rfind(|c: char| !c.is_ascii_alphabetic()) {
+                (&text[pos + 1..], pos + 1)
+            } else {
+                (text, 0)
+            };
+            let digits = text[..digits_end].replace('_', "");
+            let kind = match suffix {
+                "i8"  => IntKind::I8,  "i16" => IntKind::I16,
+                "i32" => IntKind::I32, "i64" => IntKind::I64,
+                "u8"  => IntKind::U8,  "u16" => IntKind::U16,
+                "u32" => IntKind::U32, "u64" => IntKind::U64,
+                _ => return Err(MetelError::internal(format!("unknown int suffix '{suffix}'"))),
+            };
+            let value: i128 = digits.parse().map_err(|_| MetelError::ParseError {
+                code: ParseErrorCode::P0002,
+                message: format!("integer literal '{text}' is too large"),
+                start: span.start, end: span.end, filename: filename.to_string(),
+                line: span.line, col: span.col, source_line: None,
+            })?;
+            let in_range = match kind {
+                IntKind::I8  => value <= i8::MAX as i128,
+                IntKind::I16 => value <= i16::MAX as i128,
+                IntKind::I32 => value <= i32::MAX as i128,
+                IntKind::I64 => value <= i64::MAX as i128,
+                IntKind::U8  => value <= u8::MAX as i128,
+                IntKind::U16 => value <= u16::MAX as i128,
+                IntKind::U32 => value <= u32::MAX as i128,
+                IntKind::U64 => value <= u64::MAX as i128,
+            };
+            if !in_range {
+                return Err(MetelError::ParseError {
+                    code: ParseErrorCode::P0002,
+                    message: format!("literal '{text}' is out of range for {suffix}"),
+                    start: span.start, end: span.end, filename: filename.to_string(),
+                    line: span.line, col: span.col, source_line: None,
+                });
+            }
+            Literal::SizedInt { value, kind }
+        }
+        Rule::float_lit_suffixed => {
+            let (suffix, digits_end) = if let Some(pos) = text.rfind(|c: char| !c.is_ascii_alphabetic()) {
+                (&text[pos + 1..], pos + 1)
+            } else {
+                (text, 0)
+            };
+            let digits = &text[..digits_end];
+            let kind = match suffix {
+                "f32" => FloatKind::F32,
+                "f64" => FloatKind::F64,
+                _ => return Err(MetelError::internal(format!("unknown float suffix '{suffix}'"))),
+            };
+            let value: f64 = digits.parse().map_err(|_| MetelError::ParseError {
+                code: ParseErrorCode::P0003,
+                message: format!("invalid float literal '{text}'"),
+                start: span.start, end: span.end, filename: filename.to_string(),
+                line: span.line, col: span.col, source_line: None,
+            })?;
+            Literal::SizedFloat { value, kind }
+        }
         Rule::string_lit => return parse_string_literal_expr(text, span, filename),
         Rule::bool_lit   => Literal::Bool(text == "true"),
         Rule::none_lit   => Literal::None,
@@ -1559,27 +1622,10 @@ fn parse_pattern(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Pa
             let span = Span::of(&pair, filename);
             let lit_pair = pair.into_inner().next()
                 .ok_or_else(|| MetelError::internal("literal_pattern: expected literal"))?;
-            let text = lit_pair.as_str();
-            let lit = match lit_pair.as_rule() {
-                Rule::float_lit => Literal::Float(
-                    text.parse().map_err(|_| MetelError::ParseError {
-                        code: ParseErrorCode::P0003,
-                        message: format!("float literal '{text}' is out of range"),
-                        start: span.start, end: span.end, filename: filename.to_string(),
-                        line: span.line, col: span.col, source_line: None,
-                    })?
-                ),
-                Rule::int_lit => Literal::Int(
-                    text.replace('_', "").parse().map_err(|_| MetelError::ParseError {
-                        code: ParseErrorCode::P0002,
-                        message: format!("integer literal '{text}' is out of range for i64"),
-                        start: span.start, end: span.end, filename: filename.to_string(),
-                        line: span.line, col: span.col, source_line: None,
-                    })?
-                ),
-                Rule::string_lit => Literal::Str(unescape(&text[1..text.len()-1])),
-                Rule::bool_lit   => Literal::Bool(text == "true"),
-                r => return Err(MetelError::internal(format!("literal_pattern: unexpected rule {r:?}"))),
+            // Delegate to parse_literal_expr and extract the Literal.
+            let lit = match parse_literal_expr(lit_pair, filename)? {
+                Expr::Literal(l, _) => l,
+                _ => return Err(MetelError::internal("literal_pattern: expected literal expr")),
             };
             Ok(Pattern::Literal(lit, span))
         }

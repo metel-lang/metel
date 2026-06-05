@@ -14,6 +14,14 @@ pub(super) fn value_to_display_string(v: &Value) -> Option<String> {
         Value::Float(f) => Some(format_float(*f)),
         Value::Bool(b)  => Some(if *b { "true" } else { "false" }.to_string()),
         Value::Str(s)   => Some(s.clone()),
+        Value::I8(n)    => Some(n.to_string()),
+        Value::I16(n)   => Some(n.to_string()),
+        Value::I32(n)   => Some(n.to_string()),
+        Value::U8(n)    => Some(n.to_string()),
+        Value::U16(n)   => Some(n.to_string()),
+        Value::U32(n)   => Some(n.to_string()),
+        Value::U64(n)   => Some(n.to_string()),
+        Value::F32(f)   => Some(f.to_string()),
         _ => None,
     }
 }
@@ -25,6 +33,14 @@ pub(super) fn format_value(val: &Value) -> String {
         Value::Bool(b)  => b.to_string(),
         Value::Str(s)   => format!("{:?}", s),
         Value::Unit     => "()".to_string(),
+        Value::I8(n)    => n.to_string(),
+        Value::I16(n)   => n.to_string(),
+        Value::I32(n)   => n.to_string(),
+        Value::U8(n)    => n.to_string(),
+        Value::U16(n)   => n.to_string(),
+        Value::U32(n)   => n.to_string(),
+        Value::U64(n)   => n.to_string(),
+        Value::F32(f)   => f.to_string(),
         Value::Tuple(items) => {
             let inner = items.iter().map(format_value).collect::<Vec<_>>().join(", ");
             format!("({})", inner)

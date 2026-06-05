@@ -1083,9 +1083,24 @@ fn named_type_name(ty: &InferType) -> Option<String> {
 }
 
 fn infer_literal(lit: &Literal, ctx: &mut InferContext) -> InferType {
+    use crate::ast::{IntKind, FloatKind};
     match lit {
         Literal::Int(_)   => InferType::int(),
         Literal::Float(_) => InferType::float(),
+        Literal::SizedInt { kind, .. } => InferType::Concrete(match kind {
+            IntKind::I8  => Type::I8,
+            IntKind::I16 => Type::I16,
+            IntKind::I32 => Type::I32,
+            IntKind::I64 => Type::Int,
+            IntKind::U8  => Type::U8,
+            IntKind::U16 => Type::U16,
+            IntKind::U32 => Type::U32,
+            IntKind::U64 => Type::U64,
+        }),
+        Literal::SizedFloat { kind, .. } => InferType::Concrete(match kind {
+            FloatKind::F32 => Type::F32,
+            FloatKind::F64 => Type::Float,
+        }),
         Literal::Bool(_)  => InferType::bool(),
         Literal::Str(_)   => InferType::str(),
         Literal::Unit     => InferType::unit(),

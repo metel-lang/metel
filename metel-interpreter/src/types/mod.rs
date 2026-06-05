@@ -2,7 +2,9 @@
 /// No type variables exist here; generics have been monomorphised.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
+    /// Ergonomic alias for `i64`. Plain integer literals and `Int` annotations use this.
     Int,
+    /// Ergonomic alias for `f64`. Plain float literals and `Float` annotations use this.
     Float,
     Bool,
     Str,
@@ -10,6 +12,12 @@ pub enum Type {
     /// The bottom type `!`. Produced by expressions that never return (infinite
     /// loops with no reachable `break`, `return`, `panic!`). Coerces to any type.
     Never,
+    // ── Sized integer types ───────────────────────────────────────────────────
+    I8, I16, I32,
+    U8, U16, U32, U64,
+    // ── Sized float type ──────────────────────────────────────────────────────
+    F32,
+    // ─────────────────────────────────────────────────────────────────────────
     Tuple(Vec<Type>),
     Array(Box<Type>),
     Pointer(Box<Type>),
@@ -20,6 +28,24 @@ pub enum Type {
 }
 
 
+impl Type {
+    /// Returns true if this is any integer type (signed or unsigned, any width).
+    pub fn is_integer(&self) -> bool {
+        matches!(self, Type::Int | Type::I8 | Type::I16 | Type::I32
+                     | Type::U8 | Type::U16 | Type::U32 | Type::U64)
+    }
+
+    /// Returns true if this is any float type.
+    pub fn is_float(&self) -> bool {
+        matches!(self, Type::Float | Type::F32)
+    }
+
+    /// Returns true if this is any numeric type (integer or float).
+    pub fn is_numeric(&self) -> bool {
+        self.is_integer() || self.is_float()
+    }
+}
+
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -29,6 +55,14 @@ impl std::fmt::Display for Type {
             Type::Str => write!(f, "String"),
             Type::Unit => write!(f, "()"),
             Type::Never => write!(f, "!"),
+            Type::I8  => write!(f, "i8"),
+            Type::I16 => write!(f, "i16"),
+            Type::I32 => write!(f, "i32"),
+            Type::U8  => write!(f, "u8"),
+            Type::U16 => write!(f, "u16"),
+            Type::U32 => write!(f, "u32"),
+            Type::U64 => write!(f, "u64"),
+            Type::F32 => write!(f, "f32"),
             Type::Tuple(ts) => {
                 write!(f, "(")?;
                 for (i, t) in ts.iter().enumerate() {

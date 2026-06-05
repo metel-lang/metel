@@ -152,7 +152,9 @@ postfix          = {
 arg_list = { expr ~ ("," ~ expr)* ~ ","? }
 
 primary_expr = {
-    float_lit     // must come before int_lit — "3.14" would match int "3" first otherwise
+    float_lit_suffixed  // must come before float_lit — "3.14f32" would match float "3.14" first otherwise
+  | float_lit           // must come before int_lit_suffixed and int_lit
+  | int_lit_suffixed    // must come before int_lit — "42u8" would match int "42" first otherwise
   | int_lit
   | string_lit
   | bool_lit
@@ -200,7 +202,7 @@ pattern = {
 
 tuple_pattern   = { "(" ~ pattern ~ ("," ~ pattern)* ~ ")" }
 enum_pattern    = { ident ~ "::" ~ ident ~ ("{" ~ ident ~ ("," ~ ident)* ~ "}")? }
-literal_pattern = { float_lit | int_lit | string_lit | bool_lit }
+literal_pattern = { float_lit_suffixed | float_lit | int_lit_suffixed | int_lit | string_lit | bool_lit }
 bind_pattern    = { ident }
 
 // ── Type expressions ──────────────────────────────────────────────────────────
@@ -230,6 +232,10 @@ type_list  = { type_expr ~ ("," ~ type_expr)* }
 
 // ── Terminals ─────────────────────────────────────────────────────────────────
 
+int_lit_suffix     = @{ "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" }
+float_lit_suffix   = @{ "f32" | "f64" }
+int_lit_suffixed   = @{ ASCII_DIGIT+ ~ ("_" ~ ASCII_DIGIT+)* ~ int_lit_suffix }
+float_lit_suffixed = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ ~ float_lit_suffix }
 int_lit     = @{ ASCII_DIGIT+ ~ ("_" ~ ASCII_DIGIT+)* }
 float_lit   = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
 decimal_int = @{ ASCII_DIGIT+ }

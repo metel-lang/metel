@@ -42,11 +42,21 @@ use crate::typed_ast::{FunBody, TypedBlock, TypedDecl, TypedExpr, TypedForInit, 
 
 #[derive(Debug, Clone)]
 pub enum Value {
+    // ── Primitive types ───────────────────────────────────────────────────────
+    /// Int / i64 — ergonomic integer alias.
     Int(i64),
+    /// Sized signed integers.
+    I8(i8), I16(i16), I32(i32),
+    /// Sized unsigned integers.
+    U8(u8), U16(u16), U32(u32), U64(u64),
+    /// Float / f64 — ergonomic float alias.
     Float(f64),
+    /// 32-bit float.
+    F32(f32),
     Bool(bool),
     Str(String),
     Unit,
+    // ── Compound types ────────────────────────────────────────────────────────
     Tuple(Vec<Value>),
     Array(Rc<RefCell<Vec<Value>>>),
     Struct { name: String, fields: HashMap<String, Value> },
@@ -764,9 +774,24 @@ fn range_field(fields: &HashMap<String, Value>, name: &str, _span: &Span) -> Res
 pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, MetelError> {
     match expr {
         TypedExpr::Literal(lit, _, _) => {
+            use crate::ast::{IntKind, FloatKind};
             let val = match lit {
                 Literal::Int(n)   => Value::Int(*n),
                 Literal::Float(f) => Value::Float(*f),
+                Literal::SizedInt { value, kind } => match kind {
+                    IntKind::I8  => Value::I8(*value as i8),
+                    IntKind::I16 => Value::I16(*value as i16),
+                    IntKind::I32 => Value::I32(*value as i32),
+                    IntKind::I64 => Value::Int(*value as i64),
+                    IntKind::U8  => Value::U8(*value as u8),
+                    IntKind::U16 => Value::U16(*value as u16),
+                    IntKind::U32 => Value::U32(*value as u32),
+                    IntKind::U64 => Value::U64(*value as u64),
+                },
+                Literal::SizedFloat { value, kind } => match kind {
+                    FloatKind::F32 => Value::F32(*value as f32),
+                    FloatKind::F64 => Value::Float(*value),
+                },
                 Literal::Bool(b)  => Value::Bool(*b),
                 Literal::Str(s)   => Value::Str(s.clone()),
                 Literal::None     => Value::Enum { name: "Perhaps".into(), variant: "None".into(), fields: HashMap::new() },
@@ -874,11 +899,15 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
             }
             let v = eval_expr(operand, env)?.into_value();
             let result = match (op, v) {
-                (UnaryOp::Neg, Value::Int(n))   => Value::Int(-n),
+                (UnaryOp::Neg, Value::Int(n))   => Value::Int(n.wrapping_neg()),
+                (UnaryOp::Neg, Value::I8(n))    => Value::I8(n.wrapping_neg()),
+                (UnaryOp::Neg, Value::I16(n))   => Value::I16(n.wrapping_neg()),
+                (UnaryOp::Neg, Value::I32(n))   => Value::I32(n.wrapping_neg()),
                 (UnaryOp::Neg, Value::Float(f)) => Value::Float(-f),
+                (UnaryOp::Neg, Value::F32(f))   => Value::F32(-f),
                 (UnaryOp::Not, Value::Bool(b))  => Value::Bool(!b),
                 (UnaryOp::Deref, Value::Pointer(rc)) | (UnaryOp::Deref, Value::MutPointer(rc)) => rc.borrow().clone(),
-                (UnaryOp::Neg, _) => return Err(MetelError::internal("unary `-`: expected Int or Float (typechecker should have caught this)")),
+                (UnaryOp::Neg, _) => return Err(MetelError::internal("unary `-`: expected numeric type (typechecker should have caught this)")),
                 (UnaryOp::Not, _) => return Err(MetelError::internal("unary `!`: expected Bool (typechecker should have caught this)")),
                 (UnaryOp::Deref, _) => return Err(MetelError::internal("unary `*`: expected pointer (typechecker should have caught this)")),
                 _ => unreachable!("Ref/RefMut handled above"),
@@ -894,10 +923,18 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
             if let crate::ast::TypeExpr::Named(target_name, _) = target_type {
                 let src_name = match &v {
                     Value::Struct { name, .. } => Some(name.as_str()),
-                    Value::Int(_) => Some("Int"),
+                    Value::Int(_)  => Some("Int"),
+                    Value::I8(_)   => Some("i8"),
+                    Value::I16(_)  => Some("i16"),
+                    Value::I32(_)  => Some("i32"),
+                    Value::U8(_)   => Some("u8"),
+                    Value::U16(_)  => Some("u16"),
+                    Value::U32(_)  => Some("u32"),
+                    Value::U64(_)  => Some("u64"),
                     Value::Float(_) => Some("Float"),
-                    Value::Bool(_) => Some("Bool"),
-                    Value::Str(_) => Some("String"),
+                    Value::F32(_)   => Some("f32"),
+                    Value::Bool(_)  => Some("Bool"),
+                    Value::Str(_)   => Some("String"),
                     _ => None,
                 };
                 let from_fn = src_name
@@ -930,21 +967,31 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
         TypedExpr::Index { object, index, span, .. } => {
             let arr = eval_expr(object, env)?.into_value();
             let idx = eval_expr(index, env)?.into_value();
-            match (arr, idx) {
-                (Value::Array(rc), Value::Int(i)) => {
+            let i: usize = match idx {
+                Value::U64(u) => u as usize,
+                // Plain int literals in index position infer as u64 but evaluate as Int.
+                Value::Int(n) if n >= 0 => n as usize,
+                Value::Int(n) => return Err(MetelError::panic(
+                    RuntimeErrorCode::R0004,
+                    format!("index {n} out of bounds (negative)"),
+                    span,
+                )),
+                _ => return Err(MetelError::internal("index: expected u64 index (typechecker should have caught this)")),
+            };
+            match arr {
+                Value::Array(rc) => {
                     let borrowed = rc.borrow();
-                    let len = borrowed.len() as i64;
-                    if i < 0 || i >= len {
+                    if i >= borrowed.len() {
                         Err(MetelError::panic(
                             RuntimeErrorCode::R0004,
-                            format!("index {i} out of bounds (len {len})"),
+                            format!("index {i} out of bounds (len {})", borrowed.len()),
                             span,
                         ))
                     } else {
-                        Ok(Signal::Value(borrowed[i as usize].clone()))
+                        Ok(Signal::Value(borrowed[i].clone()))
                     }
                 }
-                _ => Err(MetelError::internal("index: expected Array[Int] (typechecker should have caught this)")),
+                _ => Err(MetelError::internal("index: expected Array (typechecker should have caught this)")),
             }
         }
 

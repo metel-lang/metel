@@ -451,10 +451,21 @@ pub enum TypeExpr {
 
 // ── Literals ──────────────────────────────────────────────────────────────────
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum IntKind { I8, I16, I32, I64, U8, U16, U32, U64 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum FloatKind { F32, F64 }
+
 #[derive(Debug, Clone)]
 pub enum Literal {
     Int(i64),
     Float(f64),
+    /// An integer literal with an explicit bit-width suffix, e.g. `42u8`, `100i32`.
+    /// `value` is stored as `i128` to accommodate the full u64 range.
+    SizedInt { value: i128, kind: IntKind },
+    /// A float literal with an explicit precision suffix, e.g. `3.14f32`.
+    SizedFloat { value: f64, kind: FloatKind },
     Bool(bool),
     Str(String),
     None,

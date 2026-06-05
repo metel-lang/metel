@@ -19,6 +19,26 @@ pub(super) fn match_pattern(pattern: &Pattern, value: &Value, out: &mut HashMap<
             (Literal::Unit,     Value::Unit)      => true,
             (Literal::None, Value::Enum { name, variant, .. })
                 if name == "Perhaps" && variant == "None" => true,
+            (Literal::SizedInt { value: a, kind }, v) => {
+                use crate::ast::IntKind;
+                match kind {
+                    IntKind::I8  => matches!(v, Value::I8(b)  if *b == *a as i8),
+                    IntKind::I16 => matches!(v, Value::I16(b) if *b == *a as i16),
+                    IntKind::I32 => matches!(v, Value::I32(b) if *b == *a as i32),
+                    IntKind::I64 => matches!(v, Value::Int(b) if *b == *a as i64),
+                    IntKind::U8  => matches!(v, Value::U8(b)  if *b == *a as u8),
+                    IntKind::U16 => matches!(v, Value::U16(b) if *b == *a as u16),
+                    IntKind::U32 => matches!(v, Value::U32(b) if *b == *a as u32),
+                    IntKind::U64 => matches!(v, Value::U64(b) if *b == *a as u64),
+                }
+            }
+            (Literal::SizedFloat { value: a, kind }, v) => {
+                use crate::ast::FloatKind;
+                match kind {
+                    FloatKind::F32 => matches!(v, Value::F32(b) if *b == *a as f32),
+                    FloatKind::F64 => matches!(v, Value::Float(b) if *b == *a),
+                }
+            }
             _ => false,
         },
 

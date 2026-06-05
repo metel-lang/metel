@@ -20,6 +20,14 @@ pub(super) fn value_to_type(value: &Value) -> Type {
         Value::Bool(_)  => Type::Bool,
         Value::Str(_)   => Type::Str,
         Value::Unit     => Type::Unit,
+        Value::I8(_)    => Type::I8,
+        Value::I16(_)   => Type::I16,
+        Value::I32(_)   => Type::I32,
+        Value::U8(_)    => Type::U8,
+        Value::U16(_)   => Type::U16,
+        Value::U32(_)   => Type::U32,
+        Value::U64(_)   => Type::U64,
+        Value::F32(_)   => Type::F32,
         Value::Tuple(elems) => {
             Type::Tuple(elems.iter().map(value_to_type).collect())
         }

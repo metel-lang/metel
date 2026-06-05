@@ -703,7 +703,7 @@ fn construct_expr(
         Expr::Call { callee, args, span } => construct_call(callee, args, span, ctx),
         Expr::Index { object, index, span } => {
             let typed_obj = construct_expr(object, None, ctx)?;
-            let typed_idx = construct_expr(index,  None, ctx)?;
+            let typed_idx = construct_expr(index,  Some(&Type::U64), ctx)?;
             let elem_ty = match typed_obj.ty() {
                 Type::Array(elem) => *elem.clone(),
                 _ => return Err(MetelError::type_error(
@@ -1543,9 +1543,38 @@ fn construct_literal_type(
     expected_ty: Option<&Type>,
     span: &Span,
 ) -> Result<Type, MetelError> {
+    use crate::ast::{IntKind, FloatKind};
     match lit {
-        Literal::Int(_)   => Ok(Type::Int),
+        // Plain int literal: use expected_ty hint for u64 index context, otherwise Int.
+        Literal::Int(n) => {
+            if matches!(expected_ty, Some(Type::U64)) {
+                if *n < 0 {
+                    return Err(MetelError::type_error(
+                        TypeErrorCode::T0005,
+                        format!("integer literal `{n}` is negative and cannot be used as a u64 index"),
+                        span,
+                    ));
+                }
+                Ok(Type::U64)
+            } else {
+                Ok(Type::Int)
+            }
+        }
         Literal::Float(_) => Ok(Type::Float),
+        Literal::SizedInt { kind, .. } => Ok(match kind {
+            IntKind::I8  => Type::I8,
+            IntKind::I16 => Type::I16,
+            IntKind::I32 => Type::I32,
+            IntKind::I64 => Type::Int,
+            IntKind::U8  => Type::U8,
+            IntKind::U16 => Type::U16,
+            IntKind::U32 => Type::U32,
+            IntKind::U64 => Type::U64,
+        }),
+        Literal::SizedFloat { kind, .. } => Ok(match kind {
+            FloatKind::F32 => Type::F32,
+            FloatKind::F64 => Type::Float,
+        }),
         Literal::Bool(_)  => Ok(Type::Bool),
         Literal::Str(_)   => Ok(Type::Str),
         Literal::Unit     => Ok(Type::Unit),
@@ -1573,10 +1602,10 @@ fn construct_binop(
     let ty = match op {
         BinOp::Add => {
             let t = lhs.ty();
-            if !matches!(t, Type::Int | Type::Float | Type::Str | Type::Never) {
+            if !matches!(t, Type::Str | Type::Never) && !t.is_numeric() {
                 return Err(MetelError::type_error(
                     TypeErrorCode::T0005,
-                    format!("`+` requires Int, Float, or String operands, got `{t}`"),
+                    format!("`+` requires a numeric type or String operands, got `{t}`"),
                     span,
                 ));
             }
@@ -1584,10 +1613,10 @@ fn construct_binop(
         }
         BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => {
             let t = lhs.ty();
-            if !matches!(t, Type::Int | Type::Float | Type::Never) {
+            if !matches!(t, Type::Never) && !t.is_numeric() {
                 return Err(MetelError::type_error(
                     TypeErrorCode::T0005,
-                    format!("arithmetic operator requires Int or Float operands, got `{t}`"),
+                    format!("arithmetic operator requires a numeric type operand, got `{t}`"),
                     span,
                 ));
             }
@@ -1595,10 +1624,10 @@ fn construct_binop(
         }
         BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => {
             let t = lhs.ty();
-            if !matches!(t, Type::Int | Type::Float | Type::Str | Type::Never) {
+            if !matches!(t, Type::Str | Type::Never) && !t.is_numeric() {
                 return Err(MetelError::type_error(
                     TypeErrorCode::T0005,
-                    format!("ordering comparison requires Int, Float, or String operands, got `{t}`"),
+                    format!("ordering comparison requires a numeric type or String operands, got `{t}`"),
                     span,
                 ));
             }
@@ -1612,13 +1641,22 @@ fn construct_binop(
 }
 
 fn type_to_type_expr(ty: &Type) -> TypeExpr {
+    let named = |s: &str| TypeExpr::Named(s.to_string(), vec![]);
     match ty {
-        Type::Int => TypeExpr::Named("Int".to_string(), vec![]),
-        Type::Float => TypeExpr::Named("Float".to_string(), vec![]),
-        Type::Bool => TypeExpr::Named("Bool".to_string(), vec![]),
-        Type::Str => TypeExpr::Named("String".to_string(), vec![]),
-        Type::Unit => TypeExpr::Unit,
-        Type::Never => TypeExpr::Named("!".to_string(), vec![]),
+        Type::Int   => named("Int"),
+        Type::Float => named("Float"),
+        Type::Bool  => named("Bool"),
+        Type::Str   => named("String"),
+        Type::Unit  => TypeExpr::Unit,
+        Type::Never => named("!"),
+        Type::I8    => named("i8"),
+        Type::I16   => named("i16"),
+        Type::I32   => named("i32"),
+        Type::U8    => named("u8"),
+        Type::U16   => named("u16"),
+        Type::U32   => named("u32"),
+        Type::U64   => named("u64"),
+        Type::F32   => named("f32"),
         Type::Tuple(items) => TypeExpr::Tuple(items.iter().map(type_to_type_expr).collect()),
         Type::Array(item) => TypeExpr::Array(Box::new(type_to_type_expr(item))),
         Type::Pointer(item) => TypeExpr::Pointer(Box::new(type_to_type_expr(item))),
@@ -1744,10 +1782,10 @@ fn construct_unaryop(
     let ty = match op {
         UnaryOp::Neg => {
             let t = operand.ty();
-            if !matches!(t, Type::Int | Type::Float | Type::Never) {
+            if !matches!(t, Type::Never) && !t.is_numeric() {
                 return Err(MetelError::type_error(
                     TypeErrorCode::T0005,
-                    format!("unary negation requires Int or Float operand, got `{t}`"),
+                    format!("unary negation requires a numeric type operand, got `{t}`"),
                     span,
                 ));
             }
