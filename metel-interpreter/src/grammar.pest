@@ -142,11 +142,14 @@ unary_expr       = { ("!" | "-" | "*" | "&" ~ mut_kw?) ~ unary_expr | postfix_ex
 
 postfix_expr     = { primary_expr ~ postfix* }
 postfix          = {
-    "(" ~ arg_list? ~ ")"           // function call
-  | "." ~ decimal_int              // tuple access (.0, .1, ...)
-  | "." ~ ident ~ ("(" ~ arg_list? ~ ")")?  // field access or method call
-  | "[" ~ expr ~ "]"               // index
-  | "?"                            // error propagation
+    "::<" ~ type_args ~ ">" ~ "(" ~ arg_list? ~ ")"              // turbofish call
+  | "(" ~ arg_list? ~ ")"                                         // function call
+  | "." ~ decimal_int                                             // tuple access (.0, .1, ...)
+  | "." ~ ident ~ "::<" ~ type_args ~ ">" ~ "(" ~ arg_list? ~ ")"  // method call with turbofish
+  | "." ~ ident ~ "(" ~ arg_list? ~ ")"                           // method call
+  | "." ~ ident                                                    // field access
+  | "[" ~ expr ~ "]"                                              // index
+  | "?"                                                           // error propagation
 }
 
 arg_list = { expr ~ ("," ~ expr)* ~ ","? }

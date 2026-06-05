@@ -605,7 +605,7 @@ fn infer_expr(
             }
             Ok(InferType::Array(Box::new(first_ty)))
         }
-        Expr::Call { callee, args, span } => {
+        Expr::Call { callee, args, span, .. } => {
             let callee_ty = infer_expr(callee, ctx, fun_generalizations)?;
             // Auto-deref: *(() -> T) and *mut (() -> T) are callable directly.
             let callee_ty = match ctx.solve()?.apply(&callee_ty) {
@@ -748,7 +748,7 @@ fn infer_expr(
                 Ok(raw_ty)
             }
         }
-        Expr::MethodCall { receiver, method, args, span } => {
+        Expr::MethodCall { receiver, method, args, span, .. } => {
             let recv_ty = infer_expr(receiver, ctx, fun_generalizations)?;
             let recv_ty = ctx.solve()?.apply(&recv_ty);
 

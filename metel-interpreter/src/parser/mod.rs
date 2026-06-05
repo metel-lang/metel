@@ -781,6 +781,7 @@ fn parse_string_literal_expr(text: &str, span: Span, filename: &str) -> Result<E
             parts.push(Expr::MethodCall {
                 receiver: Box::new(expr),
                 method: "to_string".to_string(),
+                type_args: vec![],
                 args: vec![],
                 span: placeholder_span,
             });
@@ -958,7 +959,7 @@ fn shift_expr_span(expr: &mut Expr, base_start: usize, base_line: u32, base_col:
             shift_expr_span(value, base_start, base_line, base_col);
             shift_span(span, base_start, base_line, base_col);
         }
-        Expr::Call { callee, args, span } => {
+        Expr::Call { callee, args, span, .. } => {
             shift_expr_span(callee, base_start, base_line, base_col);
             for arg in args { shift_expr_span(arg, base_start, base_line, base_col); }
             shift_span(span, base_start, base_line, base_col);
@@ -1476,18 +1477,35 @@ fn parse_postfix_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resu
     Ok(expr)
 }
 
+fn parse_type_args_pair(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Vec<TypeExpr>, MetelError> {
+    pair.into_inner()
+        .filter(|p| p.as_rule() == Rule::type_expr)
+        .map(|p| parse_type_expr(p, filename))
+        .collect()
+}
+
 fn apply_postfix(base: Expr, pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Expr, MetelError> {
     let span = Span::of(&pair, filename);
     let text = pair.as_str();
     let mut inner = pair.into_inner();
 
-    if text.starts_with('(') {
+    if text.starts_with("::<") {
+        // Turbofish free function call: children are type_args, then optional arg_list
+        let targs_pair = inner.next()
+            .ok_or_else(|| MetelError::internal("turbofish call: expected type_args"))?;
+        let type_args = parse_type_args_pair(targs_pair, filename)?;
+        let args = match inner.next() {
+            Some(a) if a.as_rule() == Rule::arg_list => collect_args(a.into_inner(), filename)?,
+            _ => vec![],
+        };
+        Ok(Expr::Call { callee: Box::new(base), type_args, args, span })
+    } else if text.starts_with('(') {
         // Function call: postfix children are (arg_list?), so unwrap one level
         let args = match inner.next() {
             Some(a) if a.as_rule() == Rule::arg_list => collect_args(a.into_inner(), filename)?,
             _ => vec![],
         };
-        Ok(Expr::Call { callee: Box::new(base), args, span })
+        Ok(Expr::Call { callee: Box::new(base), type_args: vec![], args, span })
     } else if text.starts_with('[') {
         // Index
         let idx = parse_expr(
@@ -1511,13 +1529,23 @@ fn apply_postfix(base: Expr, pair: pest::iterators::Pair<Rule>, filename: &str) 
             }
             Rule::ident => {
                 let name = first.as_str().to_string();
-                // If a `(` follows in the text, it's a method call
-                if text.contains('(') {
+                if text.contains("::<") {
+                    // Method call with turbofish: next child is type_args, then optional arg_list
+                    let targs_pair = inner.next()
+                        .ok_or_else(|| MetelError::internal("method turbofish: expected type_args"))?;
+                    let type_args = parse_type_args_pair(targs_pair, filename)?;
                     let args = match inner.next() {
                         Some(a) if a.as_rule() == Rule::arg_list => collect_args(a.into_inner(), filename)?,
                         _ => vec![],
                     };
-                    Ok(Expr::MethodCall { receiver: Box::new(base), method: name, args, span })
+                    Ok(Expr::MethodCall { receiver: Box::new(base), method: name, type_args, args, span })
+                } else if text.contains('(') {
+                    // Method call without turbofish (arg_list may be absent if call has no args)
+                    let args = match inner.next() {
+                        Some(a) if a.as_rule() == Rule::arg_list => collect_args(a.into_inner(), filename)?,
+                        _ => vec![],
+                    };
+                    Ok(Expr::MethodCall { receiver: Box::new(base), method: name, type_args: vec![], args, span })
                 } else {
                     Ok(Expr::FieldAccess { object: Box::new(base), field: name, span })
                 }

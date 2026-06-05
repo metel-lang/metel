@@ -700,7 +700,7 @@ fn construct_expr(
             let ty = Type::Array(Box::new(elem_ty));
             Ok(TypedExpr::Array(typed, ty, span.clone()))
         }
-        Expr::Call { callee, args, span } => construct_call(callee, args, span, ctx),
+        Expr::Call { callee, type_args, args, span } => construct_call(callee, type_args, args, span, ctx),
         Expr::Index { object, index, span } => {
             let typed_obj = construct_expr(object, None, ctx)?;
             let typed_idx = construct_expr(index, Some(&Type::U64), ctx)?;
@@ -800,7 +800,7 @@ fn construct_expr(
                 span:   span.clone(),
             })
         }
-        Expr::MethodCall { receiver, method, args, span } => {
+        Expr::MethodCall { receiver, method, type_args, args, span } => {
             let typed_receiver = construct_expr(receiver, None, ctx)?;
             let (struct_name, receiver_type_args) = match typed_receiver.ty() {
                 Type::Named(name, targs) => (name.clone(), targs.clone()),
@@ -820,11 +820,27 @@ fn construct_expr(
                 )),
             };
 
+            // Resolve explicit method type args once.
+            let explicit_method_tys: Option<Vec<Type>> = if type_args.is_empty() {
+                None
+            } else {
+                Some(type_args.iter()
+                    .map(|te| infer_type_to_type(&type_expr_to_infer(te), span))
+                    .collect::<Result<_, _>>()?)
+            };
+
             // Fast path: concrete method type already in method_env.
             let method_fun_ty = if let Some(ty) = ctx.method_env.get(&struct_name)
                 .and_then(|m| m.get(method.as_str()))
                 .cloned()
             {
+                if explicit_method_tys.is_some() {
+                    return Err(MetelError::type_error(
+                        TypeErrorCode::T0004,
+                        format!("method `{method}` on `{struct_name}` has no type parameters"),
+                        span,
+                    ));
+                }
                 ty
             } else {
                 // Slow path: method on a generic struct — look up polymorphic scheme and
@@ -838,6 +854,27 @@ fn construct_expr(
                 let mut subst = Substitution::new();
                 for (&tv, concrete) in struct_tvars.iter().zip(receiver_type_args.iter()) {
                     subst.bind(tv, type_to_infer(concrete));
+                }
+                // If turbofish was supplied, also bind remaining free vars from explicit types.
+                if let Some(ref explicit) = explicit_method_tys {
+                    let free: Vec<TypeVar> = {
+                        let mut fv: Vec<TypeVar> = typeinference::free_vars(&scheme.ty)
+                            .into_iter()
+                            .filter(|v| !struct_tvars.contains(v))
+                            .collect();
+                        fv.sort();
+                        fv
+                    };
+                    if explicit.len() != free.len() {
+                        return Err(MetelError::type_error(
+                            TypeErrorCode::T0004,
+                            format!("expected {} type argument(s), got {}", free.len(), explicit.len()),
+                            span,
+                        ));
+                    }
+                    for (tv, concrete_ty) in free.iter().zip(explicit.iter()) {
+                        subst.bind(*tv, type_to_infer(concrete_ty));
+                    }
                 }
                 // Apply to the scheme's type to get the concrete method type.
                 let instantiated = subst.apply(&scheme.ty);
@@ -1363,10 +1400,11 @@ fn bind_enum_variant_fields(
 /// local unification. This is the Pass 2 counterpart of the inline
 /// solve-and-generalize done in `infer_fun_decl`.
 fn construct_call(
-    callee: &Expr,
-    args:   &[Expr],
-    span:   &Span,
-    ctx:    &mut ConstructCtx,
+    callee:    &Expr,
+    type_args: &[TypeExpr],
+    args:      &[Expr],
+    span:      &Span,
+    ctx:       &mut ConstructCtx,
 ) -> Result<TypedExpr, MetelError> {
     // For monomorphic callee identifiers already in scope, extract param types as hints so
     // inherently ambiguous args (bare `[]`, `None`) can resolve without requiring ascription.
@@ -1403,12 +1441,24 @@ fn construct_call(
         .collect::<Result<_, _>>()?;
     let arg_types: Vec<&Type> = typed_args.iter().map(|a| a.ty()).collect();
 
+    // Resolve explicit type args once, outside the match.
+    let explicit_tys: Option<Vec<Type>> = if type_args.is_empty() {
+        None
+    } else {
+        Some(type_args.iter()
+            .map(|te| infer_type_to_type(&type_expr_to_infer(te), span))
+            .collect::<Result<_, _>>()?)
+    };
+
     let (typed_callee, fun_ty) = match callee {
         Expr::Ident(name, ident_span) if ctx.lookup(name).is_none() => {
             let scheme = ctx.scheme_env.get(name.as_str()).ok_or_else(|| {
                 MetelError::type_error(TypeErrorCode::T0003, format!("undefined name `{name}`"), ident_span)
             })?;
-            let (concrete, var_map) = instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?;
+            let (concrete, var_map) = match &explicit_tys {
+                Some(tys) => instantiate_scheme_with_turbofish(scheme, tys, span)?,
+                None      => instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?,
+            };
             check_fun_call_bounds(name, &var_map, span, ctx.registry)?;
             let typed = TypedExpr::Ident(name.clone(), concrete.clone(), ident_span.clone());
             (typed, concrete)
@@ -1425,7 +1475,10 @@ fn construct_call(
         } => {
             let last = segments.last().unwrap().clone();
             let scheme = ctx.scheme_env.get(last.as_str()).unwrap();
-            let (concrete, var_map) = instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?;
+            let (concrete, var_map) = match &explicit_tys {
+                Some(tys) => instantiate_scheme_with_turbofish(scheme, tys, span)?,
+                None      => instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?,
+            };
             check_fun_call_bounds(&last, &var_map, span, ctx.registry)?;
             let typed = TypedExpr::Path(segments.clone(), concrete.clone(), path_span.clone());
             (typed, concrete)
@@ -1434,7 +1487,10 @@ fn construct_call(
             if ctx.lookup(resolved).is_none() && ctx.scheme_env.contains_key(resolved.as_str()) =>
         {
             let scheme = ctx.scheme_env.get(resolved.as_str()).unwrap();
-            let (concrete, var_map) = instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?;
+            let (concrete, var_map) = match &explicit_tys {
+                Some(tys) => instantiate_scheme_with_turbofish(scheme, tys, span)?,
+                None      => instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?,
+            };
             check_fun_call_bounds(resolved, &var_map, span, ctx.registry)?;
             let typed = TypedExpr::Ident(resolved.clone(), concrete.clone(), rspan.clone());
             (typed, concrete)
@@ -1544,6 +1600,33 @@ fn instantiate_scheme_for_call(
     }
 
     Ok((Type::Fun(concrete_params, Box::new(concrete_ret)), var_to_concrete))
+}
+
+fn instantiate_scheme_with_turbofish(
+    scheme:         &TypeScheme,
+    explicit_types: &[Type],
+    span:           &Span,
+) -> Result<(Type, HashMap<TypeVar, Type>), MetelError> {
+    if explicit_types.len() != scheme.quantified_vars.len() {
+        return Err(MetelError::type_error(
+            TypeErrorCode::T0004,
+            format!(
+                "expected {} type argument(s), got {}",
+                scheme.quantified_vars.len(),
+                explicit_types.len()
+            ),
+            span,
+        ));
+    }
+    let mut subst = Substitution::new();
+    let mut var_to_concrete: HashMap<TypeVar, Type> = HashMap::new();
+    for (&qvar, concrete_ty) in scheme.quantified_vars.iter().zip(explicit_types.iter()) {
+        subst.bind(qvar, type_to_infer(concrete_ty));
+        var_to_concrete.insert(qvar, concrete_ty.clone());
+    }
+    let instantiated = subst.apply(&scheme.ty);
+    let concrete_ty = infer_type_to_type(&instantiated, span)?;
+    Ok((concrete_ty, var_to_concrete))
 }
 
 fn construct_literal_type(
