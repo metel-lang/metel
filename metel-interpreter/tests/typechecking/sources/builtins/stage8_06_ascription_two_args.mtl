@@ -7,7 +7,7 @@
 // whose names carry no meaning beyond surviving to the call site.
 
 fun zip_lengths(a: i64[], b: String[]) -> i64 {
-    array_len(a) + array_len(b)
+    a.len() + b.len()
 }
 
 // Ascription form — both element types resolved inline, no extra names.

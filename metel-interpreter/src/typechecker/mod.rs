@@ -58,11 +58,15 @@ impl StdPrelude {
         Self { schemes: HashMap::new() }
     }
 
-    /// All built-in function schemes (print, assert, array_push, …).
+    /// All built-in function schemes (print, assert, List::new, …).
     /// This is the canonical list — nothing else should register builtins.
+    ///
+    /// The generator starts at 10000 so that prelude TypeVars never collide
+    /// with the registry TypeVars allocated by `build_registry` (which starts
+    /// at 0 and typically allocates fewer than 100 vars).  See ADR-0027.
     pub fn default() -> Self {
         let mut schemes = HashMap::new();
-        let mut gen = TypeVarGenerator::new();
+        let mut gen = TypeVarGenerator::with_counter(10000);
         registry::populate_std_schemes(&mut schemes, &mut gen);
         Self { schemes }
     }

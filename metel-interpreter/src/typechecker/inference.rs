@@ -752,6 +752,21 @@ fn infer_expr(
             let recv_ty = infer_expr(receiver, ctx, fun_generalizations)?;
             let recv_ty = ctx.solve()?.apply(&recv_ty);
 
+            // T[]::len — built-in method on array types.
+            if let InferType::Array(_) = &recv_ty {
+                let arg_tys: Vec<InferType> = args.iter()
+                    .map(|a| infer_expr(a, ctx, fun_generalizations))
+                    .collect::<Result<_, _>>()?;
+                if method == "len" && arg_tys.is_empty() {
+                    return Ok(InferType::int());
+                }
+                return Err(MetelError::type_error(
+                    TypeErrorCode::T0003,
+                    format!("no method `{method}` on array type `T[]`; use `List<T>` for mutable collections"),
+                    span,
+                ));
+            }
+
             // Fast path: concrete named type — look up method as usual.
             if let Some(struct_name) = named_type_name(&recv_ty) {
                 let recv_type_args = match &recv_ty {
@@ -950,6 +965,11 @@ fn infer_expr(
             if let [type_name, member_name] = segments.as_slice() {
                 if let Some(fun_ty) = ctx.get_method_type(type_name, member_name).cloned() {
                     return Ok(fun_ty);
+                }
+                // Try builtin static constructors registered as joined-path poly schemes (e.g. "List::new").
+                let joined = format!("{type_name}::{member_name}");
+                if let Some(ty) = ctx.lookup(&joined) {
+                    return Ok(ty);
                 }
                 if let Some(info) = ctx.get_enum(type_name).cloned() {
                     if let Some(variant) = info.variants.iter().find(|v| v.name == *member_name) {

@@ -642,16 +642,16 @@ fn group_import_with_alias_subset() {
 #[test]
 fn std_core_builtins_available_in_each_module_without_import() {
     // Every module in a multi-module graph must see std::core builtins (print,
-    // assert, array_push, array_len) without any explicit import statement.
+    // assert, List, .len()) without any explicit import statement.
     let dir = fixture_dir("int_std_auto_import");
     let main = dir.join("main.mtl");
     write(
         &dir.join("helper.mtl"),
         "pub fun sum(arr: i64[]) -> i64 {\
-         \n    assert(array_len(arr) > 0);\
+         \n    assert(arr.len() > 0);\
          \n    let mut total = 0;\
          \n    let mut i = 0;\
-         \n    while (i < array_len(arr)) { total += arr[i as u64]; i += 1; }\
+         \n    while (i < arr.len()) { total += arr[i as u64]; i += 1; }\
          \n    return total;\
          \n}\n",
     );
@@ -712,7 +712,7 @@ fn multi_module_perhaps_and_result_without_explicit_std_import() {
         &dir.join("finder.mtl"),
         "pub fun find_first_positive(arr: i64[]) -> Perhaps<i64> {\
          \n    let mut i = 0;\
-         \n    while (i < array_len(arr)) {\
+         \n    while (i < arr.len()) {\
          \n        if (arr[i as u64] > 0) { return Perhaps::Some { value: arr[i as u64] }; }\
          \n        i += 1;\
          \n    }\
@@ -891,20 +891,6 @@ pub struct ValidationError { pub message: String }
     write(
         &dir.join("utils.mtl"),
         r#"
-pub fun filter_array<T>(arr: T[], pred: (T) -> Bool) -> T[] {
-    let mut out: T[]  = [];
-    for (let x in arr) {
-        if (pred(x)) { array_push(out, x); }
-    }
-    out
-}
-
-pub fun map_array<T, U>(arr: T[], f: (T) -> U) -> U[] {
-    let mut out: U[]  = [];
-    for (let x in arr) { array_push(out, f(x)); }
-    out
-}
-
 pub fun fold_left<T, A>(arr: T[], init: A, f: (A, T) -> A) -> A {
     let mut acc = init;
     for (let x in arr) {
@@ -924,6 +910,20 @@ pub fun sum_ints(arr: i64[]) -> i64 {
     let mut total = 0;
     for (let x in arr) { total += x; }
     total
+}
+
+pub fun filter_array<T>(arr: T[], pred: (T) -> Bool) -> T[] {
+    let mut out: List<T> = List::new();
+    for (let x in arr) {
+        if (pred(x)) { out.push(x); }
+    }
+    out.as_slice()
+}
+
+pub fun map_array<T, U>(arr: T[], f: (T) -> U) -> U[] {
+    let mut out: List<U> = List::new();
+    for (let x in arr) { out.push(f(x)); }
+    out.as_slice()
 }
 "#,
     );
@@ -986,7 +986,7 @@ pub fun find_by_title(tasks: Task[], title: String) -> Perhaps<Task> {
 }
 
 pub fun compute_completion_pct(tasks: Task[]) -> i64 {
-    let n = array_len(tasks);
+    let n = tasks.len();
     if (n == 0) { return 0; }
     let mut done = 0;
     for (let t in tasks) {
@@ -1047,7 +1047,7 @@ fun main() {
 
     // 3. Build task list (efforts: 5, 3, 2, 4, 1 = 15 total)
     let tasks = make_tasks();
-    assert(array_len(tasks) == 5);
+    assert(tasks.len() == 5);
 
     // 4. total_effort via cross-module fold_left: 5+3+2+4+1 = 15
     assert(total_effort(tasks) == 15);
@@ -1057,10 +1057,10 @@ fun main() {
 
     // 6. Generic filter_array with cross-module predicates
     let high = filter_array(tasks, (t: Task) -> Bool { is_high_priority(t) });
-    assert(array_len(high) == 3);
+    assert(high.len() == 3);
 
     let done_list = filter_array(tasks, (t: Task) -> Bool { is_done(t) });
-    assert(array_len(done_list) == 1);
+    assert(done_list.len() == 1);
 
     // 7. map_array: extract efforts, sum via sum_ints
     let efforts = map_array(tasks, (t: Task) -> i64 { t.effort });
@@ -1070,7 +1070,7 @@ fun main() {
 
     // 8. task_titles (cross-module map_array inside tasks module)
     let titles = task_titles(tasks);
-    assert(array_len(titles) == 5);
+    assert(titles.len() == 5);
     assert(titles[0] == "Design API");
     assert(titles[2] == "Deploy");
 
@@ -1108,11 +1108,11 @@ fun main() {
     // 14. Closure capturing outer variable (min_effort threshold)
     let min_effort = 3;
     let heavy = filter_array(tasks, (t: Task) -> Bool { t.effort >= min_effort });
-    assert(array_len(heavy) == 3);
+    assert(heavy.len() == 3);
 
     // 15. C-style for: manual effort accumulation
     let mut manual_sum = 0;
-    for (let mut i = 0; i < array_len(tasks); i += 1) {
+    for (let mut i = 0; i < tasks.len(); i += 1) {
         manual_sum += tasks[i as u64].effort;
     }
     assert(manual_sum == 15);
@@ -1121,7 +1121,7 @@ fun main() {
     // t1(High,Open) and t5(High,InProgress) qualify; t3(High,Done) does not
     let mut hp_active = 0;
     let mut idx = 0;
-    while (idx < array_len(tasks)) {
+    while (idx < tasks.len()) {
         let t = tasks[idx as u64];
         if (is_high_priority(t) && !is_done(t)) { hp_active += 1; }
         idx += 1;
@@ -1138,7 +1138,7 @@ fun main() {
     assert(effort_f == 15.0);
 
     // 19. Tuple: pack (task_count, total_effort)
-    let report: (i64, i64) = (array_len(tasks), total_effort(tasks));
+    let report: (i64, i64) = (tasks.len(), total_effort(tasks));
     assert(report.0 == 5);
     assert(report.1 == 15);
 
@@ -1146,7 +1146,7 @@ fun main() {
     // doubled efforts: [10,6,4,8,2]; filter > 5: [10,6,8] = 3 items
     let doubled = map_array(efforts, (x: i64) -> i64 { x * 2 });
     let big = filter_array(doubled, (x: i64) -> Bool { x > 5 });
-    assert(array_len(big) == 3);
+    assert(big.len() == 3);
 
     // 21. Let-polymorphism: identity closure used at two different types
     let id = (x) -> { x };

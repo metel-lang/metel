@@ -49,24 +49,21 @@ fn dbg_scheme(t: TypeVar) -> TypeScheme {
     }
 }
 
-fn array_push_scheme(t: TypeVar) -> TypeScheme {
+fn list_new_scheme(t: TypeVar) -> TypeScheme {
     TypeScheme {
         quantified_vars: vec![t],
         param_names: vec![],
-        ty: InferType::Fun(
-            vec![InferType::Array(Box::new(InferType::Var(t))), InferType::Var(t)],
-            Box::new(InferType::unit()),
-        ),
+        ty: InferType::Fun(vec![], Box::new(InferType::Named("List".into(), vec![InferType::Var(t)]))),
     }
 }
 
-fn array_len_scheme(t: TypeVar) -> TypeScheme {
+fn list_from_scheme(t: TypeVar) -> TypeScheme {
     TypeScheme {
         quantified_vars: vec![t],
         param_names: vec![],
         ty: InferType::Fun(
             vec![InferType::Array(Box::new(InferType::Var(t)))],
-            Box::new(InferType::int()),
+            Box::new(InferType::Named("List".into(), vec![InferType::Var(t)])),
         ),
     }
 }
@@ -156,6 +153,42 @@ pub(super) fn build_registry(
             }] },
         ],
     }, vec!["std".into(), "core".into()]);
+
+    // Register built-in generic struct List<T>.
+    let t = gen.fresh();
+    registry.register_struct_fields("List".into(), vec![FieldEntry {
+        name: "inner".into(),
+        ty: InferType::Array(Box::new(InferType::Var(t))),
+        span: builtin_span.clone(),
+        visibility: crate::ast::Visibility::Private,
+    }], vec!["std".into(), "core".into()]);
+    registry.register_struct_type_params("List".into(), vec![t]);
+    registry.register_struct_generic_names("List".into(), vec!["T".into()]);
+    // List method schemes (all reference struct type param t).
+    let list_self = || InferType::Named("List".into(), vec![InferType::Var(t)]);
+    let perhaps_t  = || InferType::Named("Perhaps".into(), vec![InferType::Var(t)]);
+    registry.register_method_scheme("List".into(), "push".into(), TypeScheme {
+        quantified_vars: vec![t], param_names: vec![],
+        ty: InferType::Fun(vec![list_self(), InferType::Var(t)], Box::new(InferType::unit())),
+    }, vec![t]);
+    registry.register_method_receiver("List".into(), "push".into(), crate::ast::ReceiverKind::RefMut);
+    registry.register_method_scheme("List".into(), "pop".into(), TypeScheme {
+        quantified_vars: vec![t], param_names: vec![],
+        ty: InferType::Fun(vec![list_self()], Box::new(perhaps_t())),
+    }, vec![t]);
+    registry.register_method_receiver("List".into(), "pop".into(), crate::ast::ReceiverKind::RefMut);
+    registry.register_method_scheme("List".into(), "len".into(), TypeScheme {
+        quantified_vars: vec![t], param_names: vec![],
+        ty: InferType::Fun(vec![list_self()], Box::new(InferType::int())),
+    }, vec![t]);
+    registry.register_method_scheme("List".into(), "get".into(), TypeScheme {
+        quantified_vars: vec![t], param_names: vec![],
+        ty: InferType::Fun(vec![list_self(), InferType::int()], Box::new(perhaps_t())),
+    }, vec![t]);
+    registry.register_method_scheme("List".into(), "as_slice".into(), TypeScheme {
+        quantified_vars: vec![t], param_names: vec![],
+        ty: InferType::Fun(vec![list_self()], Box::new(InferType::Array(Box::new(InferType::Var(t))))),
+    }, vec![t]);
 
     // Pass 1: register user-defined structs, enums, and aspects.
     for decl in &program.decls {
@@ -393,6 +426,7 @@ pub(super) fn register_builtins(ctx: &mut InferContext, prelude: &super::StdPrel
     }
     ctx.register_method("String".to_string(), "len".to_string(),
         InferType::Fun(vec![str_ty.clone()], Box::new(int_ty.clone())));
+    // T[]::len — handled as a special case in the typechecker; no TypeVar needed here.
 
     ctx.registry_mut().register_aspect("Display".into(),  vec!["to_string".into()]);
     ctx.registry_mut().register_aspect("Iterable".into(), vec!["next".into()]);
@@ -426,8 +460,8 @@ pub(super) fn populate_std_schemes(map: &mut HashMap<String, TypeScheme>, gen: &
     // Polymorphic builtins.
     let t = gen.fresh(); map.insert("print".into(),      print_scheme(t));
     let t = gen.fresh(); map.insert("println".into(),    print_scheme(t));
-    let t = gen.fresh(); map.insert("array_push".into(), array_push_scheme(t));
-    let t = gen.fresh(); map.insert("array_len".into(),  array_len_scheme(t));
+    let t = gen.fresh(); map.insert("List::new".into(),  list_new_scheme(t));
+    let t = gen.fresh(); map.insert("List::from".into(), list_from_scheme(t));
     let t = gen.fresh(); map.insert("dbg".into(),        dbg_scheme(t));
 
     // Monomorphic builtins.

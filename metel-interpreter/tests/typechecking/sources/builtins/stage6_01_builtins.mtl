@@ -1,4 +1,4 @@
 // Stage 6: built-in function registration.
 
-let arr: i64[] = [1, 2, 3];
-array_push(arr, 4);
+let mut arr: List<i64> = List::from([1, 2, 3]);
+arr.push(4);

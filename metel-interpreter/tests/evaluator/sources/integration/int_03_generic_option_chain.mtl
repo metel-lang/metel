@@ -75,7 +75,7 @@ fun pair_swap<A, B>(p: Pair<A, B>) -> Pair<B, A> {
 
 fun find_first<T>(arr: T[], pred: (T) -> Bool) -> Option<T> {
     let mut i = 0;
-    while (i < array_len(arr)) {
+    while (i < arr.len()) {
         if (pred(arr[i as u64])) { return Option::Some { value: arr[i as u64] }; }
         i += 1;
     }
@@ -91,9 +91,9 @@ fun count_where<T>(arr: T[], pred: (T) -> Bool) -> i64 {
 }
 
 fun map_array<T, U>(arr: T[], f: (T) -> U) -> U[] {
-    let mut out: U[]  = [];
-    for (let x in arr) { array_push(out, f(x)); }
-    out
+    let mut out: List<U> = List::new();
+    for (let x in arr) { out.push(f(x)); }
+    out.as_slice()
 }
 
 // ── Safe integer division returning Option<i64> ───────────────────────────────
@@ -105,7 +105,7 @@ fun safe_div(a: i64, b: i64) -> Option<i64> {
 // ── Safe array index ──────────────────────────────────────────────────────────
 
 fun safe_get_int(arr: i64[], i: i64) -> Option<i64> {
-    if (i < 0 || i >= array_len(arr)) Option::None
+    if (i < 0 || i >= arr.len()) Option::None
     else Option::Some { value: arr[i as u64] }
 }
 
@@ -265,7 +265,7 @@ fun main() {
 
     // ── map_array<i64, i64> and map_array<i64, Bool> ──────────────────────────
     let doubled_arr = map_array(nums, (x: i64) -> i64 { x * 2 });
-    assert(array_len(doubled_arr) == 8);
+    assert(doubled_arr.len() == 8);
     assert(doubled_arr[0] == 6);
     assert(doubled_arr[4] == 10);
 

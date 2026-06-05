@@ -1194,6 +1194,9 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
             if let (Value::Str(s), "len") = (&recv_val, method.as_str()) {
                 return Ok(Signal::Value(Value::I64(s.chars().count() as i64)));
             }
+            if let (Value::Array(arr), "len") = (&recv_val, method.as_str()) {
+                return Ok(Signal::Value(Value::I64(arr.borrow().len() as i64)));
+            }
 
             // User-defined struct/enum methods — looked up by "TypeName::method".
             let recv_type_view = read_pointer_value(&recv_val).unwrap_or_else(|| recv_val.clone());

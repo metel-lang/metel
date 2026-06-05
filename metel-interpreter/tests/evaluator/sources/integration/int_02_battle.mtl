@@ -158,7 +158,7 @@ fun total_party_hp(party: Fighter[]) -> i64 {
 
 // Index of the fighter with highest attack.  Returns None for an empty party.
 fun best_attacker_idx(party: Fighter[]) -> Perhaps<i64> {
-    let n = array_len(party);
+    let n = party.len();
     if (n == 0) { return None; }
     let mut best = 0;
     for (let mut i = 1; i < n; i += 1) {

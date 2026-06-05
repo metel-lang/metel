@@ -1,7 +1,7 @@
 // Positive: ascribed `None` in a generic function body constrains the inferred return type.
 
 fun maybe_head<T>(items: T[]) {
-    if (array_len(items) == 0) {
+    if (items.len() == 0) {
         return None : Perhaps<T>;
     }
     return Perhaps::Some { value: items[0] };

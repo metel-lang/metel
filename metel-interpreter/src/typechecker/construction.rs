@@ -700,7 +700,7 @@ fn construct_expr(
             let ty = Type::Array(Box::new(elem_ty));
             Ok(TypedExpr::Array(typed, ty, span.clone()))
         }
-        Expr::Call { callee, type_args, args, span } => construct_call(callee, type_args, args, span, ctx),
+        Expr::Call { callee, type_args, args, span } => construct_call(callee, type_args, args, span, expected_ty, ctx),
         Expr::Index { object, index, span } => {
             let typed_obj = construct_expr(object, None, ctx)?;
             let typed_idx = construct_expr(index, Some(&Type::U64), ctx)?;
@@ -815,6 +815,23 @@ fn construct_expr(
                 Type::F64 => ("f64".to_string(), vec![]),
                 Type::Bool  => ("Bool".to_string(),   vec![]),
                 Type::Char  => ("Char".to_string(),   vec![]),
+                Type::Array(_) => {
+                    if method == "len" && args.is_empty() {
+                        let typed_args: Vec<TypedExpr> = vec![];
+                        return Ok(TypedExpr::MethodCall {
+                            receiver: Box::new(typed_receiver),
+                            method:   method.clone(),
+                            args:     typed_args,
+                            ty:       Type::I64,
+                            span:     span.clone(),
+                        });
+                    }
+                    return Err(MetelError::type_error(
+                        TypeErrorCode::T0003,
+                        format!("no method `{method}` on array type `T[]`; use `List<T>` for mutable collections"),
+                        span,
+                    ));
+                }
                 t => return Err(MetelError::internal(
                     format!("method call on non-struct type {t}")
                 )),
@@ -1400,11 +1417,12 @@ fn bind_enum_variant_fields(
 /// local unification. This is the Pass 2 counterpart of the inline
 /// solve-and-generalize done in `infer_fun_decl`.
 fn construct_call(
-    callee:    &Expr,
-    type_args: &[TypeExpr],
-    args:      &[Expr],
-    span:      &Span,
-    ctx:       &mut ConstructCtx,
+    callee:      &Expr,
+    type_args:   &[TypeExpr],
+    args:        &[Expr],
+    span:        &Span,
+    expected_ty: Option<&Type>,
+    ctx:         &mut ConstructCtx,
 ) -> Result<TypedExpr, MetelError> {
     // For monomorphic callee identifiers already in scope, extract param types as hints so
     // inherently ambiguous args (bare `[]`, `None`) can resolve without requiring ascription.
@@ -1461,6 +1479,35 @@ fn construct_call(
             };
             check_fun_call_bounds(name, &var_map, span, ctx.registry)?;
             let typed = TypedExpr::Ident(name.clone(), concrete.clone(), ident_span.clone());
+            (typed, concrete)
+        }
+        // Qualified static constructors like "List::new" / "List::from" registered as joined-key schemes.
+        Expr::Path(segments, path_span) if {
+            let joined = segments.join("::");
+            ctx.lookup(&joined).is_none() && ctx.scheme_env.contains_key(joined.as_str())
+        } => {
+            let joined = segments.join("::");
+            let scheme = ctx.scheme_env.get(joined.as_str()).unwrap();
+            let (concrete, var_map) = match &explicit_tys {
+                Some(tys) => instantiate_scheme_with_turbofish(scheme, tys, span)?,
+                None => {
+                    match instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen) {
+                        Ok(result) => result,
+                        Err(e) => {
+                            // Arg-based instantiation failed (e.g. zero-arg generic constructor).
+                            // Try resolving the return type from the expected type via unification.
+                            match expected_ty {
+                                Some(expected) => instantiate_scheme_with_expected_ret(
+                                    scheme, &arg_types, expected, span, &mut ctx.gen,
+                                ).map_err(|_| e)?,
+                                None => return Err(e),
+                            }
+                        }
+                    }
+                }
+            };
+            check_fun_call_bounds(&joined, &var_map, span, ctx.registry)?;
+            let typed = TypedExpr::Path(segments.clone(), concrete.clone(), path_span.clone());
             (typed, concrete)
         }
         Expr::Path(segments, path_span) if {
@@ -1627,6 +1674,47 @@ fn instantiate_scheme_with_turbofish(
     let instantiated = subst.apply(&scheme.ty);
     let concrete_ty = infer_type_to_type(&instantiated, span)?;
     Ok((concrete_ty, var_to_concrete))
+}
+
+/// Instantiate a scheme by unifying its return type with `expected_ret`.
+/// Used for zero-arg generic constructors (e.g. `List::new()`) where T cannot
+/// be inferred from arguments but is known from the enclosing let annotation.
+fn instantiate_scheme_with_expected_ret(
+    scheme:      &TypeScheme,
+    arg_types:   &[&Type],
+    expected_ret: &Type,
+    span:        &Span,
+    gen:         &mut TypeVarGenerator,
+) -> Result<(Type, HashMap<TypeVar, Type>), MetelError> {
+    let (instance, renaming) = typeinference::instantiate_with_renaming(scheme, gen);
+    let (params, ret) = match instance {
+        InferType::Fun(p, r) => (p, r),
+        _ => return Err(MetelError::internal("scheme type is not a function")),
+    };
+    let mut subst = Substitution::new();
+    for (param, arg_ty) in params.iter().zip(arg_types.iter()) {
+        let applied = subst.apply(param);
+        let s = typeinference::unify(&applied, &type_to_infer(*arg_ty)).map_err(|_| {
+            MetelError::type_error(TypeErrorCode::T0001, "argument type mismatch", span)
+        })?;
+        subst = subst.compose(&s);
+    }
+    let applied_ret = subst.apply(&ret);
+    let s = typeinference::unify(&applied_ret, &type_to_infer(expected_ret)).map_err(|_| {
+        MetelError::type_error(TypeErrorCode::T0001, "return type does not match annotation", span)
+    })?;
+    subst = subst.compose(&s);
+    let concrete_params: Vec<Type> = params.iter()
+        .map(|p| infer_type_to_type(&subst.apply(p), span))
+        .collect::<Result<_, _>>()?;
+    let concrete_ret = infer_type_to_type(&subst.apply(&ret), span)?;
+    let mut var_to_concrete: HashMap<TypeVar, Type> = HashMap::new();
+    for (orig_var, fresh_var) in &renaming {
+        if let Ok(t) = infer_type_to_type(&subst.apply(&InferType::Var(*fresh_var)), span) {
+            var_to_concrete.insert(*orig_var, t);
+        }
+    }
+    Ok((Type::Fun(concrete_params, Box::new(concrete_ret)), var_to_concrete))
 }
 
 fn construct_literal_type(

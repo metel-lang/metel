@@ -40,9 +40,8 @@ fun int_max(a: i64, b: i64) -> i64 {
 
 // Bubble sort — returns a sorted copy of the input array.
 fun sort_floats(arr: f64[]) -> f64[] {
-    let mut s: f64[]  = [];
-    for (let x in arr) { array_push(s, x); }
-    let n = array_len(s);
+    let mut s = List::from(arr).as_slice();
+    let n = s.len();
     let mut i = 0;
     while (i < n) {
         let mut j = 0;
@@ -64,9 +63,9 @@ fun sort_floats(arr: f64[]) -> f64[] {
 
 // Binary search in a sorted f64[].  Returns Perhaps<i64> with the index.
 fun binary_search(sorted: f64[], target: f64) -> Perhaps<i64> {
-    if (array_len(sorted) == 0) { return None; }
+    if (sorted.len() == 0) { return None; }
     let mut lo = 0;
-    let mut hi = array_len(sorted) - 1;
+    let mut hi = sorted.len() - 1;
     while (lo <= hi) {
         let mid = (lo + hi) / 2;
         if (float_eq(sorted[mid as u64], target)) {
@@ -110,7 +109,7 @@ impl Stats {
 
 // Compute descriptive statistics.  Returns Err for empty input (RFC-0019).
 fun compute_stats(data: f64[]) -> Result<Stats, String> {
-    let n = array_len(data);
+    let n = data.len();
     if (n == 0) {
         return Result::Err { error: "empty dataset" };
     }
@@ -141,7 +140,7 @@ fun compute_stats(data: f64[]) -> Result<Stats, String> {
 // Median of a f64[].  Returns None for empty input (RFC-0019: types None as
 // Perhaps<f64> from the return annotation).
 fun median(data: f64[]) -> Perhaps<f64> {
-    let n = array_len(data);
+    let n = data.len();
     if (n == 0) { return None; }
     let sorted = sort_floats(data);
     let mid = n / 2;
@@ -183,37 +182,37 @@ fun count_if(data: f64[], pred: (f64) -> Bool) -> i64 {
 }
 
 fun map_floats(data: f64[], f: (f64) -> f64) -> f64[] {
-    let mut out: f64[]  = [];
-    for (let x in data) { array_push(out, f(x)); }
-    out
+    let mut out: List<f64> = List::new();
+    for (let x in data) { out.push(f(x)); }
+    out.as_slice()
 }
 
 fun filter_floats(data: f64[], pred: (f64) -> Bool) -> f64[] {
-    let mut out: f64[]  = [];
+    let mut out: List<f64> = List::new();
     for (let x in data) {
-        if (pred(x)) { array_push(out, x); }
+        if (pred(x)) { out.push(x); }
     }
-    out
+    out.as_slice()
 }
 
 // Prefix sums: out[i] = data[0] + ... + data[i].
 fun running_sums(data: f64[]) -> f64[] {
-    let mut out: f64[]  = [];
+    let mut out: List<f64> = List::new();
     let mut acc = 0.0;
     for (let x in data) {
         acc += x;
-        array_push(out, acc);
+        out.push(acc);
     }
-    out
+    out.as_slice()
 }
 
 // Build an i64[] of squares using a C-style for loop.
 fun squares_up_to(n: i64) -> i64[] {
-    let mut out: i64[]  = [];
+    let mut out: List<i64> = List::new();
     for (let mut i = 1; i <= n; i += 1) {
-        array_push(out, i * i);
+        out.push(i * i);
     }
-    out
+    out.as_slice()
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -316,7 +315,7 @@ fun main() {
     assert(squares[7]  == 64.0);
 
     let big = filter_floats(d8, (x: f64) -> Bool { x > 5.0 });
-    assert(array_len(big) == 3);
+    assert(big.len() == 3);
     assert(big[0] == 6.0);
     assert(big[2] == 8.0);
 
@@ -352,7 +351,7 @@ fun main() {
 
     // 11. C-style for: build squares 1..5 and verify.
     let sq5 = squares_up_to(5);
-    assert(array_len(sq5) == 5);
+    assert(sq5.len() == 5);
     assert(sq5[0] == 1);
     assert(sq5[4] == 25);
 

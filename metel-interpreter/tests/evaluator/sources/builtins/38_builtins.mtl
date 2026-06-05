@@ -24,25 +24,149 @@ fun main() {
     assert("pair=${string_concat(\"x\", \"y\")}" == "pair=xy");
     assert("\${value}" == "\${value}");
     assert("$5" == "$5");
-    // array_len and array_push
-    let mut arr = [10, 20, 30];
-    assert(array_len(arr) == 3);
-    array_push(arr, 40);
-    assert(array_len(arr) == 4);
-    assert(arr[3] == 40);
-    // array_push is in-place — subsequent reads see the added elements.
-    array_push(arr, 50);
-    array_push(arr, 60);
-    assert(array_len(arr) == 6);
-    assert(arr[5] == 60);
-    // Building an array from scratch with push.
-    let mut built: i64[]  = [];
+    // List<T>: new, push, len, get, pop, as_slice, from
+    let mut lst: List<i64> = List::new();
+    assert(lst.len() == 0);
+    lst.push(10);
+    lst.push(20);
+    lst.push(30);
+    assert(lst.len() == 3);
+    // get returns Perhaps<T> (bounds-checked)
+    match lst.get(1) {
+        Perhaps::Some { value } => assert(value == 20),
+        None => assert(false),
+    };
+    match lst.get(99) {
+        Perhaps::Some { value } => assert(false),
+        None => assert(true),
+    };
+    // pop removes and returns the last element
+    match lst.pop() {
+        Perhaps::Some { value } => assert(value == 30),
+        None => assert(false),
+    };
+    assert(lst.len() == 2);
+    // as_slice returns a T[] view
+    lst.push(99);
+    let sl = lst.as_slice();
+    assert(sl[0] == 10);
+    assert(sl[2] == 99);
+    // List::from copies an existing T[] array
+    let src: i64[] = [1, 2, 3, 4, 5];
+    let lst2 = List::from(src);
+    assert(lst2.len() == 5);
+    // Building a list with a loop then converting to T[]
+    let mut built: List<i64> = List::new();
     let mut i = 1;
     while (i <= 5) {
-        array_push(built, i * i);
+        built.push(i * i);
         i += 1;
     }
-    assert(array_len(built) == 5);
-    assert(built[0] == 1);
-    assert(built[4] == 25);
+    assert(built.len() == 5);
+    let built_arr = built.as_slice();
+    assert(built_arr[0] == 1);
+    assert(built_arr[4] == 25);
+    // get at boundary indices
+    let mut boundary: List<i64> = List::new();
+    boundary.push(100);
+    boundary.push(200);
+    boundary.push(300);
+    match boundary.get(0) {
+        Perhaps::Some { value } => assert(value == 100),
+        None => assert(false),
+    };
+    match boundary.get(2) {
+        Perhaps::Some { value } => assert(value == 300),
+        None => assert(false),
+    };
+    // pop on empty list returns None
+    let mut empty_lst: List<i64> = List::new();
+    match empty_lst.pop() {
+        Perhaps::Some { value } => assert(false),
+        None => assert(true),
+    };
+    // pop until empty, verifying each value
+    let mut drain: List<i64> = List::new();
+    drain.push(7);
+    drain.push(8);
+    drain.push(9);
+    match drain.pop() {
+        Perhaps::Some { value } => assert(value == 9),
+        None => assert(false),
+    };
+    match drain.pop() {
+        Perhaps::Some { value } => assert(value == 8),
+        None => assert(false),
+    };
+    match drain.pop() {
+        Perhaps::Some { value } => assert(value == 7),
+        None => assert(false),
+    };
+    match drain.pop() {
+        Perhaps::Some { value } => assert(false),
+        None => assert(true),
+    };
+    assert(drain.len() == 0);
+    // push after pop
+    let mut reuse: List<i64> = List::new();
+    reuse.push(1);
+    reuse.push(2);
+    reuse.pop();
+    reuse.push(99);
+    assert(reuse.len() == 2);
+    match reuse.get(1) {
+        Perhaps::Some { value } => assert(value == 99),
+        None => assert(false),
+    };
+    // List::from on empty array
+    let empty_src: i64[] = [];
+    let lst_from_empty = List::from(empty_src);
+    assert(lst_from_empty.len() == 0);
+    // as_slice on empty list produces empty array
+    let empty_slice = empty_lst.as_slice();
+    assert(empty_slice.len() == 0);
+    // List<String>
+    let mut words: List<String> = List::new();
+    words.push("hello");
+    words.push("world");
+    assert(words.len() == 2);
+    match words.get(0) {
+        Perhaps::Some { value } => assert(value == "hello"),
+        None => assert(false),
+    };
+    match words.pop() {
+        Perhaps::Some { value } => assert(value == "world"),
+        None => assert(false),
+    };
+    assert(words.len() == 1);
+    // List<f64>
+    let mut floats: List<f64> = List::new();
+    floats.push(1.5);
+    floats.push(2.5);
+    floats.push(3.5);
+    assert(floats.len() == 3);
+    match floats.get(1) {
+        Perhaps::Some { value } => assert(value == 2.5),
+        None => assert(false),
+    };
+    // List<Bool>
+    let mut flags: List<Bool> = List::new();
+    flags.push(true);
+    flags.push(false);
+    flags.push(true);
+    assert(flags.len() == 3);
+    match flags.get(2) {
+        Perhaps::Some { value } => assert(value == true),
+        None => assert(false),
+    };
+    // for-in over as_slice result
+    let mut sum_lst: List<i64> = List::new();
+    sum_lst.push(10);
+    sum_lst.push(20);
+    sum_lst.push(30);
+    let mut total = 0;
+    for (let x in sum_lst.as_slice()) {
+        total += x;
+    }
+    assert(total == 60);
 }

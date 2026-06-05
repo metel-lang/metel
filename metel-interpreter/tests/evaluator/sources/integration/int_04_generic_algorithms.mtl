@@ -66,8 +66,9 @@ fun stack_new() -> Stack {
 }
 
 fun stack_push(s: Stack, v: i64) -> Stack {
-    array_push(s.items, v);
-    Stack { items: s.items, size: s.size + 1 }
+    let mut items_list = List::from(s.items);
+    items_list.push(v);
+    Stack { items: items_list.as_slice(), size: s.size + 1 }
 }
 
 fun stack_top(s: Stack) -> i64 {
@@ -81,17 +82,17 @@ fun stack_empty(s: Stack) -> Bool {
 // ── Generic array combinators ─────────────────────────────────────────────────
 
 fun filter<T>(arr: T[], pred: (T) -> Bool) -> T[] {
-    let mut out: T[]  = [];
+    let mut out: List<T> = List::new();
     for (let x in arr) {
-        if (pred(x)) { array_push(out, x); }
+        if (pred(x)) { out.push(x); }
     }
-    out
+    out.as_slice()
 }
 
 fun map_arr<T, U>(arr: T[], f: (T) -> U) -> U[] {
-    let mut out: U[]  = [];
-    for (let x in arr) { array_push(out, f(x)); }
-    out
+    let mut out: List<U> = List::new();
+    for (let x in arr) { out.push(f(x)); }
+    out.as_slice()
 }
 
 fun fold<T, A>(arr: T[], init: A, f: (A, T) -> A) -> A {
@@ -101,14 +102,14 @@ fun fold<T, A>(arr: T[], init: A, f: (A, T) -> A) -> A {
 }
 
 fun zip_with<A, B, C>(a: A[], b: B[], f: (A, B) -> C) -> C[] {
-    let mut out: C[]  = [];
-    let len = if (array_len(a) < array_len(b)) array_len(a) else array_len(b);
+    let mut out: List<C> = List::new();
+    let len = if (a.len() < b.len()) a.len() else b.len();
     let mut i = 0;
     while (i < len) {
-        array_push(out, f(a[i as u64], b[i as u64]));
+        out.push(f(a[i as u64], b[i as u64]));
         i += 1;
     }
-    out
+    out.as_slice()
 }
 
 fun any<T>(arr: T[], pred: (T) -> Bool) -> Bool {
@@ -126,23 +127,23 @@ fun all<T>(arr: T[], pred: (T) -> Bool) -> Bool {
 }
 
 fun take<T>(arr: T[], n: i64) -> T[] {
-    let mut out: T[]  = [];
+    let mut out: List<T> = List::new();
     let mut i = 0;
-    while (i < n && i < array_len(arr)) {
-        array_push(out, arr[i as u64]);
+    while (i < n && i < arr.len()) {
+        out.push(arr[i as u64]);
         i += 1;
     }
-    out
+    out.as_slice()
 }
 
 fun drop<T>(arr: T[], n: i64) -> T[] {
-    let mut out: T[]  = [];
+    let mut out: List<T> = List::new();
     let mut i = n;
-    while (i < array_len(arr)) {
-        array_push(out, arr[i as u64]);
+    while (i < arr.len()) {
+        out.push(arr[i as u64]);
         i += 1;
     }
-    out
+    out.as_slice()
 }
 
 // ── Integer utilities ─────────────────────────────────────────────────────────
@@ -153,14 +154,14 @@ fun max_int(a: i64, b: i64) -> i64 { if (a > b) a else b }
 fun array_min(arr: i64[]) -> i64 {
     let mut m = arr[0];
     let mut i = 1;
-    while (i < array_len(arr)) { m = min_int(m, arr[i as u64]); i += 1; }
+    while (i < arr.len()) { m = min_int(m, arr[i as u64]); i += 1; }
     m
 }
 
 fun array_max(arr: i64[]) -> i64 {
     let mut m = arr[0];
     let mut i = 1;
-    while (i < array_len(arr)) { m = max_int(m, arr[i as u64]); i += 1; }
+    while (i < arr.len()) { m = max_int(m, arr[i as u64]); i += 1; }
     m
 }
 
@@ -177,17 +178,17 @@ fun bsearch(arr: i64[], target: i64, lo: i64, hi: i64) -> i64 {
 // ── Recursive: sum of array ───────────────────────────────────────────────────
 
 fun rsum(arr: i64[], i: i64) -> i64 {
-    if (i >= array_len(arr)) { return 0; }
+    if (i >= arr.len()) { return 0; }
     arr[i as u64] + rsum(arr, i + 1)
 }
 
 // ── Concat two int arrays ─────────────────────────────────────────────────────
 
 fun concat_int(a: i64[], b: i64[]) -> i64[] {
-    let out: i64[] = [];
-    for (let x in a) { array_push(out, x); }
-    for (let x in b) { array_push(out, x); }
-    out
+    let mut out: List<i64> = List::new();
+    for (let x in a) { out.push(x); }
+    for (let x in b) { out.push(x); }
+    out.as_slice()
 }
 
 // ── Perhaps<T> combinators ────────────────────────────────────────────────────
@@ -286,20 +287,20 @@ fun main() {
     // ── filter ────────────────────────────────────────────────────────────────
     let nums: i64[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     let evens = filter(nums, (x: i64) -> Bool { x % 2 == 0 });
-    assert(array_len(evens) == 5);
+    assert(evens.len() == 5);
     assert(evens[0] == 2);
 
     let big = filter(nums, (x: i64) -> Bool { x > 7 });
-    assert(array_len(big) == 3);
+    assert(big.len() == 3);
     assert(big[0] == 8);
 
     let strs: String[] = ["apple", "banana", "cherry", "date"];
     let long_words = filter(strs, (s: String) -> Bool { string_len(s) > 5 });
-    assert(array_len(long_words) == 2);
+    assert(long_words.len() == 2);
 
     // ── map_arr ───────────────────────────────────────────────────────────────
     let squares = map_arr(nums, (x: i64) -> i64 { x * x });
-    assert(array_len(squares) == 10);
+    assert(squares.len() == 10);
     assert(squares[0] == 1);
     assert(squares[9] == 100);
 
@@ -335,14 +336,14 @@ fun main() {
     let a: i64[] = [1, 2, 3, 4];
     let b: i64[] = [10, 20, 30, 40];
     let dot = zip_with(a, b, (x: i64, y: i64) -> i64 { x * y });
-    assert(array_len(dot) == 4);
+    assert(dot.len() == 4);
     assert(dot[0] == 10);
     assert(dot[3] == 160);
 
     // zip shorter array — result truncated to shorter length
     let c: i64[] = [100, 200];
     let partial = zip_with(a, c, (x: i64, y: i64) -> i64 { x + y });
-    assert(array_len(partial) == 2);
+    assert(partial.len() == 2);
     assert(partial[1] == 202);
 
     // zip producing Bool[]: check which b[i] equals a[i]*10
@@ -360,15 +361,15 @@ fun main() {
 
     // ── take / drop ───────────────────────────────────────────────────────────
     let first3 = take(nums, 3);
-    assert(array_len(first3) == 3);
+    assert(first3.len() == 3);
     assert(first3[2] == 3);
 
     let rest = drop(nums, 7);
-    assert(array_len(rest) == 3);
+    assert(rest.len() == 3);
     assert(rest[0] == 8);
 
     let take_all = take(nums, 100);
-    assert(array_len(take_all) == 10);
+    assert(take_all.len() == 10);
 
     // ── array_min / array_max ─────────────────────────────────────────────────
     let data: i64[] = [5, 3, 8, 1, 9, 2, 7];
@@ -390,7 +391,7 @@ fun main() {
     let a1: i64[] = [1, 2, 3];
     let a2: i64[] = [4, 5, 6];
     let merged = concat_int(a1, a2);
-    assert(array_len(merged) == 6);
+    assert(merged.len() == 6);
     assert(merged[0] == 1);
     assert(merged[5] == 6);
 

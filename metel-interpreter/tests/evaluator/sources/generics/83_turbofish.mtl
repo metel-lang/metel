@@ -1,8 +1,8 @@
 fun identity<T>(x: T) -> T { x }
 fun first<A, B>(a: A, b: B) -> A { a }
-fun wrap<T>(x: T) -> T[] {
-    let mut arr: T[] = [];
-    array_push(arr, x);
+fun wrap<T>(x: T) -> List<T> {
+    let mut arr: List<T> = List::new();
+    arr.push(x);
     arr
 }
 
@@ -37,7 +37,7 @@ fun main() {
     let inner = identity::<i64>(identity::<i64>(5));
     assert(inner == 5);
 
-    // Turbofish with array return type
+    // Turbofish with List return type
     let v = wrap::<i64>(99);
-    assert(array_len(v) == 1);
+    assert(v.len() == 1);
 }

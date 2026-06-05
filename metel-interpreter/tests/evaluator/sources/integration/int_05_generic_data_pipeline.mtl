@@ -60,28 +60,28 @@ fun record_swap<K, V>(r: Record<K, V>) -> Record<V, K> {
 // ── Generic pipeline combinators ──────────────────────────────────────────────
 
 fun filter_array<T>(arr: T[], pred: (T) -> Bool) -> T[] {
-    let mut out: T[]  = [];
+    let mut out: List<T> = List::new();
     for (let x in arr) {
-        if (pred(x)) { array_push(out, x); }
+        if (pred(x)) { out.push(x); }
     }
-    out
+    out.as_slice()
 }
 
 fun map_array<T, U>(arr: T[], f: (T) -> U) -> U[] {
-    let mut out: U[]  = [];
-    for (let x in arr) { array_push(out, f(x)); }
-    out
+    let mut out: List<U> = List::new();
+    for (let x in arr) { out.push(f(x)); }
+    out.as_slice()
 }
 
 fun zip_with<A, B, C>(a: A[], b: B[], f: (A, B) -> C) -> C[] {
-    let mut out: C[]  = [];
-    let len = if (array_len(a) < array_len(b)) array_len(a) else array_len(b);
+    let mut out: List<C> = List::new();
+    let len = if (a.len() < b.len()) a.len() else b.len();
     let mut i = 0;
     while (i < len) {
-        array_push(out, f(a[i as u64], b[i as u64]));
+        out.push(f(a[i as u64], b[i as u64]));
         i += 1;
     }
-    out
+    out.as_slice()
 }
 
 fun any<T>(arr: T[], pred: (T) -> Bool) -> Bool {
@@ -99,23 +99,23 @@ fun all<T>(arr: T[], pred: (T) -> Bool) -> Bool {
 }
 
 fun take<T>(arr: T[], n: i64) -> T[] {
-    let mut out: T[]  = [];
+    let mut out: List<T> = List::new();
     let mut i = 0;
-    while (i < n && i < array_len(arr)) {
-        array_push(out, arr[i as u64]);
+    while (i < n && i < arr.len()) {
+        out.push(arr[i as u64]);
         i += 1;
     }
-    out
+    out.as_slice()
 }
 
 fun drop<T>(arr: T[], n: i64) -> T[] {
-    let mut out: T[]  = [];
+    let mut out: List<T> = List::new();
     let mut i = n;
-    while (i < array_len(arr)) {
-        array_push(out, arr[i as u64]);
+    while (i < arr.len()) {
+        out.push(arr[i as u64]);
         i += 1;
     }
-    out
+    out.as_slice()
 }
 
 // ── Domain: student grades pipeline ──────────────────────────────────────────
@@ -195,16 +195,16 @@ fun main() {
     // ── filter_array ──────────────────────────────────────────────────────────
     let nums: i64[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     let evens = filter_array(nums, (x: i64) -> Bool { x % 2 == 0 });
-    assert(array_len(evens) == 5);
+    assert(evens.len() == 5);
     assert(evens[0] == 2);
     assert(evens[4] == 10);
 
     let big = filter_array(nums, (x: i64) -> Bool { x > 7 });
-    assert(array_len(big) == 3);
+    assert(big.len() == 3);
 
     // ── map_array ─────────────────────────────────────────────────────────────
     let squares = map_array(nums, (x: i64) -> i64 { x * x });
-    assert(array_len(squares) == 10);
+    assert(squares.len() == 10);
     assert(squares[0] == 1);
     assert(squares[9] == 100);
 
@@ -216,14 +216,14 @@ fun main() {
     let a: i64[] = [1, 2, 3, 4];
     let b: i64[] = [10, 20, 30, 40];
     let sums = zip_with(a, b, (x: i64, y: i64) -> i64 { x + y });
-    assert(array_len(sums) == 4);
+    assert(sums.len() == 4);
     assert(sums[0] == 11);
     assert(sums[3] == 44);
 
     // zip shorter arrays
     let c: i64[] = [100, 200];
     let partial = zip_with(a, c, (x: i64, y: i64) -> i64 { x * y });
-    assert(array_len(partial) == 2);
+    assert(partial.len() == 2);
     assert(partial[1] == 400);
 
     // zip with Bool→String
@@ -242,16 +242,16 @@ fun main() {
 
     // ── take / drop ───────────────────────────────────────────────────────────
     let first3 = take(nums, 3);
-    assert(array_len(first3) == 3);
+    assert(first3.len() == 3);
     assert(first3[2] == 3);
 
     let rest = drop(nums, 7);
-    assert(array_len(rest) == 3);
+    assert(rest.len() == 3);
     assert(rest[0] == 8);
 
     // take more than available
     let take_all = take(nums, 100);
-    assert(array_len(take_all) == 10);
+    assert(take_all.len() == 10);
 
     // ── Student pipeline ──────────────────────────────────────────────────────
     let students: Student[] = [
@@ -263,7 +263,7 @@ fun main() {
     ];
 
     let passing = filter_array(students, (s: Student) -> Bool { student_passing(s) });
-    assert(array_len(passing) == 3);
+    assert(passing.len() == 3);
 
     let letters = map_array(students, (s: Student) -> String { student_grade_letter(s) });
     assert(letters[0] == "A");
@@ -273,7 +273,7 @@ fun main() {
 
     // count A-grades
     let a_grades = filter_array(letters, (l: String) -> Bool { l == "A" });
-    assert(array_len(a_grades) == 1);
+    assert(a_grades.len() == 1);
 
     assert(any(students, (s: Student) -> Bool { s.grade >= 90 }));
     assert(!all(students, (s: Student) -> Bool { student_passing(s) }));

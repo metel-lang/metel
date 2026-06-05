@@ -67,12 +67,12 @@ struct NumberList { data: i64[], pos: i64 }
 
 impl NumberList {
     fun new(data: i64[]) -> NumberList { NumberList { data: data, pos: 0 } }
-    fun len(self) -> i64 { array_len(self.data) }
+    fun len(self) -> i64 { self.data.len() }
 }
 
 impl Iterable<i64> for NumberList {
     fun next(&mut self) -> Perhaps<i64> {
-        if (self.pos < array_len(self.data)) {
+        if (self.pos < self.data.len()) {
             let v = self.data[self.pos as u64];
             self.pos = self.pos + 1;
             Perhaps::Some { value: v }

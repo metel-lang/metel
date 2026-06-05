@@ -128,7 +128,7 @@ pub fn resolve(graph: &ModuleGraph) -> Result<ResolvedNames, MetelError> {
     // (std::core has no physical file; these names are registered in the type registry.)
     // See ADR-0027 for the virtual-module design and its migration path.
     let std_core_surface: HashSet<String> = [
-        "Perhaps", "Result", "Display", "Iterable", "From",
+        "Perhaps", "Result", "Display", "Iterable", "From", "List",
     ].iter().map(|s| s.to_string()).collect();
     pub_surface.insert(vec!["std".to_string(), "core".to_string()], std_core_surface);
 

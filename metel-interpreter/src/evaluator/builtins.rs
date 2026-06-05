@@ -8,7 +8,7 @@ use super::display::{format_float, format_value, value_to_display_string};
 pub(crate) fn free_function_names() -> std::collections::HashSet<&'static str> {
     [
         "print", "println", "string_len", "string_concat",
-        "array_push", "array_len", "clock", "assert", "assert_msg", "dbg",
+        "List::new", "List::from", "clock", "assert", "assert_msg", "dbg",
     ].into_iter().collect()
 }
 
@@ -183,24 +183,112 @@ pub(super) fn register_builtins(env: &mut Environment) {
         }
     }));
 
-    env.define("array_push", Value::Builtin("array_push".to_string(), |args, _span| {
-        if let Some(Value::Array(arr)) = args.first() {
-            if let Some(val) = args.get(1) {
-                arr.borrow_mut().push(val.clone());
-                Ok(Value::Unit)
-            } else {
-                Err(MetelError::internal("array_push: missing value argument"))
+    // ── List<T> constructors ──────────────────────────────────────────────────
+
+    // Helper: build a List Value from a backing Rc array.
+    // List<T> is represented as Value::Struct { name: "List", fields: { "inner": Value::Array(rc) } }
+
+    env.define("List::new", Value::Builtin("List::new".to_string(), |_args, _span| {
+        use std::rc::Rc;
+        use std::cell::RefCell;
+        let mut fields = std::collections::HashMap::new();
+        fields.insert("inner".to_string(), Value::Array(Rc::new(RefCell::new(vec![]))));
+        Ok(Value::Struct { name: "List".to_string(), fields })
+    }));
+
+    env.define("List::from", Value::Builtin("List::from".to_string(), |args, _span| {
+        use std::rc::Rc;
+        use std::cell::RefCell;
+        match args.first() {
+            Some(Value::Array(src)) => {
+                let copy = src.borrow().clone();
+                let mut fields = std::collections::HashMap::new();
+                fields.insert("inner".to_string(), Value::Array(Rc::new(RefCell::new(copy))));
+                Ok(Value::Struct { name: "List".to_string(), fields })
             }
-        } else {
-            Err(MetelError::internal("array_push: expected Array as first argument"))
+            _ => Err(MetelError::internal("List::from: expected array argument")),
         }
     }));
 
-    env.define("array_len", Value::Builtin("array_len".to_string(), |args, _span| {
-        if let Some(Value::Array(arr)) = args.first() {
-            Ok(Value::I64(arr.borrow().len() as i64))
-        } else {
-            Err(MetelError::internal("array_len: expected Array argument"))
+    // ── List<T> instance methods (keyed as "List::method") ───────────────────
+
+    env.define("List::push", Value::Builtin("List::push".to_string(), |args, _span| {
+        match (args.first(), args.get(1)) {
+            (Some(Value::Struct { name, fields }), Some(val)) if name == "List" => {
+                if let Some(Value::Array(arr)) = fields.get("inner") {
+                    arr.borrow_mut().push(val.clone());
+                    Ok(Value::Unit)
+                } else {
+                    Err(MetelError::internal("List::push: missing inner field"))
+                }
+            }
+            _ => Err(MetelError::internal("List::push: expected (List, T)")),
+        }
+    }));
+
+    env.define("List::pop", Value::Builtin("List::pop".to_string(), |args, span| {
+        match args.first() {
+            Some(Value::Struct { name, fields }) if name == "List" => {
+                if let Some(Value::Array(arr)) = fields.get("inner") {
+                    match arr.borrow_mut().pop() {
+                        Some(val) => {
+                            let mut f = std::collections::HashMap::new();
+                            f.insert("value".to_string(), val);
+                            Ok(Value::Enum { name: "Perhaps".to_string(), variant: "Some".to_string(), fields: f })
+                        }
+                        None => Ok(Value::Enum { name: "Perhaps".to_string(), variant: "None".to_string(), fields: std::collections::HashMap::new() }),
+                    }
+                } else {
+                    Err(MetelError::internal("List::pop: missing inner field"))
+                }
+            }
+            _ => Err(MetelError::panic(RuntimeErrorCode::R0009, "List::pop: expected List", span)),
+        }
+    }));
+
+    env.define("List::len", Value::Builtin("List::len".to_string(), |args, _span| {
+        match args.first() {
+            Some(Value::Struct { name, fields }) if name == "List" => {
+                if let Some(Value::Array(arr)) = fields.get("inner") {
+                    Ok(Value::I64(arr.borrow().len() as i64))
+                } else {
+                    Err(MetelError::internal("List::len: missing inner field"))
+                }
+            }
+            _ => Err(MetelError::internal("List::len: expected List")),
+        }
+    }));
+
+    env.define("List::get", Value::Builtin("List::get".to_string(), |args, _span| {
+        match (args.first(), args.get(1)) {
+            (Some(Value::Struct { name, fields }), Some(Value::I64(idx))) if name == "List" => {
+                if let Some(Value::Array(arr)) = fields.get("inner") {
+                    match arr.borrow().get(*idx as usize).cloned() {
+                        Some(val) => {
+                            let mut f = std::collections::HashMap::new();
+                            f.insert("value".to_string(), val);
+                            Ok(Value::Enum { name: "Perhaps".to_string(), variant: "Some".to_string(), fields: f })
+                        }
+                        None => Ok(Value::Enum { name: "Perhaps".to_string(), variant: "None".to_string(), fields: std::collections::HashMap::new() }),
+                    }
+                } else {
+                    Err(MetelError::internal("List::get: missing inner field"))
+                }
+            }
+            _ => Err(MetelError::internal("List::get: expected (List, i64)")),
+        }
+    }));
+
+    env.define("List::as_slice", Value::Builtin("List::as_slice".to_string(), |args, _span| {
+        match args.first() {
+            Some(Value::Struct { name, fields }) if name == "List" => {
+                if let Some(arr) = fields.get("inner") {
+                    Ok(arr.clone())
+                } else {
+                    Err(MetelError::internal("List::as_slice: missing inner field"))
+                }
+            }
+            _ => Err(MetelError::internal("List::as_slice: expected List")),
         }
     }));
 

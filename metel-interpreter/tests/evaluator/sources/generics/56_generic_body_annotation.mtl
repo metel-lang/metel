@@ -1,47 +1,51 @@
 // Test: explicit type annotations using generic type params inside function bodies
 // Covers issue #128: T/U in body annotations must resolve to TypeVars, not Named types.
 
-fun collect_matching<T>(arr: T[], pred: (T) -> Bool) -> T[] {
-    let mut result: T[]  = [];
+fun collect_matching<T>(arr: T[], pred: (T) -> Bool) -> List<T> {
+    let mut result: List<T> = List::new();
     for (let x in arr) {
-        if (pred(x)) { array_push(result, x); }
+        if (pred(x)) { result.push(x); }
     }
     result
 }
 
-fun map_to<T, U>(arr: T[], f: (T) -> U) -> U[] {
-    let mut out: U[]  = [];
-    for (let x in arr) { array_push(out, f(x)); }
+fun map_to<T, U>(arr: T[], f: (T) -> U) -> List<U> {
+    let mut out: List<U> = List::new();
+    for (let x in arr) { out.push(f(x)); }
     out
 }
 
-fun wrap_pair<A, B>(a: A, b: B) -> A[] {
-    let items: A[] = [];
-    array_push(items, a);
+fun wrap_pair<A, B>(a: A, b: B) -> List<A> {
+    let mut items: List<A> = List::new();
+    items.push(a);
     items
 }
 
 fun main() {
     let nums: i64[] = [1, 2, 3, 4, 5, 6];
     let evens = collect_matching(nums, (x: i64) -> Bool { x % 2 == 0 });
-    assert(array_len(evens) == 3);
-    assert(evens[0] == 2);
+    assert(evens.len() == 3);
+    let evens_arr = evens.as_slice();
+    assert(evens_arr[0] == 2);
 
     let strs: String[] = ["a", "bb", "ccc", "dddd"];
     let long = collect_matching(strs, (s: String) -> Bool { string_len(s) > 2 });
-    assert(array_len(long) == 2);
+    assert(long.len() == 2);
 
     let squares = map_to(nums, (x: i64) -> i64 { x * x });
-    assert(array_len(squares) == 6);
-    assert(squares[0] == 1);
-    assert(squares[5] == 36);
+    assert(squares.len() == 6);
+    let squares_arr = squares.as_slice();
+    assert(squares_arr[0] == 1);
+    assert(squares_arr[5] == 36);
 
     let bools = map_to(nums, (x: i64) -> Bool { x > 3 });
-    assert(array_len(bools) == 6);
-    assert(!bools[0]);
-    assert(bools[5]);
+    assert(bools.len() == 6);
+    let bools_arr = bools.as_slice();
+    assert(!bools_arr[0]);
+    assert(bools_arr[5]);
 
     let wrapped = wrap_pair(42, true);
-    assert(array_len(wrapped) == 1);
-    assert(wrapped[0] == 42);
+    assert(wrapped.len() == 1);
+    let wrapped_arr = wrapped.as_slice();
+    assert(wrapped_arr[0] == 42);
 }

@@ -13,11 +13,11 @@ fun check_var() {
 }
 
 // Ascription in argument position
-fun take_ints(arr: i64[]) -> i64 { array_len(arr) }
+fun take_ints(arr: i64[]) -> i64 { arr.len() }
 let _: i64 = take_ints([] : i64[]);
 
 // Ascription disambiguates two empty-array arguments
-fun two_arrays(a: i64[], b: f64[]) -> i64 { array_len(a) }
+fun two_arrays(a: i64[], b: f64[]) -> i64 { a.len() }
 let _: i64 = two_arrays([] : i64[], [] : f64[]);
 
 // Ascription on a struct literal
@@ -39,7 +39,7 @@ fun returns_ascribed() -> i64 {
 // Ascription resolves the type of an unannotated let binding
 fun check_inferred() {
     let arr = [] : i64[];
-    let _: i64 = array_len(arr);
+    let _: i64 = arr.len();
 }
 
 // Ascription inside a binary expression operand
