@@ -1,0 +1,5 @@
+// boolean has no From impl for any numeric type.
+fun main() {
+    let b = true;
+    b as? i64  // ERROR[T0007]
+}

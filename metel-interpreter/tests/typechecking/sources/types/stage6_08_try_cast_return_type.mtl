@@ -1,0 +1,20 @@
+// Return type is inferred as Perhaps<i32> without annotation.
+fun narrow(x: i64) -> Perhaps<i32> {
+    x as? i32
+}
+
+// as? chained after as: x as i64 as? i8 returns Perhaps<i8>.
+fun chain(x: i32) -> Perhaps<i8> {
+    x as i64 as? i8
+}
+
+// Identity as?: same source and target type.
+fun identity(x: i32) -> Perhaps<i32> {
+    x as? i32
+}
+
+fun main() {
+    let _ = narrow(100);
+    let _ = chain(50i32);
+    let _ = identity(7i32);
+}

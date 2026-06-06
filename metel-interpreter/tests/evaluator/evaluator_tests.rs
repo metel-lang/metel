@@ -156,6 +156,9 @@ mod tests {
     fn try_cast() { check("types/61_try_cast.mtl"); }
 
     #[test]
+    fn try_cast_extended() { check("types/62_try_cast_extended.mtl"); }
+
+    #[test]
     fn from_edge_cases() { check("types/63_from_edge_cases.mtl"); }
 
     #[test]

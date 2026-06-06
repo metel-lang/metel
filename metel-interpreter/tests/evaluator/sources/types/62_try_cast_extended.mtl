@@ -1,0 +1,91 @@
+fun main() {
+    // ── i64 → i16 ────────────────────────────────────────────────────────────
+    let a: i64 = 32767;
+    match a as? i16 {
+        Perhaps::Some { value } => assert(value == 32767i16),
+        Perhaps::None => assert(false),
+    }
+    let b: i64 = 32768;
+    match b as? i16 {
+        Perhaps::Some { value } => assert(false),
+        Perhaps::None => assert(true),
+    }
+    // Negative value that fits.
+    let neg: i64 = -100;
+    match neg as? i16 {
+        Perhaps::Some { value } => assert(value == -100i16),
+        Perhaps::None => assert(false),
+    }
+
+    // ── i64 → u16 ────────────────────────────────────────────────────────────
+    let c: i64 = 65535;
+    match c as? u16 {
+        Perhaps::Some { value } => assert(value == 65535u16),
+        Perhaps::None => assert(false),
+    }
+    let d: i64 = 65536;
+    match d as? u16 {
+        Perhaps::Some { value } => assert(false),
+        Perhaps::None => assert(true),
+    }
+    let neg2: i64 = -1;
+    match neg2 as? u16 {
+        Perhaps::Some { value } => assert(false),
+        Perhaps::None => assert(true),
+    }
+
+    // ── i64 → u32 ────────────────────────────────────────────────────────────
+    let e: i64 = 4294967295;
+    match e as? u32 {
+        Perhaps::Some { value } => assert(value == 4294967295u32),
+        Perhaps::None => assert(false),
+    }
+    let f: i64 = 4294967296;
+    match f as? u32 {
+        Perhaps::Some { value } => assert(false),
+        Perhaps::None => assert(true),
+    }
+
+    // ── i64 → u64 ────────────────────────────────────────────────────────────
+    let g: i64 = 1000;
+    match g as? u64 {
+        Perhaps::Some { value } => assert(value == 1000u64),
+        Perhaps::None => assert(false),
+    }
+    let neg3: i64 = -1;
+    match neg3 as? u64 {
+        Perhaps::Some { value } => assert(false),
+        Perhaps::None => assert(true),
+    }
+
+    // ── i32 source via i64 (chained as then as?) ─────────────────────────────
+    let h: i32 = 42i32;
+    match h as i64 as? i8 {
+        Perhaps::Some { value } => assert(value == 42i8),
+        Perhaps::None => assert(false),
+    }
+    let big32: i32 = 200i32;
+    match big32 as i64 as? i8 {
+        Perhaps::Some { value } => assert(false),
+        Perhaps::None => assert(true),
+    }
+
+    // ── Identity: same source and target type ─────────────────────────────────
+    let same: i64 = 77;
+    match same as? i64 {
+        Perhaps::Some { value } => assert(value == 77),
+        Perhaps::None => assert(false),
+    }
+
+    // ── u8 source via i64 ────────────────────────────────────────────────────
+    let j: u8 = 200u8;
+    match j as i64 as? i8 {
+        Perhaps::Some { value } => assert(false),  // 200 > i8::MAX
+        Perhaps::None => assert(true),
+    }
+    let k: u8 = 100u8;
+    match k as i64 as? i8 {
+        Perhaps::Some { value } => assert(value == 100i8),
+        Perhaps::None => assert(false),
+    }
+}
