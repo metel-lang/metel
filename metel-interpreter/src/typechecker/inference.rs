@@ -69,7 +69,7 @@ fn infer_decl(
             // If the resolved type still has free variables, they are quantified into a
             // polymorphic scheme so each call site gets a fresh instantiation.
             if matches!(&ld.value, Expr::Closure { .. }) && ld.type_ann.is_none() {
-                let partial_subst = ctx.solve()?;
+                let partial_subst = ctx.default_literal_vars(&ctx.solve()?);
                 let resolved_ty = partial_subst.apply(&val_ty);
                 let scheme = generalize(resolved_ty.clone(), &env_fvs);
                 if !scheme.quantified_vars.is_empty() {
@@ -226,7 +226,7 @@ fn infer_fun_decl(
     // Inline solve-and-generalize: future call sites look up this function via the
     // poly_env and get a fresh instantiation per call, avoiding constraint conflicts
     // when the same polymorphic function is called at different types.
-    let partial_subst = ctx.solve()?;
+    let partial_subst = ctx.default_literal_vars(&ctx.solve()?);
     let resolved_ty = partial_subst.apply(&fun_ty);
     let scheme = generalize(resolved_ty.clone(), &env_fvs);
     ctx.bind_poly(&fun.name, scheme);
@@ -327,7 +327,7 @@ fn infer_impl_method(
     ctx.swap_type_params(saved_type_params);
     ctx.pop_scope();
 
-    let partial_subst = ctx.solve()?;
+    let partial_subst = ctx.default_literal_vars(&ctx.solve()?);
     let fun_ty = InferType::Fun(param_types, Box::new(ret_ty));
     let resolved_fun_ty = partial_subst.apply(&fun_ty);
 
@@ -398,7 +398,7 @@ fn infer_default_aspect_method(
     ctx.swap_type_params(saved_type_params);
     ctx.pop_scope();
 
-    let partial_subst = ctx.solve()?;
+    let partial_subst = ctx.default_literal_vars(&ctx.solve()?);
     let fun_ty = InferType::Fun(param_types, Box::new(ret_ty));
     let resolved_fun_ty = partial_subst.apply(&fun_ty);
     ctx.register_method(target_name.to_string(), method.name.clone(), resolved_fun_ty);
@@ -762,6 +762,21 @@ fn infer_expr(
         Expr::MethodCall { receiver, method, args, span, .. } => {
             let recv_ty = infer_expr(receiver, ctx, fun_generalizations)?;
             let recv_ty = ctx.solve()?.apply(&recv_ty);
+            // If the receiver is a numeric literal TypeVar, default it to i64/f64
+            // so method dispatch can proceed with a concrete type.
+            let recv_ty = if let InferType::Var(tv) = &recv_ty {
+                if ctx.is_integer_literal_var(*tv) {
+                    ctx.add_constraint(recv_ty.clone(), InferType::int(), span.clone());
+                    InferType::int()
+                } else if ctx.is_float_literal_var(*tv) {
+                    ctx.add_constraint(recv_ty.clone(), InferType::float(), span.clone());
+                    InferType::float()
+                } else {
+                    recv_ty
+                }
+            } else {
+                recv_ty
+            };
 
             // T[]::len and [T; N]::len — built-in method on array types.
             if matches!(&recv_ty, InferType::Array(_) | InferType::SizedArray(_, _)) {
@@ -923,8 +938,9 @@ fn infer_expr(
         Expr::Cast { expr, target_type, span } => {
             let source_ty = infer_expr(expr, ctx, fun_generalizations)?;
             let target_ty = type_expr_to_infer(target_type);
-            let source_resolved = ctx.solve()?.apply(&source_ty);
-            let target_resolved = ctx.solve()?.apply(&target_ty);
+            let subst = ctx.default_literal_vars(&ctx.solve()?);
+            let source_resolved = subst.apply(&source_ty);
+            let target_resolved = subst.apply(&target_ty);
             // Identity casts always allowed.
             if source_resolved == target_resolved {
                 return Ok(target_ty);
@@ -948,8 +964,9 @@ fn infer_expr(
         Expr::TryCast { expr, target_type, span } => {
             let source_ty = infer_expr(expr, ctx, fun_generalizations)?;
             let target_ty = type_expr_to_infer(target_type);
-            let source_resolved = ctx.solve()?.apply(&source_ty);
-            let target_resolved = ctx.solve()?.apply(&target_ty);
+            let subst = ctx.default_literal_vars(&ctx.solve()?);
+            let source_resolved = subst.apply(&source_ty);
+            let target_resolved = subst.apply(&target_ty);
             // Identity casts succeed trivially → Perhaps::Some(value).
             if source_resolved != target_resolved {
                 // Require the same From impl that `as` requires.
@@ -1169,8 +1186,8 @@ fn named_type_name(ty: &InferType) -> Option<String> {
 fn infer_literal(lit: &Literal, ctx: &mut InferContext) -> InferType {
     use crate::ast::{IntKind, FloatKind};
     match lit {
-        Literal::Int(_)   => InferType::int(),
-        Literal::Float(_) => InferType::float(),
+        Literal::Int(_)   => ctx.fresh_integer_literal_var(),
+        Literal::Float(_) => ctx.fresh_float_literal_var(),
         Literal::SizedInt { kind, .. } => InferType::Concrete(match kind {
             IntKind::I8  => Type::I8,
             IntKind::I16 => Type::I16,
@@ -1215,8 +1232,16 @@ fn infer_binop(
                     (InferType::Concrete(Type::Str), InferType::Concrete(Type::Str)) => {
                         return Ok(InferType::str());
                     }
-                    (InferType::Concrete(Type::Str), InferType::Var(_))
-                    | (InferType::Var(_), InferType::Concrete(Type::Str)) => {
+                    (InferType::Concrete(Type::Str), InferType::Var(v))
+                    | (InferType::Var(v), InferType::Concrete(Type::Str)) => {
+                        // Numeric literal TypeVars cannot be String — reject with T0005.
+                        if ctx.is_integer_literal_var(*v) || ctx.is_float_literal_var(*v) {
+                            return Err(MetelError::type_error(
+                                TypeErrorCode::T0005,
+                                format!("`+` requires i64, f64, or String operands, got `{lhs_resolved}` and `{rhs_resolved}`"),
+                                span,
+                            ));
+                        }
                         ctx.add_constraint(lhs_ty, InferType::str(), span.clone());
                         ctx.add_constraint(rhs_ty, InferType::str(), span.clone());
                         return Ok(InferType::str());

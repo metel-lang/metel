@@ -469,6 +469,7 @@ mod phase_4_unification {
 
 #[cfg(test)]
 mod phase_5_constraints {
+    use std::collections::HashSet;
     use metel::typeinference::{solve_constraints, Constraint, InferType, TypeVar};
     use metel::ast::Span;
 
@@ -476,11 +477,13 @@ mod phase_5_constraints {
         Span::new(0, 1, "test")
     }
 
+    fn no_lit_vars() -> HashSet<TypeVar> { HashSet::new() }
+
     #[test]
     fn test_single_constraint_var_concrete() {
         // ?t0 = i64  =>  { ?t0 → i64 }
         let cs = vec![Constraint::new(InferType::var(TypeVar(0)), InferType::int(), span())];
-        let s = solve_constraints(cs).unwrap();
+        let s = solve_constraints(cs, &no_lit_vars(), &no_lit_vars()).unwrap();
         assert_eq!(s.apply(&InferType::var(TypeVar(0))), InferType::int());
     }
 
@@ -491,7 +494,7 @@ mod phase_5_constraints {
             Constraint::new(InferType::var(TypeVar(0)), InferType::int(), span()),
             Constraint::new(InferType::var(TypeVar(1)), InferType::bool(), span()),
         ];
-        let s = solve_constraints(cs).unwrap();
+        let s = solve_constraints(cs, &no_lit_vars(), &no_lit_vars()).unwrap();
         assert_eq!(s.apply(&InferType::var(TypeVar(0))), InferType::int());
         assert_eq!(s.apply(&InferType::var(TypeVar(1))), InferType::bool());
     }
@@ -503,7 +506,7 @@ mod phase_5_constraints {
             Constraint::new(InferType::var(TypeVar(0)), InferType::var(TypeVar(1)), span()),
             Constraint::new(InferType::var(TypeVar(1)), InferType::int(), span()),
         ];
-        let s = solve_constraints(cs).unwrap();
+        let s = solve_constraints(cs, &no_lit_vars(), &no_lit_vars()).unwrap();
         assert_eq!(s.apply(&InferType::var(TypeVar(0))), InferType::int());
         assert_eq!(s.apply(&InferType::var(TypeVar(1))), InferType::int());
     }
@@ -515,21 +518,21 @@ mod phase_5_constraints {
             Constraint::new(InferType::var(TypeVar(0)), InferType::int(), span()),
             Constraint::new(InferType::var(TypeVar(0)), InferType::bool(), span()),
         ];
-        assert!(solve_constraints(cs).is_err());
+        assert!(solve_constraints(cs, &no_lit_vars(), &no_lit_vars()).is_err());
     }
 
     #[test]
     fn test_error_carries_span() {
         let bad_span = Span::new(10, 20, "myfile.mtl");
         let cs = vec![Constraint::new(InferType::int(), InferType::bool(), bad_span)];
-        let err = solve_constraints(cs).unwrap_err();
+        let err = solve_constraints(cs, &no_lit_vars(), &no_lit_vars()).unwrap_err();
         let msg = format!("{}", err);
         assert!(msg.contains("myfile.mtl"));
     }
 
     #[test]
     fn test_empty_constraints() {
-        let s = solve_constraints(vec![]).unwrap();
+        let s = solve_constraints(vec![], &no_lit_vars(), &no_lit_vars()).unwrap();
         // Empty substitution — variables unchanged
         assert_eq!(s.apply(&InferType::var(TypeVar(0))), InferType::var(TypeVar(0)));
     }
@@ -539,7 +542,7 @@ mod phase_5_constraints {
         // ?t0 = (i64) -> boolean
         let fun_ty = InferType::Fun(vec![InferType::int()], Box::new(InferType::bool()));
         let cs = vec![Constraint::new(InferType::var(TypeVar(0)), fun_ty.clone(), span())];
-        let s = solve_constraints(cs).unwrap();
+        let s = solve_constraints(cs, &no_lit_vars(), &no_lit_vars()).unwrap();
         assert_eq!(s.apply(&InferType::var(TypeVar(0))), fun_ty);
     }
 
@@ -554,7 +557,7 @@ mod phase_5_constraints {
                 span(),
             ),
         ];
-        let s = solve_constraints(cs).unwrap();
+        let s = solve_constraints(cs, &no_lit_vars(), &no_lit_vars()).unwrap();
         assert_eq!(s.apply(&InferType::var(TypeVar(1))), InferType::int());
     }
 }
@@ -964,6 +967,7 @@ mod phase_7_infer_context {
 
 #[cfg(test)]
 mod phase_8_known_limitations {
+    use std::collections::HashSet;
     use metel::ast::Span;
     use metel::typeinference::{
         instantiate, solve_constraints, Constraint, InferType, TypeScheme, TypeVar, TypeVarGenerator,
@@ -972,6 +976,8 @@ mod phase_8_known_limitations {
     fn span() -> Span {
         Span::new(0, 1, "test")
     }
+
+    fn no_lit_vars() -> HashSet<TypeVar> { HashSet::new() }
 
     /// Rank-1 limitation: a function parameter is a monotype.
     ///
@@ -1000,7 +1006,7 @@ mod phase_8_known_limitations {
                 span(),
             ),
         ];
-        assert!(solve_constraints(cs).is_err());
+        assert!(solve_constraints(cs, &no_lit_vars(), &no_lit_vars()).is_err());
     }
 
     /// Let-bound closures are NOT generalized into type schemes.
@@ -1029,7 +1035,7 @@ mod phase_8_known_limitations {
                 span(),
             ),
         ];
-        assert!(solve_constraints(cs).is_err());
+        assert!(solve_constraints(cs, &no_lit_vars(), &no_lit_vars()).is_err());
     }
 
     /// Contrast: a properly generalized scheme CAN be used at two types.
@@ -1061,7 +1067,7 @@ mod phase_8_known_limitations {
             Constraint::new(inst1, InferType::Fun(vec![InferType::int()],  Box::new(ret1)), span()),
             Constraint::new(inst2, InferType::Fun(vec![InferType::bool()], Box::new(ret2)), span()),
         ];
-        assert!(solve_constraints(cs).is_ok(), "generalized scheme can be instantiated independently at i64 and boolean");
+        assert!(solve_constraints(cs, &no_lit_vars(), &no_lit_vars()).is_ok(), "generalized scheme can be instantiated independently at i64 and boolean");
     }
 
     /// Eager partial solve limitation: field access requires the receiver type

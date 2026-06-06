@@ -871,10 +871,22 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
         TypedExpr::Literal(lit, ty, _) => {
             use crate::ast::{IntKind, FloatKind};
             let val = match lit {
-                // Plain int literal promoted to u64 at an index site by the construction pass.
-                Literal::Int(n) if ty == &crate::types::Type::U64 => Value::U64(*n as u64),
-                Literal::Int(n)   => Value::I64(*n),
-                Literal::Float(f) => Value::F64(*f),
+                // Unsuffixed int/float literals are polymorphic; their resolved type
+                // is determined by context (defaulting to i64/f64 when unconstrained).
+                Literal::Int(n) => match ty {
+                    crate::types::Type::I8  => Value::I8(*n as i8),
+                    crate::types::Type::I16 => Value::I16(*n as i16),
+                    crate::types::Type::I32 => Value::I32(*n as i32),
+                    crate::types::Type::U8  => Value::U8(*n as u8),
+                    crate::types::Type::U16 => Value::U16(*n as u16),
+                    crate::types::Type::U32 => Value::U32(*n as u32),
+                    crate::types::Type::U64 => Value::U64(*n as u64),
+                    _ => Value::I64(*n), // i64 (default) and Int alias
+                },
+                Literal::Float(f) => match ty {
+                    crate::types::Type::F32 => Value::F32(*f as f32),
+                    _ => Value::F64(*f), // f64 (default) and Float alias
+                },
                 Literal::SizedInt { value, kind } => match kind {
                     IntKind::I8  => Value::I8(*value as i8),
                     IntKind::I16 => Value::I16(*value as i16),

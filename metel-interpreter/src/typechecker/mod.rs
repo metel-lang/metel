@@ -515,7 +515,7 @@ fn check_impl(
     // Pass 1: walk AST, emit constraints, collect function generalizations.
     let mut fun_generalizations: Vec<FunGeneralization> = vec![];
     inference::infer_program(program, &mut ctx, &mut fun_generalizations)?;
-    let subst = ctx.solve()?;
+    let subst = ctx.default_literal_vars(&ctx.solve()?);
 
     // Build SchemeEnv from user functions, then add all built-in schemes.
     let gen = ctx.split_gen();

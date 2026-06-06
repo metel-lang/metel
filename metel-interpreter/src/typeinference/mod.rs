@@ -344,12 +344,27 @@ impl Constraint {
     }
 }
 
+fn is_integer_type(t: &Type) -> bool {
+    matches!(t, Type::I8 | Type::I16 | Type::I32 | Type::I64 | Type::U8 | Type::U16 | Type::U32 | Type::U64)
+}
+
+fn is_float_type(t: &Type) -> bool {
+    matches!(t, Type::F32 | Type::F64)
+}
+
 /// Solve a list of constraints by unifying each `lhs`/`rhs` pair in order.
 ///
 /// The running substitution is applied to both sides before each unification
 /// so that earlier bindings propagate into later constraints. Errors are
 /// reported with the source span of the offending constraint.
-pub fn solve_constraints(constraints: Vec<Constraint>) -> Result<Substitution, MetelError> {
+///
+/// Integer/float literal TypeVars are validated: if one resolves to a concrete
+/// non-numeric type, T0001 is raised at the constraint site.
+pub fn solve_constraints(
+    constraints: Vec<Constraint>,
+    integer_literal_vars: &HashSet<TypeVar>,
+    float_literal_vars: &HashSet<TypeVar>,
+) -> Result<Substitution, MetelError> {
     let mut subst = Substitution::new();
     for c in constraints {
         let lhs = subst.apply(&c.lhs);
@@ -358,6 +373,29 @@ pub fn solve_constraints(constraints: Vec<Constraint>) -> Result<Substitution, M
             MetelError::type_error(crate::error::TypeErrorCode::T0001, format!("cannot unify {} with {}", lhs, rhs), &c.span)
         })?;
         subst = subst.compose(&s);
+        // Validate: integer/float literal vars must only resolve to numeric types.
+        for &var in integer_literal_vars {
+            match subst.apply(&InferType::Var(var)) {
+                InferType::Var(_) | InferType::Never => {}
+                InferType::Concrete(t) if is_integer_type(&t) => {}
+                other => return Err(MetelError::type_error(
+                    crate::error::TypeErrorCode::T0001,
+                    format!("cannot unify integer literal with `{other}`"),
+                    &c.span,
+                )),
+            }
+        }
+        for &var in float_literal_vars {
+            match subst.apply(&InferType::Var(var)) {
+                InferType::Var(_) | InferType::Never => {}
+                InferType::Concrete(t) if is_float_type(&t) => {}
+                other => return Err(MetelError::type_error(
+                    crate::error::TypeErrorCode::T0001,
+                    format!("cannot unify float literal with `{other}`"),
+                    &c.span,
+                )),
+            }
+        }
     }
     Ok(subst)
 }
@@ -826,6 +864,12 @@ pub struct InferContext {
     /// Names that have same-tier glob conflicts deferred until use. (METEL-98)
     /// Maps name → list of source module paths that both export it.
     deferred_glob_conflicts: HashMap<String, Vec<Vec<String>>>,
+    /// TypeVars introduced by unsuffixed integer literals (`42`, `1_000`).
+    /// Any such var that is still free after constraint solving defaults to `i64`.
+    integer_literal_vars: HashSet<TypeVar>,
+    /// TypeVars introduced by unsuffixed float literals (`3.14`, `2.0`).
+    /// Any such var that is still free after constraint solving defaults to `f64`.
+    float_literal_vars: HashSet<TypeVar>,
 }
 
 impl InferContext {
@@ -851,6 +895,8 @@ impl InferContext {
             current_type_param_bounds: HashMap::new(),
             current_module_path,
             deferred_glob_conflicts: HashMap::new(),
+            integer_literal_vars: HashSet::new(),
+            float_literal_vars: HashSet::new(),
         };
         for (name, scheme) in imported_schemes {
             ctx.bind_poly(name, scheme.clone());
@@ -1033,6 +1079,66 @@ impl InferContext {
         InferType::Var(self.var_gen.fresh())
     }
 
+    /// Create a fresh TypeVar for an unsuffixed integer literal.
+    /// If still free after constraint solving, it defaults to `i64`.
+    pub fn fresh_integer_literal_var(&mut self) -> InferType {
+        let ty = self.fresh_var();
+        if let InferType::Var(tv) = ty {
+            self.integer_literal_vars.insert(tv);
+            InferType::Var(tv)
+        } else {
+            ty
+        }
+    }
+
+    /// Create a fresh TypeVar for an unsuffixed float literal.
+    /// If still free after constraint solving, it defaults to `f64`.
+    pub fn fresh_float_literal_var(&mut self) -> InferType {
+        let ty = self.fresh_var();
+        if let InferType::Var(tv) = ty {
+            self.float_literal_vars.insert(tv);
+            InferType::Var(tv)
+        } else {
+            ty
+        }
+    }
+
+    /// Extend `subst` so that any literal TypeVar still free (unbound to a concrete type)
+    /// is defaulted: integer literal vars → `i64`, float literal vars → `f64`.
+    /// Also propagates defaults through TypeVar chains: if a literal var resolves to
+    /// another free TypeVar, both are bound to the default type.
+    /// Call this immediately after each `ctx.solve()` before using the substitution.
+    pub fn default_literal_vars(&self, subst: &Substitution) -> Substitution {
+        let mut extended = subst.clone();
+        for &var in &self.integer_literal_vars {
+            match extended.apply(&InferType::Var(var)) {
+                InferType::Var(final_var) => {
+                    extended.bind(final_var, InferType::int());
+                    extended.bind(var, InferType::int());
+                }
+                _ => {} // already bound to a concrete type
+            }
+        }
+        for &var in &self.float_literal_vars {
+            match extended.apply(&InferType::Var(var)) {
+                InferType::Var(final_var) => {
+                    extended.bind(final_var, InferType::float());
+                    extended.bind(var, InferType::float());
+                }
+                _ => {}
+            }
+        }
+        extended
+    }
+
+    pub fn is_integer_literal_var(&self, tv: TypeVar) -> bool {
+        self.integer_literal_vars.contains(&tv)
+    }
+
+    pub fn is_float_literal_var(&self, tv: TypeVar) -> bool {
+        self.float_literal_vars.contains(&tv)
+    }
+
     /// Bind a name to a monomorphic type in the current scope.
     /// `is_mutable` is `true` for `mut` bindings, `false` for `let` bindings and parameters.
     pub fn bind_mono(&mut self, name: impl Into<String>, ty: InferType, is_mutable: bool) {
@@ -1103,7 +1209,7 @@ impl InferContext {
 
     /// Solve all accumulated constraints and return the resulting substitution.
     pub fn solve(&self) -> Result<Substitution, MetelError> {
-        solve_constraints(self.constraints.clone())
+        solve_constraints(self.constraints.clone(), &self.integer_literal_vars, &self.float_literal_vars)
     }
 
     /// Set the expected return type for the current function, returning the previous value.
