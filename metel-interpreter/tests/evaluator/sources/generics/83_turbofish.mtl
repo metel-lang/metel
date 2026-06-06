@@ -14,7 +14,7 @@ fun main() {
     let s = identity::<String>("hello");
     assert(s == "hello");
 
-    let b = identity::<Bool>(true);
+    let b = identity::<boolean>(true);
     assert(b);
 
     // Turbofish with two type parameters
@@ -25,7 +25,7 @@ fun main() {
     assert(s2 == "kept");
 
     // Turbofish with compound types
-    let t = identity::<(i64, Bool)>((7, false));
+    let t = identity::<(i64, boolean)>((7, false));
     assert(t.0 == 7);
     assert(t.1 == false);
 

@@ -10,11 +10,11 @@ aspectComparable {
     fun compare(self, other: Self) -> i64;  // <0 less, 0 equal, >0 greater
 
     // default method built on top of compare
-    fun is_less_than(self, other: Self) -> Bool {
+    fun is_less_than(self, other: Self) -> boolean {
         return self.compare(other) < 0;
     }
 
-    fun is_equal_to(self, other: Self) -> Bool {
+    fun is_equal_to(self, other: Self) -> boolean {
         return self.compare(other) == 0;
     }
 }

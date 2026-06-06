@@ -60,7 +60,7 @@ pub enum Value {
     /// 32-bit float.
     F32(f32),
     Char(char),
-    Bool(bool),
+    Boolean(bool),
     Str(String),
     Unit,
     // ── Compound types ────────────────────────────────────────────────────────
@@ -709,10 +709,10 @@ pub fn eval_stmt(stmt: &TypedStmt, env: &mut Environment) -> Result<Signal, Mete
         TypedStmt::While(w) => {
             loop {
                 match eval_expr(&w.condition, env)? {
-                    Signal::Value(Value::Bool(false)) => break,
-                    Signal::Value(Value::Bool(true))  => {}
+                    Signal::Value(Value::Boolean(false)) => break,
+                    Signal::Value(Value::Boolean(true))  => {}
                     Signal::Value(_) => return Err(MetelError::internal(
-                        "while: expected Bool condition (typechecker should have caught this)",
+                        "while: expected boolean condition (typechecker should have caught this)",
                     )),
                     other => return Ok(other), // propagate Return from condition
                 }
@@ -746,10 +746,10 @@ pub fn eval_stmt(stmt: &TypedStmt, env: &mut Environment) -> Result<Signal, Mete
             let result = loop {
                 if let Some(cond) = &f.condition {
                     match eval_expr(cond, env)? {
-                        Signal::Value(Value::Bool(false)) => break Ok(Signal::Value(Value::Unit)),
-                        Signal::Value(Value::Bool(true))  => {}
+                        Signal::Value(Value::Boolean(false)) => break Ok(Signal::Value(Value::Unit)),
+                        Signal::Value(Value::Boolean(true))  => {}
                         Signal::Value(_) => break Err(MetelError::internal(
-                            "for: expected Bool condition (typechecker should have caught this)",
+                            "for: expected boolean condition (typechecker should have caught this)",
                         )),
                         other => break Ok(other),
                     }
@@ -890,7 +890,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                     FloatKind::F64 => Value::F64(*value),
                 },
                 Literal::Char(c)  => Value::Char(*c),
-                Literal::Bool(b)  => Value::Bool(*b),
+                Literal::Boolean(b)  => Value::Boolean(*b),
                 Literal::Str(s)   => Value::Str(s.clone()),
                 Literal::None     => Value::Enum { name: "Perhaps".into(), variant: "None".into(), fields: HashMap::new() },
                 Literal::Unit     => Value::Unit,
@@ -962,17 +962,17 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
             if matches!(op, BinOp::And) {
                 let l = eval_expr(lhs, env)?.into_value();
                 return match l {
-                    Value::Bool(false) => Ok(Signal::Value(Value::Bool(false))),
-                    Value::Bool(true)  => eval_expr(rhs, env),
-                    _ => Err(MetelError::internal("&&: expected Bool (typechecker should have caught this)")),
+                    Value::Boolean(false) => Ok(Signal::Value(Value::Boolean(false))),
+                    Value::Boolean(true)  => eval_expr(rhs, env),
+                    _ => Err(MetelError::internal("&&: expected boolean (typechecker should have caught this)")),
                 };
             }
             if matches!(op, BinOp::Or) {
                 let l = eval_expr(lhs, env)?.into_value();
                 return match l {
-                    Value::Bool(true)  => Ok(Signal::Value(Value::Bool(true))),
-                    Value::Bool(false) => eval_expr(rhs, env),
-                    _ => Err(MetelError::internal("||: expected Bool (typechecker should have caught this)")),
+                    Value::Boolean(true)  => Ok(Signal::Value(Value::Boolean(true))),
+                    Value::Boolean(false) => eval_expr(rhs, env),
+                    _ => Err(MetelError::internal("||: expected boolean (typechecker should have caught this)")),
                 };
             }
 
@@ -1015,12 +1015,12 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                 (UnaryOp::Neg, Value::I32(n))   => Value::I32(n.wrapping_neg()),
                 (UnaryOp::Neg, Value::F64(f)) => Value::F64(-f),
                 (UnaryOp::Neg, Value::F32(f))   => Value::F32(-f),
-                (UnaryOp::Not, Value::Bool(b))  => Value::Bool(!b),
+                (UnaryOp::Not, Value::Boolean(b))  => Value::Boolean(!b),
                 (UnaryOp::Deref, Value::Pointer(rc)) | (UnaryOp::Deref, Value::MutPointer(rc)) => rc.borrow().clone(),
                 (UnaryOp::Deref, Value::MutFieldPointer { root, path }) =>
                     read_path(&root.borrow(), &path, span)?,
                 (UnaryOp::Neg, _) => return Err(MetelError::internal("unary `-`: expected numeric type (typechecker should have caught this)")),
-                (UnaryOp::Not, _) => return Err(MetelError::internal("unary `!`: expected Bool (typechecker should have caught this)")),
+                (UnaryOp::Not, _) => return Err(MetelError::internal("unary `!`: expected boolean (typechecker should have caught this)")),
                 (UnaryOp::Deref, _) => return Err(MetelError::internal("unary `*`: expected pointer (typechecker should have caught this)")),
                 _ => unreachable!("Ref/RefMut handled above"),
             };
@@ -1046,7 +1046,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                     Value::F64(_) => Some("f64"),
                     Value::F32(_)   => Some("f32"),
                     Value::Char(_)  => Some("Char"),
-                    Value::Bool(_)  => Some("Bool"),
+                    Value::Boolean(_)  => Some("boolean"),
                     Value::Str(_)   => Some("String"),
                     _ => None,
                 };
@@ -1103,12 +1103,12 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
 
         TypedExpr::If { condition, then_branch, else_branch, .. } => {
             match eval_expr(condition, env)? {
-                Signal::Value(Value::Bool(true))  => eval_block(then_branch, env),
-                Signal::Value(Value::Bool(false)) => match else_branch {
+                Signal::Value(Value::Boolean(true))  => eval_block(then_branch, env),
+                Signal::Value(Value::Boolean(false)) => match else_branch {
                     Some(branch) => eval_block(branch, env),
                     None         => Ok(Signal::Value(Value::Unit)),
                 },
-                Signal::Value(_) => Err(MetelError::internal("if: expected Bool condition (typechecker should have caught this)")),
+                Signal::Value(_) => Err(MetelError::internal("if: expected boolean condition (typechecker should have caught this)")),
                 other => Ok(other), // propagate Return from condition
             }
         }
@@ -1137,9 +1137,9 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                     let guard_val = eval_expr(guard, env)?.into_value();
                     env.pop_scope();
                     match guard_val {
-                        Value::Bool(true)  => {}
-                        Value::Bool(false) => continue,
-                        _ => return Err(MetelError::internal("match guard: expected Bool (typechecker should have caught this)")),
+                        Value::Boolean(true)  => {}
+                        Value::Boolean(false) => continue,
+                        _ => return Err(MetelError::internal("match guard: expected boolean (typechecker should have caught this)")),
                     }
                 }
                 // Execute the arm body in a scope with pattern bindings.
@@ -1325,7 +1325,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                 Value::I64(_)   => "i64".to_string(),
                 Value::F64(_) => "f64".to_string(),
                 Value::Char(_)  => "Char".to_string(),
-                Value::Bool(_)  => "Bool".to_string(),
+                Value::Boolean(_)  => "boolean".to_string(),
                 Value::Str(_)   => "String".to_string(),
                 _ => return Err(MetelError::panic(
                     RuntimeErrorCode::R0009,

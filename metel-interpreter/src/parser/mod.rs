@@ -704,7 +704,7 @@ fn parse_literal_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resu
             })?;
             Literal::Char(ch)
         }
-        Rule::bool_lit   => Literal::Bool(text == "true"),
+        Rule::bool_lit   => Literal::Boolean(text == "true"),
         Rule::none_lit   => Literal::None,
         Rule::unit_lit   => Literal::Unit,
         r => return Err(MetelError::internal(format!("parse_literal_expr: unexpected rule {r:?}"))),

@@ -1,6 +1,6 @@
 // Test: type annotation mismatch
 //
-// The annotation says i64 but the value is Bool — the typechecker must
+// The annotation says i64 but the value is boolean — the typechecker must
 // produce a type mismatch error (T0001).
 
 let x: i64 = true;  // ERROR[T0001]

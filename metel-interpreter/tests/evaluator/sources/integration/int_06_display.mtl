@@ -1,7 +1,7 @@
 // Integration Test 6 — Display and Text Rendering
 //
 // Feature coverage (v0.4):
-//   to_string on all built-in Display types (i64, f64, Bool, String),
+//   to_string on all built-in Display types (i64, f64, boolean, String),
 //   print / println accept any Display type,
 //   f64 whole-number formatting (5.0 → "5") vs fractional (3.14 → "3.14"),
 //   user aspect Printable with format() method,
@@ -118,7 +118,7 @@ fun main() {
     assert(0.5.to_string()   == "0.5");
     assert(1.25.to_string()  == "1.25");
 
-    // to_string on Bool
+    // to_string on boolean
     assert(true.to_string()  == "true");
     assert(false.to_string() == "false");
 

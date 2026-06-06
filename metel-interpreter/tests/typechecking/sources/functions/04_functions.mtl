@@ -9,20 +9,20 @@
 //
 // Expected inferred types:
 //   add(i64, i64) -> i64
-//   negate(Bool) -> Bool
+//   negate(boolean) -> boolean
 //   to_string(i64) -> String  (uses a built-in)
 //   a : i64    (call to add)
-//   b : Bool   (call to negate)
+//   b : boolean   (call to negate)
 //
 // The body of each function is also type-checked:
 //   add body:    x + y  infers i64 — must unify with declared return i64 ✓
-//   negate body: !b     infers Bool — must unify with declared return Bool ✓
+//   negate body: !b     infers boolean — must unify with declared return boolean ✓
 
 fun add(x: i64, y: i64) -> i64 {
     x + y
 }
 
-fun negate(b: Bool) -> Bool {
+fun negate(b: boolean) -> boolean {
     !b
 }
 

@@ -50,10 +50,10 @@ pub(super) fn register_builtins(env: &mut Environment) {
             _ => Err(MetelError::internal("f64::to_string: expected f64")),
         }
     }));
-    env.define("Bool::to_string", Value::Builtin("Bool::to_string".to_string(), |args, _span| {
+    env.define("boolean::to_string", Value::Builtin("boolean::to_string".to_string(), |args, _span| {
         match args.first() {
-            Some(Value::Bool(b)) => Ok(Value::Str(if *b { "true" } else { "false" }.to_string())),
-            _ => Err(MetelError::internal("Bool::to_string: expected Bool")),
+            Some(Value::Boolean(b)) => Ok(Value::Str(if *b { "true" } else { "false" }.to_string())),
+            _ => Err(MetelError::internal("boolean::to_string: expected boolean")),
         }
     }));
     env.define("Char::to_string", Value::Builtin("Char::to_string".to_string(), |args, _span| {
@@ -304,30 +304,30 @@ pub(super) fn register_builtins(env: &mut Environment) {
 
     env.define("assert", Value::Builtin("assert".to_string(), |args, span| {
         match args.first() {
-            Some(Value::Bool(true)) => Ok(Value::Unit),
-            Some(Value::Bool(false)) => Err(MetelError::panic(
+            Some(Value::Boolean(true)) => Ok(Value::Unit),
+            Some(Value::Boolean(false)) => Err(MetelError::panic(
                 RuntimeErrorCode::R0013,
                 "assertion failed",
                 span,
             )),
-            _ => Err(MetelError::internal("assert: expected Bool argument")),
+            _ => Err(MetelError::internal("assert: expected boolean argument")),
         }
     }));
 
     env.define("assert_msg", Value::Builtin("assert_msg".to_string(), |args, span| {
         match (args.first(), args.get(1)) {
-            (Some(Value::Bool(true)), _) => Ok(Value::Unit),
-            (Some(Value::Bool(false)), Some(Value::Str(msg))) => Err(MetelError::panic(
+            (Some(Value::Boolean(true)), _) => Ok(Value::Unit),
+            (Some(Value::Boolean(false)), Some(Value::Str(msg))) => Err(MetelError::panic(
                 RuntimeErrorCode::R0013,
                 msg.clone(),
                 span,
             )),
-            (Some(Value::Bool(false)), _) => Err(MetelError::panic(
+            (Some(Value::Boolean(false)), _) => Err(MetelError::panic(
                 RuntimeErrorCode::R0013,
                 "assertion failed",
                 span,
             )),
-            _ => Err(MetelError::internal("assert_msg: expected (Bool, String) arguments")),
+            _ => Err(MetelError::internal("assert_msg: expected (boolean, String) arguments")),
         }
     }));
 

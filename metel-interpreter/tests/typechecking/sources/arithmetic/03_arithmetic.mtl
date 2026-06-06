@@ -3,8 +3,8 @@
 // Arithmetic operators constrain both operands to be the same numeric type
 // and produce that same type as their result.
 // Comparison operators constrain both operands to be the same type and always
-// produce Bool.
-// Logical operators require Bool operands and produce Bool.
+// produce boolean.
+// Logical operators require boolean operands and produce boolean.
 //
 // Expected inferred types:
 //   sum      : i64   (i64 + i64 -> i64)
@@ -12,12 +12,12 @@
 //   diff     : i64   (i64 - i64 -> i64)
 //   quotient : i64   (i64 / i64 -> i64)
 //   fsum     : f64 (f64 + f64 -> f64)
-//   eq_check : Bool  (i64 == i64 -> Bool)
-//   lt_check : Bool  (i64 < i64 -> Bool)
-//   and_expr : Bool  (Bool && Bool -> Bool)
-//   or_expr  : Bool  (Bool || Bool -> Bool)
+//   eq_check : boolean  (i64 == i64 -> boolean)
+//   lt_check : boolean  (i64 < i64 -> boolean)
+//   and_expr : boolean  (boolean && boolean -> boolean)
+//   or_expr  : boolean  (boolean || boolean -> boolean)
 //   neg_int  : i64   (-i64 -> i64)
-//   neg_bool : Bool  (!Bool -> Bool)
+//   neg_bool : boolean  (!boolean -> boolean)
 
 let sum      = 1 + 2;
 let product  = 3 * 4;

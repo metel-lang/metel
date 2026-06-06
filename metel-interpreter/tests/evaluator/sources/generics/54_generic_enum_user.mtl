@@ -10,7 +10,7 @@ fun unwrap_or_int(m: Maybe<i64>, default: i64) -> i64 {
     }
 }
 
-fun unwrap_or_bool(m: Maybe<Bool>, default: Bool) -> Bool {
+fun unwrap_or_bool(m: Maybe<boolean>, default: boolean) -> boolean {
     match m {
         Maybe::Some { value } => value,
         _                     => default,
@@ -27,6 +27,6 @@ fun main() {
     let some_bool = Maybe::Some { value: true };
     assert(unwrap_or_bool(some_bool, false));
 
-    let none_bool: Maybe<Bool> = Maybe::None;
+    let none_bool: Maybe<boolean> = Maybe::None;
     assert(!unwrap_or_bool(none_bool, false));
 }

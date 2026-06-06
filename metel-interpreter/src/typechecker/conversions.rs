@@ -29,7 +29,7 @@ fn type_expr_to_infer_in_context(
             match (name.as_str(), arg_tys.len()) {
                 ("i64", 0) => InferType::int(),
                 ("f64", 0) => InferType::float(),
-                ("Bool",   0) => InferType::bool(),
+                ("boolean",   0) => InferType::bool(),
                 ("Char",   0) => InferType::Concrete(Type::Char),
                 ("String", 0) => InferType::str(),
                 ("Never",  0) => InferType::never(),

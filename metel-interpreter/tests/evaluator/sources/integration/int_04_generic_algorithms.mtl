@@ -27,7 +27,7 @@ fun result_and_then<T, U, E>(r: MyResult<T, E>, f: (T) -> MyResult<U, E>) -> MyR
     }
 }
 
-fun result_is_ok<T, E>(r: MyResult<T, E>) -> Bool {
+fun result_is_ok<T, E>(r: MyResult<T, E>) -> boolean {
     match r {
         MyResult::Ok  { value } => true,
         MyResult::Err { error } => false,
@@ -75,13 +75,13 @@ fun stack_top(s: Stack) -> i64 {
     s.items[(s.size - 1) as u64]
 }
 
-fun stack_empty(s: Stack) -> Bool {
+fun stack_empty(s: Stack) -> boolean {
     s.size == 0
 }
 
 // ── Generic array combinators ─────────────────────────────────────────────────
 
-fun filter<T>(arr: T[], pred: (T) -> Bool) -> T[] {
+fun filter<T>(arr: T[], pred: (T) -> boolean) -> T[] {
     let mut out: List<T> = List::new();
     for (let x in arr) {
         if (pred(x)) { out.push(x); }
@@ -112,14 +112,14 @@ fun zip_with<A, B, C>(a: A[], b: B[], f: (A, B) -> C) -> C[] {
     out.as_slice()
 }
 
-fun any<T>(arr: T[], pred: (T) -> Bool) -> Bool {
+fun any<T>(arr: T[], pred: (T) -> boolean) -> boolean {
     for (let x in arr) {
         if (pred(x)) { return true; }
     }
     false
 }
 
-fun all<T>(arr: T[], pred: (T) -> Bool) -> Bool {
+fun all<T>(arr: T[], pred: (T) -> boolean) -> boolean {
     for (let x in arr) {
         if (!pred(x)) { return false; }
     }
@@ -193,7 +193,7 @@ fun concat_int(a: i64[], b: i64[]) -> i64[] {
 
 // ── Perhaps<T> combinators ────────────────────────────────────────────────────
 
-fun find_first<T>(arr: T[], pred: (T) -> Bool) -> Perhaps<T> {
+fun find_first<T>(arr: T[], pred: (T) -> boolean) -> Perhaps<T> {
     for (let x in arr) {
         if (pred(x)) { return Perhaps::Some { value: x }; }
     }
@@ -207,7 +207,7 @@ fun perhaps_or<T>(p: Perhaps<T>, default: T) -> T {
     }
 }
 
-fun perhaps_is_some<T>(p: Perhaps<T>) -> Bool {
+fun perhaps_is_some<T>(p: Perhaps<T>) -> boolean {
     match p {
         Perhaps::Some { value } => true,
         _                       => false,
@@ -279,23 +279,23 @@ fun main() {
     });
     assert(!result_is_ok(chain_err));
 
-    // MyResult<Bool, String>
-    let ok_b: MyResult<Bool, String> = MyResult::Ok { value: true };
-    let neg   = result_map(ok_b, (b: Bool) -> Bool { !b });
+    // MyResult<boolean, String>
+    let ok_b: MyResult<boolean, String> = MyResult::Ok { value: true };
+    let neg   = result_map(ok_b, (b: boolean) -> boolean { !b });
     assert(!result_unwrap_or(neg, true));
 
     // ── filter ────────────────────────────────────────────────────────────────
     let nums: i64[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-    let evens = filter(nums, (x: i64) -> Bool { x % 2 == 0 });
+    let evens = filter(nums, (x: i64) -> boolean { x % 2 == 0 });
     assert(evens.len() == 5);
     assert(evens[0] == 2);
 
-    let big = filter(nums, (x: i64) -> Bool { x > 7 });
+    let big = filter(nums, (x: i64) -> boolean { x > 7 });
     assert(big.len() == 3);
     assert(big[0] == 8);
 
     let strs: String[] = ["apple", "banana", "cherry", "date"];
-    let long_words = filter(strs, (s: String) -> Bool { string_len(s) > 5 });
+    let long_words = filter(strs, (s: String) -> boolean { string_len(s) > 5 });
     assert(long_words.len() == 2);
 
     // ── map_arr ───────────────────────────────────────────────────────────────
@@ -304,7 +304,7 @@ fun main() {
     assert(squares[0] == 1);
     assert(squares[9] == 100);
 
-    let is_even: Bool[] = map_arr(nums, (x: i64) -> Bool { x % 2 == 0 });
+    let is_even: boolean[] = map_arr(nums, (x: i64) -> boolean { x % 2 == 0 });
     assert(!is_even[0]);
     assert(is_even[1]);
 
@@ -319,12 +319,12 @@ fun main() {
     let maximum = fold(nums, nums[0], (acc: i64, x: i64) -> i64 { max_int(acc, x) });
     assert(maximum == 10);
 
-    // fold over Bool[]
-    let flags: Bool[] = [true, true, false, true];
-    let all_set = fold(flags, true, (acc: Bool, b: Bool) -> Bool { acc && b });
+    // fold over boolean[]
+    let flags: boolean[] = [true, true, false, true];
+    let all_set = fold(flags, true, (acc: boolean, b: boolean) -> boolean { acc && b });
     assert(!all_set);
 
-    let any_set = fold(flags, false, (acc: Bool, b: Bool) -> Bool { acc || b });
+    let any_set = fold(flags, false, (acc: boolean, b: boolean) -> boolean { acc || b });
     assert(any_set);
 
     // fold to build a string
@@ -346,18 +346,18 @@ fun main() {
     assert(partial.len() == 2);
     assert(partial[1] == 202);
 
-    // zip producing Bool[]: check which b[i] equals a[i]*10
-    let exact: Bool[] = zip_with(a, b, (x: i64, y: i64) -> Bool { y == x * 10 });
+    // zip producing boolean[]: check which b[i] equals a[i]*10
+    let exact: boolean[] = zip_with(a, b, (x: i64, y: i64) -> boolean { y == x * 10 });
     assert(exact[0]);   // 10 == 10
     assert(exact[1]);   // 20 == 20
     assert(exact[2]);   // 30 == 30
     assert(exact[3]);   // 40 == 40
 
     // ── any / all ─────────────────────────────────────────────────────────────
-    assert(any(nums, (x: i64) -> Bool { x > 9 }));
-    assert(!any(nums, (x: i64) -> Bool { x > 100 }));
-    assert(all(nums, (x: i64) -> Bool { x > 0 }));
-    assert(!all(nums, (x: i64) -> Bool { x > 5 }));
+    assert(any(nums, (x: i64) -> boolean { x > 9 }));
+    assert(!any(nums, (x: i64) -> boolean { x > 100 }));
+    assert(all(nums, (x: i64) -> boolean { x > 0 }));
+    assert(!all(nums, (x: i64) -> boolean { x > 5 }));
 
     // ── take / drop ───────────────────────────────────────────────────────────
     let first3 = take(nums, 3);
@@ -396,15 +396,15 @@ fun main() {
     assert(merged[5] == 6);
 
     // ── find_first (Perhaps<T>) ───────────────────────────────────────────────
-    let first_big = find_first(nums, (x: i64) -> Bool { x > 6 });
+    let first_big = find_first(nums, (x: i64) -> boolean { x > 6 });
     assert(perhaps_is_some(first_big));
     assert(perhaps_or(first_big, 0) == 7);
 
-    let none_found = find_first(nums, (x: i64) -> Bool { x > 100 });
+    let none_found = find_first(nums, (x: i64) -> boolean { x > 100 });
     assert(!perhaps_is_some(none_found));
 
     // find in string array
-    let first_long = find_first(strs, (s: String) -> Bool { string_len(s) >= 6 });
+    let first_long = find_first(strs, (s: String) -> boolean { string_len(s) >= 6 });
     assert(perhaps_is_some(first_long));
     assert(perhaps_or(first_long, "") == "banana");
 

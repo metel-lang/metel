@@ -6,7 +6,7 @@
 //
 // Expected inferred types:
 //   counter : i64    (inferred from literal 0)
-//   flag    : Bool   (inferred from literal false)
+//   flag    : boolean   (inferred from literal false)
 //   name    : String (annotated String, value infers String — unification succeeds)
 
 let mut counter = 0;

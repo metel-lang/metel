@@ -1,6 +1,6 @@
 // Stage 2: if statement
 //
-// Condition must be Bool; body is inferred; no value is produced.
+// Condition must be boolean; body is inferred; no value is produced.
 
 fun abs_via_if(x: i64) -> i64 {
     if (x < 0) {
@@ -9,7 +9,7 @@ fun abs_via_if(x: i64) -> i64 {
     x
 }
 
-fun no_else(b: Bool) {
+fun no_else(b: boolean) {
     if (b) {
         return;
     }

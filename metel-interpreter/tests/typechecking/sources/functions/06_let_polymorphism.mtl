@@ -9,7 +9,7 @@
 //
 // At each call site:
 //   a = identity(42)    — instantiates to (i64) -> i64,  a : i64
-//   b = identity(true)  — instantiates to (Bool) -> Bool, b : Bool
+//   b = identity(true)  — instantiates to (boolean) -> boolean, b : boolean
 //   c = identity("hi")  — instantiates to (String) -> String, c : String
 //
 // The two calls do NOT interfere — they bind different fresh type variables.

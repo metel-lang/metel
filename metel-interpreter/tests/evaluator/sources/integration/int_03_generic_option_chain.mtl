@@ -38,14 +38,14 @@ fun option_or<T>(opt: Option<T>, fallback: T) -> T {
     }
 }
 
-fun option_filter<T>(opt: Option<T>, pred: (T) -> Bool) -> Option<T> {
+fun option_filter<T>(opt: Option<T>, pred: (T) -> boolean) -> Option<T> {
     match opt {
         Option::Some { value } => if (pred(value)) Option::Some { value: value } else Option::None,
         _                      => Option::None,
     }
 }
 
-fun option_is_some<T>(opt: Option<T>) -> Bool {
+fun option_is_some<T>(opt: Option<T>) -> boolean {
     match opt {
         Option::Some { value } => true,
         _                      => false,
@@ -73,7 +73,7 @@ fun pair_swap<A, B>(p: Pair<A, B>) -> Pair<B, A> {
 
 // ── Generic array utilities ───────────────────────────────────────────────────
 
-fun find_first<T>(arr: T[], pred: (T) -> Bool) -> Option<T> {
+fun find_first<T>(arr: T[], pred: (T) -> boolean) -> Option<T> {
     let mut i = 0;
     while (i < arr.len()) {
         if (pred(arr[i as u64])) { return Option::Some { value: arr[i as u64] }; }
@@ -82,7 +82,7 @@ fun find_first<T>(arr: T[], pred: (T) -> Bool) -> Option<T> {
     Option::None
 }
 
-fun count_where<T>(arr: T[], pred: (T) -> Bool) -> i64 {
+fun count_where<T>(arr: T[], pred: (T) -> boolean) -> i64 {
     let mut cnt = 0;
     for (let x in arr) {
         if (pred(x)) { cnt += 1; }
@@ -112,14 +112,14 @@ fun safe_get_int(arr: i64[], i: i64) -> Option<i64> {
 // ── String lookup in a Pair<String,i64>[] "map" ───────────────────────────────
 
 fun table_get(table: Pair<String, i64>[], key: String) -> Option<i64> {
-    let entry = find_first(table, (p: Pair<String, i64>) -> Bool { p.first == key });
+    let entry = find_first(table, (p: Pair<String, i64>) -> boolean { p.first == key });
     option_map(entry, (p: Pair<String, i64>) -> i64 { p.second })
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 fun main() {
-    // ── Let-polymorphism: id used at i64, Bool, String ─────────────────────────
+    // ── Let-polymorphism: id used at i64, boolean, String ─────────────────────────
     let id = (x) -> { x };
     assert(id(42) == 42);
     assert(id(true));
@@ -142,8 +142,8 @@ fun main() {
     assert(option_or(none_i,  99) == 99);
 
     // filter: keeps if predicate holds
-    let keep   = option_filter(some10, (x: i64) -> Bool { x > 5  });
-    let remove = option_filter(some10, (x: i64) -> Bool { x > 50 });
+    let keep   = option_filter(some10, (x: i64) -> boolean { x > 5  });
+    let remove = option_filter(some10, (x: i64) -> boolean { x > 50 });
     assert(option_is_some(keep));
     assert(!option_is_some(remove));
 
@@ -158,14 +158,14 @@ fun main() {
     });
     assert(!option_is_some(chained_none));
 
-    // ── Option<Bool> ──────────────────────────────────────────────────────────
-    let some_true: Option<Bool> = Option::Some { value: true };
-    let some_false: Option<Bool> = Option::Some { value: false };
+    // ── Option<boolean> ──────────────────────────────────────────────────────────
+    let some_true: Option<boolean> = Option::Some { value: true };
+    let some_false: Option<boolean> = Option::Some { value: false };
 
     assert(option_or(some_true,  false));
     assert(!option_or(some_false, true));
 
-    let negated = option_map(some_true, (b: Bool) -> Bool { !b });
+    let negated = option_map(some_true, (b: boolean) -> boolean { !b });
     assert(!option_or(negated, true));
 
     // ── Option<String> ────────────────────────────────────────────────────────
@@ -206,7 +206,7 @@ fun main() {
     assert(option_or(doubled_elem, -1) == 60);
 
     // ── Pair<A,B> operations ──────────────────────────────────────────────────
-    let p1: Pair<i64, Bool> = Pair { first: 7, second: true };
+    let p1: Pair<i64, boolean> = Pair { first: 7, second: true };
     assert(p1.first == 7);
     assert(p1.second);
 
@@ -215,12 +215,12 @@ fun main() {
     assert(p2.first == 14);
     assert(p2.second);
 
-    // map_second: negate the Bool
-    let p3 = pair_map_second(p1, (b: Bool) -> Bool { !b });
+    // map_second: negate the boolean
+    let p3 = pair_map_second(p1, (b: boolean) -> boolean { !b });
     assert(p3.first  == 7);
     assert(!p3.second);
 
-    // swap: Pair<i64,Bool> → Pair<Bool,i64>
+    // swap: Pair<i64,boolean> → Pair<boolean,i64>
     let p4 = pair_swap(p1);
     assert(p4.first);
     assert(p4.second == 7);
@@ -254,28 +254,28 @@ fun main() {
     // ── find_first and count_where on i64[] ──────────────────────────────────
     let nums: i64[] = [3, 1, 4, 1, 5, 9, 2, 6];
 
-    let first_big = find_first(nums, (x: i64) -> Bool { x > 4 });
+    let first_big = find_first(nums, (x: i64) -> boolean { x > 4 });
     assert(option_or(first_big, 0) == 5);
 
-    let first_huge = find_first(nums, (x: i64) -> Bool { x > 100 });
+    let first_huge = find_first(nums, (x: i64) -> boolean { x > 100 });
     assert(!option_is_some(first_huge));
 
-    let evens_count = count_where(nums, (x: i64) -> Bool { x % 2 == 0 });
+    let evens_count = count_where(nums, (x: i64) -> boolean { x % 2 == 0 });
     assert(evens_count == 3);   // 4, 2, 6
 
-    // ── map_array<i64, i64> and map_array<i64, Bool> ──────────────────────────
+    // ── map_array<i64, i64> and map_array<i64, boolean> ──────────────────────────
     let doubled_arr = map_array(nums, (x: i64) -> i64 { x * 2 });
     assert(doubled_arr.len() == 8);
     assert(doubled_arr[0] == 6);
     assert(doubled_arr[4] == 10);
 
-    let above_mean: Bool[] = map_array(nums, (x: i64) -> Bool { x > 4 });
+    let above_mean: boolean[] = map_array(nums, (x: i64) -> boolean { x > 4 });
     assert(!above_mean[0]);   // 3 <= 4
     assert(above_mean[5]);    // 9 > 4
 
     // ── Composing combinators ─────────────────────────────────────────────────
     // find_first in an array of Pairs: locate entry with value > 5
-    let rich_entry = find_first(table, (p: Pair<String, i64>) -> Bool { p.second > 5 });
+    let rich_entry = find_first(table, (p: Pair<String, i64>) -> boolean { p.second > 5 });
     assert(option_is_some(rich_entry));
     let rich_name = option_map(rich_entry, (p: Pair<String, i64>) -> String { p.first });
     assert(option_or(rich_name, "") == "bananas");

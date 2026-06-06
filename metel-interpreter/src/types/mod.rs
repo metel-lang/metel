@@ -2,7 +2,7 @@
 /// No type variables exist here; generics have been monomorphised.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
-    Bool,
+    Boolean,
     Str,
     Char,
     Unit,
@@ -49,7 +49,7 @@ impl std::fmt::Display for Type {
         match self {
             Type::I64 => write!(f, "i64"),
             Type::F64 => write!(f, "f64"),
-            Type::Bool => write!(f, "Bool"),
+            Type::Boolean => write!(f, "boolean"),
             Type::Str => write!(f, "String"),
             Type::Char => write!(f, "Char"),
             Type::Unit => write!(f, "()"),

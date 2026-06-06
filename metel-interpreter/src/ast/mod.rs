@@ -471,7 +471,7 @@ pub enum Literal {
     /// A float literal with an explicit precision suffix, e.g. `3.14f32`.
     SizedFloat { value: f64, kind: FloatKind },
     Char(char),
-    Bool(bool),
+    Boolean(bool),
     Str(String),
     None,
     Unit,

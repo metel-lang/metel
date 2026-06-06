@@ -104,7 +104,7 @@ pub enum InferType {
 impl InferType {
     pub fn int() -> Self { InferType::Concrete(Type::I64) }
     pub fn float() -> Self { InferType::Concrete(Type::F64) }
-    pub fn bool() -> Self { InferType::Concrete(Type::Bool) }
+    pub fn bool() -> Self { InferType::Concrete(Type::Boolean) }
     pub fn str() -> Self { InferType::Concrete(Type::Str) }
     pub fn unit() -> Self { InferType::Concrete(Type::Unit) }
     pub fn never() -> Self { InferType::Never }

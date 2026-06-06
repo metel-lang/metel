@@ -1135,7 +1135,7 @@ fn named_type_name(ty: &InferType) -> Option<String> {
         InferType::Concrete(Type::Str)    => Some("String".to_string()),
         InferType::Concrete(Type::I64)    => Some("i64".to_string()),
         InferType::Concrete(Type::F64)  => Some("f64".to_string()),
-        InferType::Concrete(Type::Bool)   => Some("Bool".to_string()),
+        InferType::Concrete(Type::Boolean)   => Some("boolean".to_string()),
         InferType::Concrete(Type::Char)   => Some("Char".to_string()),
         _ => None,
     }
@@ -1161,7 +1161,7 @@ fn infer_literal(lit: &Literal, ctx: &mut InferContext) -> InferType {
             FloatKind::F64 => Type::F64,
         }),
         Literal::Char(_)  => InferType::Concrete(Type::Char),
-        Literal::Bool(_)  => InferType::bool(),
+        Literal::Boolean(_)  => InferType::bool(),
         Literal::Str(_)   => InferType::str(),
         Literal::Unit     => InferType::unit(),
         Literal::None     => InferType::Named("Perhaps".to_string(), vec![ctx.fresh_var()]),
@@ -1628,7 +1628,7 @@ fn infer_type_name(ty: &InferType) -> Option<&str> {
     match ty {
         InferType::Concrete(Type::I64)   => Some("i64"),
         InferType::Concrete(Type::F64) => Some("f64"),
-        InferType::Concrete(Type::Bool)  => Some("Bool"),
+        InferType::Concrete(Type::Boolean)  => Some("boolean"),
         InferType::Concrete(Type::Char)  => Some("Char"),
         InferType::Concrete(Type::Str)   => Some("String"),
         InferType::Concrete(Type::I8)    => Some("i8"),

@@ -98,7 +98,7 @@ fn register_builtin_aspect_impls(registry: &mut TypeDefinitionRegistry) {
     // Display impls for built-in types (used by to_string method dispatch)
     registry.register_aspect_impl("i64".into(),    "Display".into(), vec![]);
     registry.register_aspect_impl("f64".into(),  "Display".into(), vec![]);
-    registry.register_aspect_impl("Bool".into(),   "Display".into(), vec![]);
+    registry.register_aspect_impl("boolean".into(),   "Display".into(), vec![]);
     registry.register_aspect_impl("Char".into(),   "Display".into(), vec![]);
     registry.register_aspect_impl("String".into(), "Display".into(), vec![]);
     // Char ↔ u32 (Unicode code point) conversions
@@ -412,11 +412,11 @@ pub(super) fn register_builtins(ctx: &mut InferContext, prelude: &super::StdPrel
 
     // Methods are not free functions; they're not in StdPrelude::schemes.
     let char_ty = InferType::Concrete(Type::Char);
-    for type_name in &["i64", "f64", "Bool", "Char", "String"] {
+    for type_name in &["i64", "f64", "boolean", "Char", "String"] {
         let self_ty = match *type_name {
             "i64"    => int_ty.clone(),
             "f64"    => float_ty.clone(),
-            "Bool"   => bool_ty.clone(),
+            "boolean"   => bool_ty.clone(),
             "Char"   => char_ty.clone(),
             "String" => str_ty.clone(),
             _ => unreachable!(),

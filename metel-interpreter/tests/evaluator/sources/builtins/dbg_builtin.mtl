@@ -5,7 +5,7 @@ fun main() {
     let x: i64 = dbg(42);
     assert(x == 42);
 
-    let b: Bool = dbg(true);
+    let b: boolean = dbg(true);
     assert(b == true);
 
     let s: String = dbg("hello");

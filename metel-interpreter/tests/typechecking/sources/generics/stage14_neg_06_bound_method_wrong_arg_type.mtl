@@ -3,15 +3,15 @@
 // Passing a String where i64 is expected should emit T0001.
 
 aspect Validatable {
-    fun validate(self, code: i64) -> Bool;
+    fun validate(self, code: i64) -> boolean;
 }
 
 struct Item { value: i64 }
 
 impl Validatable for Item {
-    fun validate(self, code: i64) -> Bool { self.value == code }
+    fun validate(self, code: i64) -> boolean { self.value == code }
 }
 
-fun bad<T: Validatable>(x: T) -> Bool {
+fun bad<T: Validatable>(x: T) -> boolean {
     x.validate("not an int") // ERROR[T0001]
 }

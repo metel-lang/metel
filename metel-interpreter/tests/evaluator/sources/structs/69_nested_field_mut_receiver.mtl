@@ -19,7 +19,7 @@ impl Counter {
         self.value
     }
 
-    fun is_positive(&self) -> Bool {
+    fun is_positive(&self) -> boolean {
         self.value > 0
     }
 

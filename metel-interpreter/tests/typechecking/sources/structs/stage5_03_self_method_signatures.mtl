@@ -9,7 +9,7 @@ impl Point {
         self
     }
 
-    fun same_as(self, other: Self) -> Bool {
+    fun same_as(self, other: Self) -> boolean {
         self.x == other.x
     }
 }
@@ -26,7 +26,7 @@ impl Token {
 
 let p = Point { x: 1 };
 let q: Point = p.clone();
-let same: Bool = p.same_as(q);
+let same: boolean = p.same_as(q);
 
 let token = Token::i64 { value: 7 };
 let token_copy: Token = token.identity();

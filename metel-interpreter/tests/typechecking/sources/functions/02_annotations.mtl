@@ -9,12 +9,12 @@
 // Expected inferred types:
 //   x : i64          (annotation i64, value infers i64 — unification succeeds)
 //   y : f64        (annotation f64, value infers f64)
-//   z : Bool         (annotation Bool, value infers Bool)
+//   z : boolean         (annotation boolean, value infers boolean)
 //   s : String       (annotation String, value infers String)
 //   n : Perhaps<i64> (None literal; type comes from annotation — Pass 2 expected_ty path)
 
 let x: i64 = 100;
 let y: f64 = 2.718;
-let z: Bool = false;
+let z: boolean = false;
 let s: String = "metel";
 let n: Perhaps<i64> = None;

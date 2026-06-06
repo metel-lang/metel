@@ -5,10 +5,10 @@ let n: i64    = pair.0;
 let s: String = pair.1;
 
 // Nested tuples
-let triple: (i64, f64, Bool) = (1, 2.0, true);
+let triple: (i64, f64, boolean) = (1, 2.0, true);
 let a: i64   = triple.0;
 let b: f64 = triple.1;
-let c: Bool  = triple.2;
+let c: boolean  = triple.2;
 
 // Tuple returned from a function
 fun make_pair() -> (i64, String) {

@@ -8,7 +8,7 @@
 //   ? with From coercion (ConfigError → RunError),
 //   ? inside a for-in loop (early exit on first Err),
 //   nested for-in loops,
-//   to_string on i64 / Bool.
+//   to_string on i64 / boolean.
 
 // ── Aspects ────────────────────────────────────────────────────────────────────
 
@@ -41,7 +41,7 @@ impl From<ConfigError> for RunError {
 
 // ── Task types ─────────────────────────────────────────────────────────────────
 
-struct Task { name: String, enabled: Bool }
+struct Task { name: String, enabled: boolean }
 
 impl Runnable for Task {
     fun run(self) -> String {
@@ -182,7 +182,7 @@ fun main() {
         Result::Err { error } => assert(error.msg == "config: unknown key: missing"),
     };
 
-    // to_string on Bool
+    // to_string on boolean
     assert(true.to_string()  == "true");
     assert(false.to_string() == "false");
 

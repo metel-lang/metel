@@ -13,7 +13,7 @@ fun abs_float(x: f64) -> f64 {
     if (x < 0.0) { 0.0 - x } else { x }
 }
 
-fun float_eq(a: f64, b: f64) -> Bool {
+fun float_eq(a: f64, b: f64) -> boolean {
     abs_float(a - b) < 0.0001
 }
 
@@ -173,7 +173,7 @@ fun sum_floats(data: f64[]) -> f64 {
     acc
 }
 
-fun count_if(data: f64[], pred: (f64) -> Bool) -> i64 {
+fun count_if(data: f64[], pred: (f64) -> boolean) -> i64 {
     let mut cnt = 0;
     for (let x in data) {
         if (pred(x)) { cnt += 1; }
@@ -187,7 +187,7 @@ fun map_floats(data: f64[], f: (f64) -> f64) -> f64[] {
     out.as_slice()
 }
 
-fun filter_floats(data: f64[], pred: (f64) -> Bool) -> f64[] {
+fun filter_floats(data: f64[], pred: (f64) -> boolean) -> f64[] {
     let mut out: List<f64> = List::new();
     for (let x in data) {
         if (pred(x)) { out.push(x); }
@@ -306,7 +306,7 @@ fun main() {
 
     assert(sum_floats(d8) == 36.0);
 
-    let above4 = count_if(d8, (x: f64) -> Bool { x > 4.0 });
+    let above4 = count_if(d8, (x: f64) -> boolean { x > 4.0 });
     assert(above4 == 4);
 
     let squares = map_floats(d8, (x: f64) -> f64 { x * x });
@@ -314,7 +314,7 @@ fun main() {
     assert(squares[3]  == 16.0);
     assert(squares[7]  == 64.0);
 
-    let big = filter_floats(d8, (x: f64) -> Bool { x > 5.0 });
+    let big = filter_floats(d8, (x: f64) -> boolean { x > 5.0 });
     assert(big.len() == 3);
     assert(big[0] == 6.0);
     assert(big[2] == 8.0);
@@ -362,7 +362,7 @@ fun main() {
 
     // 13. Closure capturing an outer variable.
     let threshold = 3.0;
-    let above_threshold = count_if(d5, (x: f64) -> Bool { x > threshold });
+    let above_threshold = count_if(d5, (x: f64) -> boolean { x > threshold });
     assert(above_threshold == 2);
 
     // 14. Stats description as string (exercises to_str method).

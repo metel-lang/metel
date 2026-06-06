@@ -5,19 +5,19 @@
 //
 // Inference order:
 //   1. Pre-pass: register both `even` and `odd` with fresh type variables
-//   2. Infer `is_nonzero` body: n > 0 gives Bool, matches return type Bool ✓
-//   3. Infer `classify` body: calls is_nonzero(n), which returns Bool ✓
+//   2. Infer `is_nonzero` body: n > 0 gives boolean, matches return type boolean ✓
+//   3. Infer `classify` body: calls is_nonzero(n), which returns boolean ✓
 //
 // Expected inferred types:
-//   is_nonzero(i64) -> Bool
-//   classify(i64) -> Bool
-//   result : Bool
+//   is_nonzero(i64) -> boolean
+//   classify(i64) -> boolean
+//   result : boolean
 
-fun classify(n: i64) -> Bool {
+fun classify(n: i64) -> boolean {
     is_nonzero(n)
 }
 
-fun is_nonzero(n: i64) -> Bool {
+fun is_nonzero(n: i64) -> boolean {
     n > 0
 }
 

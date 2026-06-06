@@ -28,7 +28,7 @@ struct Fighter {
 // ── Fighter methods ───────────────────────────────────────────────────────────
 
 impl Fighter {
-    fun is_alive(self) -> Bool {
+    fun is_alive(self) -> boolean {
         self.hp > 0
     }
 

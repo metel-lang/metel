@@ -17,7 +17,7 @@ pub(super) fn match_pattern(pattern: &Pattern, value: &Value, out: &mut HashMap<
             (Literal::Int(a),   Value::I64(b))   => a == b,
             (Literal::Float(a), Value::F64(b)) => a == b,
             (Literal::Char(a),  Value::Char(b))  => a == b,
-            (Literal::Bool(a),  Value::Bool(b))  => a == b,
+            (Literal::Boolean(a),  Value::Boolean(b))  => a == b,
             (Literal::Str(a),   Value::Str(b))   => a == b,
             (Literal::Unit,     Value::Unit)      => true,
             (Literal::None, Value::Enum { name, variant, .. })

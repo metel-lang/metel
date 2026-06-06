@@ -24,7 +24,7 @@ fun main() {
     // String literal pattern.
     let r7 = match "hello" { "world" => 1, "hello" => 2, _ => 3, };
     assert(r7 == 2);
-    // Bool literal patterns.
+    // boolean literal patterns.
     assert(true);
     assert(!false);
     // f64 literal pattern.

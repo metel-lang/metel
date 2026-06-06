@@ -1,8 +1,8 @@
 // Mutual recursion.
-fun is_even(n: i64) -> Bool {
+fun is_even(n: i64) -> boolean {
     if (n == 0) { true } else { is_odd(n - 1) }
 }
-fun is_odd(n: i64) -> Bool {
+fun is_odd(n: i64) -> boolean {
     if (n == 0) { false } else { is_even(n - 1) }
 }
 // Early return via return statement (not tail expression).

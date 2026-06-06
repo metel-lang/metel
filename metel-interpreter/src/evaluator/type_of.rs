@@ -18,7 +18,7 @@ pub(super) fn value_to_type(value: &Value) -> Type {
         Value::I64(_)   => Type::I64,
         Value::F64(_) => Type::F64,
         Value::Char(_)  => Type::Char,
-        Value::Bool(_)  => Type::Bool,
+        Value::Boolean(_)  => Type::Boolean,
         Value::Str(_)   => Type::Str,
         Value::Unit     => Type::Unit,
         Value::I8(_)    => Type::I8,

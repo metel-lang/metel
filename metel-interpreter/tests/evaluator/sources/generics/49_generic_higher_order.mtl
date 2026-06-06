@@ -14,8 +14,8 @@ fun main() {
     let r1 = apply((n: i64) -> i64 { n * 2 }, 5);
     assert(r1 == 10);
 
-    // apply at Bool.
-    let r2 = apply((b: Bool) -> Bool { !b }, false);
+    // apply at boolean.
+    let r2 = apply((b: boolean) -> boolean { !b }, false);
     assert(r2);
 
     // apply at String (identity).
@@ -26,21 +26,21 @@ fun main() {
     let r4 = apply((n: i64) -> i64 { n + 1 }, apply((n: i64) -> i64 { n * 3 }, 4));
     assert(r4 == 13);
 
-    // transform: i64 → Bool.
-    let r5 = transform((n: i64) -> Bool { n > 0 }, 3);
+    // transform: i64 → boolean.
+    let r5 = transform((n: i64) -> boolean { n > 0 }, 3);
     assert(r5);
 
-    let r6 = transform((n: i64) -> Bool { n > 0 }, 0);
+    let r6 = transform((n: i64) -> boolean { n > 0 }, 0);
     assert(!r6);
 
-    // transform: Bool → i64.
-    let r7 = transform((b: Bool) -> i64 { if (b) 1 else 0 }, true);
+    // transform: boolean → i64.
+    let r7 = transform((b: boolean) -> i64 { if (b) 1 else 0 }, true);
     assert(r7 == 1);
 
-    // pipe: i64 → Bool → i64.
+    // pipe: i64 → boolean → i64.
     let r8 = pipe(
-        (n: i64) -> Bool { n > 0 },
-        (b: Bool) -> i64 { if (b) 10 else -1 },
+        (n: i64) -> boolean { n > 0 },
+        (b: boolean) -> i64 { if (b) 10 else -1 },
         5
     );
     assert(r8 == 10);

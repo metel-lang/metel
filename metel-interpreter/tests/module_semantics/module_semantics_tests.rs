@@ -914,7 +914,7 @@ pub fun fold_left<T, A>(arr: T[], init: A, f: (A, T) -> A) -> A {
     acc
 }
 
-pub fun find_first<T>(arr: T[], pred: (T) -> Bool) -> Perhaps<T> {
+pub fun find_first<T>(arr: T[], pred: (T) -> boolean) -> Perhaps<T> {
     for (let x in arr) {
         if (pred(x)) { return Perhaps::Some { value: x }; }
     }
@@ -927,7 +927,7 @@ pub fun sum_ints(arr: i64[]) -> i64 {
     total
 }
 
-pub fun filter_array<T>(arr: T[], pred: (T) -> Bool) -> T[] {
+pub fun filter_array<T>(arr: T[], pred: (T) -> boolean) -> T[] {
     let mut out: List<T> = List::new();
     for (let x in arr) {
         if (pred(x)) { out.push(x); }
@@ -976,7 +976,7 @@ pub fun open_task_count(tasks: Task[]) -> i64 {
     count
 }
 
-pub fun is_high_priority(t: Task) -> Bool {
+pub fun is_high_priority(t: Task) -> boolean {
     match t.priority {
         Priority::High   => true,
         Priority::Medium => false,
@@ -984,7 +984,7 @@ pub fun is_high_priority(t: Task) -> Bool {
     }
 }
 
-pub fun is_done(t: Task) -> Bool {
+pub fun is_done(t: Task) -> boolean {
     match t.status {
         Status::Done       => true,
         Status::Open       => false,
@@ -997,7 +997,7 @@ pub fun task_titles(tasks: Task[]) -> String[] {
 }
 
 pub fun find_by_title(tasks: Task[], title: String) -> Perhaps<Task> {
-    find_first(tasks, (t: Task) -> Bool { t.title == title })
+    find_first(tasks, (t: Task) -> boolean { t.title == title })
 }
 
 pub fun compute_completion_pct(tasks: Task[]) -> i64 {
@@ -1071,10 +1071,10 @@ fun main() {
     assert(open_task_count(tasks) == 4);
 
     // 6. Generic filter_array with cross-module predicates
-    let high = filter_array(tasks, (t: Task) -> Bool { is_high_priority(t) });
+    let high = filter_array(tasks, (t: Task) -> boolean { is_high_priority(t) });
     assert(high.len() == 3);
 
-    let done_list = filter_array(tasks, (t: Task) -> Bool { is_done(t) });
+    let done_list = filter_array(tasks, (t: Task) -> boolean { is_done(t) });
     assert(done_list.len() == 1);
 
     // 7. map_array: extract efforts, sum via sum_ints
@@ -1114,7 +1114,7 @@ fun main() {
     assert(product == 24);
 
     // 13. find_first: locate the Done task (Deploy, effort=2)
-    let first_done = find_first(tasks, (t: Task) -> Bool { is_done(t) });
+    let first_done = find_first(tasks, (t: Task) -> boolean { is_done(t) });
     match first_done {
         Perhaps::Some { value } => assert(value.title == "Deploy"),
         None                    => assert(false),
@@ -1122,7 +1122,7 @@ fun main() {
 
     // 14. Closure capturing outer variable (min_effort threshold)
     let min_effort = 3;
-    let heavy = filter_array(tasks, (t: Task) -> Bool { t.effort >= min_effort });
+    let heavy = filter_array(tasks, (t: Task) -> boolean { t.effort >= min_effort });
     assert(heavy.len() == 3);
 
     // 15. C-style for: manual effort accumulation
@@ -1160,7 +1160,7 @@ fun main() {
     // 20. Chained map + filter across modules
     // doubled efforts: [10,6,4,8,2]; filter > 5: [10,6,8] = 3 items
     let doubled = map_array(efforts, (x: i64) -> i64 { x * 2 });
-    let big = filter_array(doubled, (x: i64) -> Bool { x > 5 });
+    let big = filter_array(doubled, (x: i64) -> boolean { x > 5 });
     assert(big.len() == 3);
 
     // 21. Let-polymorphism: identity closure used at two different types

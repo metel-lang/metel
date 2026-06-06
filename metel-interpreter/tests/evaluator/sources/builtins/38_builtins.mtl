@@ -149,8 +149,8 @@ fun main() {
         Perhaps::Some { value } => assert(value == 2.5),
         None => assert(false),
     };
-    // List<Bool>
-    let mut flags: List<Bool> = List::new();
+    // List<boolean>
+    let mut flags: List<boolean> = List::new();
     flags.push(true);
     flags.push(false);
     flags.push(true);

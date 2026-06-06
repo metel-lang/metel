@@ -829,7 +829,7 @@ fn construct_expr(
                 Type::Str   => ("String".to_string(), vec![]),
                 Type::I64   => ("i64".to_string(), vec![]),
                 Type::F64 => ("f64".to_string(), vec![]),
-                Type::Bool  => ("Bool".to_string(),   vec![]),
+                Type::Boolean  => ("boolean".to_string(),   vec![]),
                 Type::Char  => ("Char".to_string(),   vec![]),
                 Type::Array(_) | Type::SizedArray(_, _) => {
                     if method == "len" && args.is_empty() {
@@ -1181,7 +1181,7 @@ fn check_match_exhaustiveness(
         return Ok(());
     }
     let exhaustive = match scrutinee_ty {
-        Type::Bool => {
+        Type::Boolean => {
             let has_true  = arms.iter().any(|a| a.guard.is_none() && is_bool_literal_pattern(&a.pattern, true));
             let has_false = arms.iter().any(|a| a.guard.is_none() && is_bool_literal_pattern(&a.pattern, false));
             has_true && has_false
@@ -1244,7 +1244,7 @@ fn is_catch_all_pattern(pattern: &Pattern) -> bool {
 }
 
 fn is_bool_literal_pattern(pattern: &Pattern, expected: bool) -> bool {
-    matches!(pattern, Pattern::Literal(Literal::Bool(b), _) if *b == expected)
+    matches!(pattern, Pattern::Literal(Literal::Boolean(b), _) if *b == expected)
 }
 
 /// Returns true if `pattern` (unguarded) covers variant `variant_name` of enum `enum_name`.
@@ -1796,7 +1796,7 @@ fn construct_literal_type(
             FloatKind::F64 => Type::F64,
         }),
         Literal::Char(_)  => Ok(Type::Char),
-        Literal::Bool(_)  => Ok(Type::Bool),
+        Literal::Boolean(_)  => Ok(Type::Boolean),
         Literal::Str(_)   => Ok(Type::Str),
         Literal::Unit     => Ok(Type::Unit),
         // None's type cannot be re-derived from the literal alone. Pass 2 must receive
@@ -1852,10 +1852,10 @@ fn construct_binop(
                     span,
                 ));
             }
-            Type::Bool
+            Type::Boolean
         }
-        BinOp::Eq | BinOp::Ne => Type::Bool,
-        BinOp::And | BinOp::Or => Type::Bool,
+        BinOp::Eq | BinOp::Ne => Type::Boolean,
+        BinOp::And | BinOp::Or => Type::Boolean,
         BinOp::Range | BinOp::RangeInclusive => Type::Named("Range".to_string(), vec![Type::I64]),
     };
     Ok(TypedExpr::BinOp(Box::new(lhs), op.clone(), Box::new(rhs), ty, span.clone()))
@@ -1866,7 +1866,7 @@ fn type_to_type_expr(ty: &Type) -> TypeExpr {
     match ty {
         Type::I64   => named("i64"),
         Type::F64 => named("f64"),
-        Type::Bool  => named("Bool"),
+        Type::Boolean  => named("boolean"),
         Type::Char  => named("Char"),
         Type::Str   => named("String"),
         Type::Unit  => TypeExpr::Unit,
@@ -2014,7 +2014,7 @@ fn construct_unaryop(
             }
             t.clone()
         }
-        UnaryOp::Not => Type::Bool,
+        UnaryOp::Not => Type::Boolean,
         UnaryOp::Ref => Type::Pointer(Box::new(operand.ty().clone())),
         UnaryOp::RefMut => Type::MutPointer(Box::new(operand.ty().clone())),
         UnaryOp::Deref => match operand.ty() {

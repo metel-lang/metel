@@ -1,7 +1,7 @@
 // Stage 2: else-if chains (statement form)
 //
 // The else branch of an if_expr can be another if_expr (chaining).
-// Each condition must be Bool; the overall type is Unit when used as a statement.
+// Each condition must be boolean; the overall type is Unit when used as a statement.
 
 fun check_range(x: i64) {
     if (x < 0) {
@@ -13,7 +13,7 @@ fun check_range(x: i64) {
     }
 }
 
-fun multi_branch(a: Bool, b: Bool) {
+fun multi_branch(a: boolean, b: boolean) {
     if (a) {
     } else if (b) {
     }

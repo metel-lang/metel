@@ -5,7 +5,7 @@ impl Point {
         self
     }
 
-    fun same_as(self, other: Self) -> Bool {
+    fun same_as(self, other: Self) -> boolean {
         self.x == other.x
     }
 }

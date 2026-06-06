@@ -48,7 +48,7 @@ impl Stack<i64> {
         return array_len(self.items);
     }
 
-    fun is_empty(self) -> Bool {
+    fun is_empty(self) -> boolean {
         return array_len(self.items) == 0;
     }
 }
@@ -85,7 +85,7 @@ enum Priority {
 
 struct Task {
     title: String,
-    done: Bool,
+    done: boolean,
     priority: Priority,
 }
 

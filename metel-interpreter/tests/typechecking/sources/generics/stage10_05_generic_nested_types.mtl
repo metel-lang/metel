@@ -10,12 +10,12 @@ fun snd<A, B>(pair: (A, B)) -> B { pair.1 }
 // T as both array element and return.
 fun wrap_in_pair<T>(arr: T[]) -> (T, T) { (arr[0], arr[1]) }
 
-fun use_nested() -> Bool {
+fun use_nested() -> boolean {
     let arr = [10, 20, 30];
     let n: i64 = array_first(arr);
 
     let p = (true, 42);
-    let b: Bool = fst(p);
+    let b: boolean = fst(p);
     let _i: i64 = snd(p);
 
     let nums = [1, 2];

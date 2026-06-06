@@ -6,7 +6,7 @@
 // Expected inferred types:
 //   a : i64
 //   b : f64
-//   c : Bool
+//   c : boolean
 //   d : String
 //   e : ()
 

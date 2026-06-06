@@ -4,7 +4,7 @@
 //   user aspect declaration (Measurable, Describable),
 //   impl Aspect for Type and method dispatch on multiple types,
 //   both aspects implemented on the same type (Circle, Rectangle),
-//   to_string on i64 / f64 / Bool / String (all four built-in Display types),
+//   to_string on i64 / f64 / boolean / String (all four built-in Display types),
 //   polymorphic print / println,
 //   user-defined Iterable<f64> (AreaList) — stateful forward scan,
 //   empty Iterable guard (loop body skipped),
@@ -36,7 +36,7 @@ aspect From<T> {
 
 fun pi() -> f64 { 3.14159 }
 
-fun approx(a: f64, b: f64) -> Bool {
+fun approx(a: f64, b: f64) -> boolean {
     let d = a - b;
     let abs_d = if (d < 0.0) { 0.0 - d } else { d };
     abs_d < 0.01
@@ -189,7 +189,7 @@ fun main() {
     assert(f5.to_string() == "5");
     assert(frac.to_string() == "3.14");
 
-    // to_string on Bool
+    // to_string on boolean
     assert(true.to_string() == "true");
     assert(false.to_string() == "false");
 
@@ -213,7 +213,7 @@ fun main() {
     assert(approx(total_area, 404.70));
 
     // Empty Iterable: loop body never runs
-    let mut body_ran: Bool  = false;
+    let mut body_ran: boolean  = false;
     let empty_areas: f64[] = [];
     for (let _a in AreaList::new(empty_areas)) { body_ran = true; }
     assert(!body_ran);

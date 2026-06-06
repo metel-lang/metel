@@ -62,7 +62,7 @@ impl From<Celsius> for Fahrenheit {
     }
 }
 
-fun approx(a: f64, b: f64) -> Bool {
+fun approx(a: f64, b: f64) -> boolean {
     let d = a - b;
     let abs_d = if (d < 0.0) { 0.0 - d } else { d };
     abs_d < 0.01

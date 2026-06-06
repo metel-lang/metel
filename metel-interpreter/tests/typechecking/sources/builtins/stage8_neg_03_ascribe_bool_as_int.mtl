@@ -1,4 +1,4 @@
-// Stage 8 negative: Bool cannot be ascribed as i64.
+// Stage 8 negative: boolean cannot be ascribed as i64.
 
 fun main() {
     let _: i64 = true : i64; // ERROR[T0001]

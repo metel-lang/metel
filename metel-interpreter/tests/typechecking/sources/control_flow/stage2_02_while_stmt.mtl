@@ -1,14 +1,14 @@
 // Stage 2: while statement
 //
-// Condition must be Bool; body is inferred.
+// Condition must be boolean; body is inferred.
 
-fun loop_while(b: Bool) {
+fun loop_while(b: boolean) {
     while (b) {
     }
 }
 
 fun while_with_computation(x: i64) {
-    let keep_going: Bool = x > 0;
+    let keep_going: boolean = x > 0;
     while (keep_going) {
         return;
     }

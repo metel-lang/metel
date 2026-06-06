@@ -15,15 +15,15 @@
 //
 // Expected inferred types:
 //   foo(i64) -> i64    (x is i64 inside foo)
-//   bar(Bool) -> Bool  (x is Bool inside bar — different x, different scope)
+//   bar(boolean) -> boolean  (x is boolean inside bar — different x, different scope)
 //   a : i64
-//   b : Bool
+//   b : boolean
 
 fun foo(x: i64) -> i64 {
     x + 1
 }
 
-fun bar(x: Bool) -> Bool {
+fun bar(x: boolean) -> boolean {
     !x
 }
 

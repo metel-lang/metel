@@ -15,7 +15,7 @@ fun main() {
     assert(first(10, 20) == 10);
     assert(second(10, 20) == 20);
 
-    // first/second at Bool.
+    // first/second at boolean.
     assert(first(true, false));
     assert(!second(true, false));
 
@@ -37,7 +37,7 @@ fun main() {
     assert(w1.0 == 3);
     assert(w1.1 == 7);
 
-    // wrap at Bool.
+    // wrap at boolean.
     let w2 = wrap(true, false);
     assert(w2.0);
     assert(!w2.1);

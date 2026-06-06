@@ -85,7 +85,7 @@ fun main() {
     println(int_to_string(coord.0));            // 10
     println(int_to_string(coord.1));            // 20
 
-    let triple: (String, i64, Bool) = ("yes", 42, true);
+    let triple: (String, i64, boolean) = ("yes", 42, true);
     println(triple.0);                          // yes
     println(int_to_string(triple.1));           // 42
     println(bool_to_string(triple.2));          // true
