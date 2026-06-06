@@ -5,8 +5,8 @@ use crate::ast::Span;
 use crate::error::{MetelError, RuntimeErrorCode};
 
 use super::{
-    attach_stack, eval_block, pop_frame, push_frame, type_of, ClosureBody, RuntimeRegistry, Signal,
-    Value,
+    attach_stack, eval_block, pop_frame, push_frame, type_of, ClosureBody, RuntimeCallable,
+    RuntimeRegistry, Signal, Value,
 };
 
 /// How the receiver is bound into the callee's environment.
@@ -17,23 +17,17 @@ pub(super) enum ReceiverBinding {
     Shared(Rc<RefCell<Value>>),
 }
 
-/// Dispatch a function call to a `Value::Builtin` or `Value::Closure`.
-/// Converts `Signal::Return` at the function boundary.
-pub(super) fn call_function(
-    func: Value,
+fn call_runtime_callable(
+    callable: RuntimeCallable,
     args: Vec<Value>,
     span: &Span,
     runtime: &RuntimeRegistry,
 ) -> Result<Signal, MetelError> {
-    // Auto-deref: calling through a function pointer transparently unwraps one pointer layer.
-    let func = match func {
-        Value::Pointer(rc) | Value::MutPointer(rc) => rc.borrow().clone(),
-        other => other,
-    };
-    match func {
-        Value::Builtin(_, f) => f(args, span).map(Signal::Value).map_err(attach_stack),
-
-        Value::Closure(rc) => {
+    match callable {
+        RuntimeCallable::Intrinsic { fun, .. } => {
+            fun(args, span).map(Signal::Value).map_err(attach_stack)
+        }
+        RuntimeCallable::Closure(rc) => {
             let closure = (*rc).clone();
             let fn_name = closure
                 .name
@@ -80,6 +74,24 @@ pub(super) fn call_function(
                 other => other,
             })
         }
+    }
+}
+
+/// Dispatch a function call to a callable runtime value.
+/// Converts `Signal::Return` at the function boundary.
+pub(super) fn call_function(
+    func: Value,
+    args: Vec<Value>,
+    span: &Span,
+    runtime: &RuntimeRegistry,
+) -> Result<Signal, MetelError> {
+    // Auto-deref: calling through a function pointer transparently unwraps one pointer layer.
+    let func = match func {
+        Value::Pointer(rc) | Value::MutPointer(rc) => rc.borrow().clone(),
+        other => other,
+    };
+    match func {
+        Value::Callable(callable) => call_runtime_callable(callable, args, span, runtime),
 
         Value::Unit => Err(attach_stack(MetelError::panic(
             RuntimeErrorCode::R0002,
@@ -99,14 +111,14 @@ pub(super) fn call_function(
 }
 
 pub(super) fn call_method_function(
-    func: Value,
+    func: RuntimeCallable,
     receiver: ReceiverBinding,
-    args: Vec<Value>,
+    mut args: Vec<Value>,
     span: &Span,
     runtime: &RuntimeRegistry,
 ) -> Result<Signal, MetelError> {
     match func {
-        Value::Closure(rc) => {
+        RuntimeCallable::Closure(rc) => {
             let closure = (*rc).clone();
             let fn_name = closure
                 .name
@@ -159,6 +171,13 @@ pub(super) fn call_method_function(
                 other => other,
             })
         }
-        other => call_function(other, args, span, runtime),
+        callable => {
+            let receiver_value = match receiver {
+                ReceiverBinding::Value(value) => value,
+                ReceiverBinding::Shared(cell) => cell.borrow().clone(),
+            };
+            args.insert(0, receiver_value);
+            call_runtime_callable(callable, args, span, runtime)
+        }
     }
 }

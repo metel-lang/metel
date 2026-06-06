@@ -113,8 +113,10 @@ pub(super) fn format_value(val: &Value) -> String {
                 format!("{}::{}{{ {} }}", name, variant, inner)
             }
         }
-        Value::Closure(_) => "<closure>".to_string(),
-        Value::Builtin(name, _) => format!("<builtin:{}>", name),
+        Value::Callable(super::RuntimeCallable::Closure(_)) => "<closure>".to_string(),
+        Value::Callable(super::RuntimeCallable::Intrinsic { label, .. }) => {
+            format!("<intrinsic:{}>", label)
+        }
         Value::Pointer(rc) => format!("*{}", format_value(&rc.borrow())),
         Value::MutPointer(rc) => format!("*mut {}", format_value(&rc.borrow())),
         Value::MutFieldPointer { .. } => "<*mut field-path>".to_string(),

@@ -14,7 +14,7 @@ TypedModuleGraph  ──►  evaluate_graph() ──►  side effects / RuntimeP
 
 Entry points:
 - `evaluator::evaluate(program: TypedProgram) -> Result<(), MetelError>` — single-module legacy path; used by the evaluator test harness only, not called from the main pipeline
-- `evaluator::evaluate_graph(graph: TypedModuleGraph) -> Result<(), MetelError>` — multi-module path (v0.6.0): processes each `TypedModule` in topological order in its own isolated `Environment`, seeding imported names from already-evaluated dependency environments and sharing a process-wide `RuntimeRegistry` for builtins and impl dispatch
+- `evaluator::evaluate_graph(graph: TypedModuleGraph) -> Result<(), MetelError>` — multi-module path (v0.6.0): processes each `TypedModule` in topological order in its own isolated `Environment`, seeding imported names from already-evaluated dependency environments and sharing a process-wide `RuntimeRegistry` for `std::core` ownership plus type/aspect dispatch
 
 The evaluator operates on the typed AST produced by the typechecker. It does not re-check types — if the evaluator panics on a type mismatch, that is a typechecker bug, not an evaluator limitation.
 
@@ -35,10 +35,19 @@ pub enum Value {
     Array(Rc<RefCell<Vec<Value>>>),
     Struct { name: String, fields: HashMap<String, Value> },
     Enum   { name: String, variant: String, fields: HashMap<String, Value> },
-    Closure(Rc<ClosureValue>),
-    Builtin(String, fn(Vec<Value>, &Span) -> Result<Value, MetelError>),
+    Callable(RuntimeCallable),
     Pointer(Rc<RefCell<Value>>),        // shared immutable reference — &expr (RFC-0043)
     MutPointer(Rc<RefCell<Value>>),     // shared mutable reference — &mut expr (RFC-0043)
+}
+```
+
+`RuntimeCallable` distinguishes host-backed intrinsic callables from user
+closures without making either one a special namespace concept:
+
+```rust
+pub enum RuntimeCallable {
+    Closure(Rc<ClosureValue>),
+    Intrinsic { label: String, fun: fn(Vec<Value>, &Span) -> Result<Value, MetelError> },
 }
 ```
 
@@ -101,7 +110,7 @@ Each binding is stored as an `Rc<RefCell<Value>>`. This has two consequences:
 
    This is an unintentional consequence of the PoC design. RFC-0006 (closure capture semantics) will establish the intended semantics. For now, any program that relies on closures sharing mutable state with their enclosing scope may produce surprising results, and any program that expects clone-at-definition isolation may also be surprised. The test suite avoids this ambiguity.
 
-Lexical `Environment` storage is intentionally separate from runtime metadata. Builtin free functions, builtin methods, and aspect impl methods live in a shared `RuntimeRegistry`, not as synthetic bindings inside the lexical scope stack. Closures capture only lexical environment state; they do not capture runtime dispatch tables.
+Lexical `Environment` storage is intentionally separate from runtime metadata. Module-owned runtime values, type-owned methods, and aspect impl methods live in a shared `RuntimeRegistry`, not as synthetic bindings inside the lexical scope stack. Type-owned method entries now also carry receiver and lightweight signature metadata so static-style callables and receiver methods are structurally distinct at runtime. Closures capture only lexical environment state; they do not capture runtime dispatch tables.
 
 ---
 
@@ -113,9 +122,9 @@ Lexical `Environment` storage is intentionally separate from runtime metadata. B
 Every top-level `Fun` is bound to `Value::Unit` in the root environment. This ensures the names exist before any closure is created, so closures formed in Pass 1b can capture them via shared `Rc`s.
 
 **Pass 1b — Create closures:**
-Every top-level `Fun` clones the full current environment and creates a `Value::Closure`. The clone captures the `Rc`s from Pass 1a, not copies of `Value::Unit`. `env.set()` then mutates those `Rc`s in place.
+Every top-level `Fun` clones the full current environment and creates a `Value::Callable(RuntimeCallable::Closure(...))`. The clone captures the `Rc`s from Pass 1a, not copies of `Value::Unit`. `env.set()` then mutates those `Rc`s in place.
 
-Top-level `Impl` methods are registered into the shared `RuntimeRegistry` during this pass. They are available both as typed method dispatch entries and as qualified runtime globals such as `TypeName::method_name` for static-style calls like `Type::new(...)`.
+Top-level `Impl` methods are registered into the shared `RuntimeRegistry` during this pass. Inherent impls with no receiver are stored as type-owned associated values for `Type::method(...)` path resolution; inherent impls with a receiver are stored as receiver methods under the owning type. Aspect impls are stored as explicit aspect records attached to the owning type, and each runtime method entry carries receiver/signature metadata.
 
 Because all function closures from Pass 1b share the same set of `Rc`s, after Pass 1b completes every closure's captured environment already contains references to every other function closure — including those defined after it. This "ties the knot" for mutual recursion without a fixpoint pass or separate reference-resolution step.
 
@@ -202,11 +211,11 @@ Index mutation works by calling `eval_typed_place_value` on the receiver to get 
 
 `call_function(func, args, span)` handles three cases:
 
-- `Value::Builtin(_, f)` — calls the function pointer directly.
-- `Value::Closure(rc)` — clones the captured environment, pushes a parameter scope, evaluates the body, and converts `Signal::Return` to `Signal::Value` at the boundary. `Signal::PropagateErr` is also converted: it wraps the error value in `Value::Enum { name: "Result", variant: "Err", fields: { "error": e } }` and returns `Signal::Value` — so the `?` error appears as a `Result::Err` value to the caller.
-- `Value::Closure(rc)` where `rc.body` is `ClosureBody::Untyped(block)` — a polymorphic generic function or let-bound closure. The evaluator re-runs the construction pass on the untyped block at the concrete argument types, producing a `TypedBlock` that is evaluated immediately. This is the monomorphization path.
+- `Value::Callable(RuntimeCallable::Intrinsic { fun, .. })` — calls the intrinsic function pointer directly.
+- `Value::Callable(RuntimeCallable::Closure(rc))` — clones the captured environment, pushes a parameter scope, evaluates the body, and converts `Signal::Return` to `Signal::Value` at the boundary. `Signal::PropagateErr` is also converted: it wraps the error value in `Value::Enum { name: "Result", variant: "Err", fields: { "error": e } }` and returns `Signal::Value` — so the `?` error appears as a `Result::Err` value to the caller.
+- `Value::Callable(RuntimeCallable::Closure(rc))` where `rc.body` is `ClosureBody::Untyped(block)` — a polymorphic generic function or let-bound closure. The evaluator re-runs the construction pass on the untyped block at the concrete argument types, producing a `TypedBlock` that is evaluated immediately. This is the monomorphization path.
 
-Method dispatch no longer looks up synthetic environment keys. `eval_expr` derives a typed runtime method key from the receiver and method name, then resolves it through `RuntimeRegistry`. `impl From<S> for T` coercions use the same runtime registry keyed by `(target, source)` rather than by environment strings.
+Method dispatch no longer looks up synthetic environment keys. `eval_expr` resolves methods through the owning type's runtime entry, checking receiver methods first and then explicit aspect impl entries. Static paths such as `Type::new(...)` resolve through type-owned associated values. `impl From<S> for T` coercions resolve through the target type's `From<S>` aspect impl rather than by environment strings, and receiver binding now follows the runtime method metadata instead of closure parameter inspection.
 
 ---
 

@@ -12,7 +12,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::ast::{BinOp, Literal, Param, Span, UnaryOp};
+use crate::ast::{BinOp, Literal, Param, Span, TypeExpr, UnaryOp};
 use crate::error::{FrameInfo, MetelError, RuntimeErrorCode};
 use crate::typeinference::TypeCtx;
 
@@ -86,8 +86,7 @@ pub enum Value {
         variant: String,
         fields: HashMap<String, Value>,
     },
-    Closure(Rc<ClosureValue>),
-    Builtin(String, fn(Vec<Value>, &Span) -> Result<Value, MetelError>),
+    Callable(RuntimeCallable),
     /// Read-only pointer to a named binding cell.
     Pointer(Rc<RefCell<Value>>),
     /// Writable pointer to a named binding cell.
@@ -109,54 +108,61 @@ pub enum ClosureBody {
     Untyped(Block),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum RuntimeMethodKey {
-    Regular {
-        type_name: String,
-        method_name: String,
-    },
-    FromImpl {
-        target: String,
-        source: String,
+#[derive(Debug, Clone)]
+pub enum RuntimeCallable {
+    Closure(Rc<ClosureValue>),
+    Intrinsic {
+        label: String,
+        fun: fn(Vec<Value>, &Span) -> Result<Value, MetelError>,
     },
 }
 
-impl RuntimeMethodKey {
-    fn regular(type_name: impl Into<String>, method_name: impl Into<String>) -> Self {
-        Self::Regular {
-            type_name: type_name.into(),
-            method_name: method_name.into(),
-        }
-    }
+#[derive(Debug, Clone, Default)]
+pub struct RuntimeModuleEntry {
+    values: HashMap<String, Value>,
+}
 
-    fn from_impl(target: impl Into<String>, source: impl Into<String>) -> Self {
-        Self::FromImpl {
-            target: target.into(),
-            source: source.into(),
-        }
-    }
+#[derive(Debug, Clone, Default)]
+pub struct RuntimeTypeEntry {
+    associated_values: HashMap<String, RuntimeMethod>,
+    inherent_methods: HashMap<String, RuntimeMethod>,
+    aspect_impls: Vec<RuntimeAspectImpl>,
+}
 
-    fn from_block(
-        type_name: &str,
-        method_name: &str,
-        impl_block: &crate::typed_ast::TypedImplBlock,
-    ) -> Self {
-        if impl_block.aspect_name.as_deref() == Some("From")
-            && method_name == "from"
-            && !impl_block.aspect_type_args.is_empty()
-        {
-            if let crate::ast::TypeExpr::Named(src, _) = &impl_block.aspect_type_args[0] {
-                return Self::from_impl(type_name, src);
-            }
-        }
-        Self::regular(type_name, method_name)
-    }
+#[derive(Debug, Clone, Default)]
+pub struct RuntimeAspectImpl {
+    aspect_name: String,
+    type_args: Vec<String>,
+    methods: HashMap<String, RuntimeMethod>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RuntimeTypeRef {
+    Named(String),
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct RuntimeSignature {
+    #[allow(dead_code)] // stored for future diagnostics/reflection and System F transition work
+    pub params: Vec<RuntimeTypeRef>,
+    #[allow(dead_code)] // stored for future diagnostics/reflection and System F transition work
+    pub ret: Option<RuntimeTypeRef>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RuntimeMethod {
+    #[allow(dead_code)] // stored for diagnostics/debugging; not used for structural lookup
+    pub label: String,
+    pub receiver: Option<crate::ast::ReceiverKind>,
+    #[allow(dead_code)] // stored for future diagnostics/reflection and System F transition work
+    pub signature: RuntimeSignature,
+    pub body: RuntimeCallable,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct RuntimeRegistry {
-    globals: HashMap<String, Value>,
-    methods: HashMap<RuntimeMethodKey, Value>,
+    modules: HashMap<Vec<String>, RuntimeModuleEntry>,
+    types: HashMap<String, RuntimeTypeEntry>,
 }
 
 impl RuntimeRegistry {
@@ -164,29 +170,197 @@ impl RuntimeRegistry {
         Self::default()
     }
 
-    pub fn register_global(&mut self, name: impl Into<String>, value: Value) {
-        self.globals.insert(name.into(), value);
+    pub fn register_module_value(
+        &mut self,
+        module_path: impl Into<Vec<String>>,
+        name: impl Into<String>,
+        value: Value,
+    ) {
+        self.modules
+            .entry(module_path.into())
+            .or_default()
+            .values
+            .insert(name.into(), value);
     }
 
-    pub fn register_method(&mut self, key: RuntimeMethodKey, value: Value) {
-        self.methods.insert(key, value);
+    pub fn register_std_core_value(&mut self, name: impl Into<String>, value: Value) {
+        self.register_module_value(vec!["std".to_string(), "core".to_string()], name, value);
     }
 
-    pub fn get_global(&self, name: &str) -> Option<Value> {
-        self.globals.get(name).cloned()
+    pub fn register_type_value(
+        &mut self,
+        type_name: impl Into<String>,
+        name: impl Into<String>,
+        value: RuntimeMethod,
+    ) {
+        self.types
+            .entry(type_name.into())
+            .or_default()
+            .associated_values
+            .insert(name.into(), value);
     }
 
-    pub fn get_method(&self, key: &RuntimeMethodKey) -> Option<Value> {
-        self.methods.get(key).cloned()
+    pub fn register_inherent_method(
+        &mut self,
+        type_name: impl Into<String>,
+        method_name: impl Into<String>,
+        value: RuntimeMethod,
+    ) {
+        self.types
+            .entry(type_name.into())
+            .or_default()
+            .inherent_methods
+            .insert(method_name.into(), value);
     }
 
-    pub fn get_regular_method(&self, type_name: &str, method_name: &str) -> Option<Value> {
-        self.get_method(&RuntimeMethodKey::regular(type_name, method_name))
+    pub fn register_aspect_method(
+        &mut self,
+        type_name: impl Into<String>,
+        aspect_name: impl Into<String>,
+        type_args: Vec<String>,
+        method_name: impl Into<String>,
+        value: RuntimeMethod,
+    ) {
+        let entry = self.types.entry(type_name.into()).or_default();
+        let aspect_name = aspect_name.into();
+        let method_name = method_name.into();
+        if let Some(aspect_impl) = entry
+            .aspect_impls
+            .iter_mut()
+            .find(|aspect_impl| aspect_impl.aspect_name == aspect_name && aspect_impl.type_args == type_args)
+        {
+            aspect_impl.methods.insert(method_name, value);
+            return;
+        }
+
+        let mut methods = HashMap::new();
+        methods.insert(method_name, value);
+        entry.aspect_impls.push(RuntimeAspectImpl {
+            aspect_name,
+            type_args,
+            methods,
+        });
     }
 
-    pub fn get_from_method(&self, target: &str, source: &str) -> Option<Value> {
-        self.get_method(&RuntimeMethodKey::from_impl(target, source))
-            .or_else(|| self.get_regular_method(target, "from"))
+    pub fn get_module_value(&self, module_path: &[String], name: &str) -> Option<Value> {
+        self.modules.get(module_path)?.values.get(name).cloned()
+    }
+
+    pub fn std_core_values(&self) -> Option<&HashMap<String, Value>> {
+        self.modules
+            .get(&vec!["std".to_string(), "core".to_string()])
+            .map(|entry| &entry.values)
+    }
+
+    pub fn get_type_value(&self, type_name: &str, name: &str) -> Option<Value> {
+        let type_entry = self.types.get(type_name)?;
+        type_entry
+            .associated_values
+            .get(name)
+            .map(|method| Value::Callable(method.body.clone()))
+            .or_else(|| {
+                type_entry
+                    .aspect_impls
+                    .iter()
+                    .rev()
+                    .find_map(|aspect_impl| {
+                        aspect_impl
+                            .methods
+                            .get(name)
+                            .filter(|method| method.receiver.is_none())
+                            .map(|method| Value::Callable(method.body.clone()))
+                    })
+            })
+    }
+
+    pub fn get_inherent_method(&self, type_name: &str, method_name: &str) -> Option<RuntimeMethod> {
+        self.types
+            .get(type_name)?
+            .inherent_methods
+            .get(method_name)
+            .cloned()
+            .filter(|method| method.receiver.is_some())
+    }
+
+    pub fn get_regular_method(&self, type_name: &str, method_name: &str) -> Option<RuntimeMethod> {
+        self.get_inherent_method(type_name, method_name).or_else(|| {
+            self.types
+                .get(type_name)?
+                .aspect_impls
+                .iter()
+                .rev()
+                .find_map(|aspect_impl| {
+                    aspect_impl
+                        .methods
+                        .get(method_name)
+                        .cloned()
+                        .filter(|method| method.receiver.is_some())
+                })
+        })
+    }
+
+    pub fn get_from_method(&self, target: &str, source: &str) -> Option<RuntimeMethod> {
+        self.types
+            .get(target)?
+            .aspect_impls
+            .iter()
+            .rev()
+            .find_map(|aspect_impl| {
+                (aspect_impl.aspect_name == "From"
+                    && aspect_impl.type_args.len() == 1
+                    && aspect_impl.type_args[0] == source)
+                    .then(|| aspect_impl.methods.get("from").cloned())
+                    .flatten()
+            })
+            .or_else(|| {
+                self.types
+                    .get(target)?
+                    .associated_values
+                    .get("from")
+                    .cloned()
+                    .or_else(|| self.inherent_method_without_receiver(target, "from"))
+            })
+    }
+
+    fn inherent_method_without_receiver(
+        &self,
+        type_name: &str,
+        method_name: &str,
+    ) -> Option<RuntimeMethod> {
+        self.types
+            .get(type_name)?
+            .inherent_methods
+            .get(method_name)
+            .cloned()
+            .filter(|method| method.receiver.is_none())
+    }
+
+    pub fn resolve_module_export(&self, module_path: &[String], local_name: &str) -> Option<Value> {
+        self.get_module_value(module_path, local_name).or_else(|| {
+            let mut segments = local_name.split("::");
+            let type_name = segments.next()?;
+            let member_name = segments.next()?;
+            if segments.next().is_some() {
+                return None;
+            }
+            self.get_type_value(type_name, member_name)
+        })
+    }
+
+    pub fn resolve_path_value(&self, segments: &[String]) -> Option<Value> {
+        if segments.len() >= 3 {
+            let module_path = segments[..2].to_vec();
+            let local_name = segments[2..].join("::");
+            if let Some(value) = self.resolve_module_export(&module_path, &local_name) {
+                return Some(value);
+            }
+        }
+
+        if segments.len() == 2 {
+            return self.get_type_value(&segments[0], &segments[1]);
+        }
+
+        None
     }
 }
 
@@ -361,6 +535,94 @@ fn runtime_type_name(value: &Value) -> Option<&str> {
         Value::Boolean(_) => Some("boolean"),
         Value::Str(_) => Some("String"),
         _ => None,
+    }
+}
+
+fn runtime_type_key(ty: &TypeExpr) -> String {
+    match ty {
+        TypeExpr::Named(name, args) if args.is_empty() => name.clone(),
+        TypeExpr::Named(name, args) => format!(
+            "{name}<{}>",
+            args.iter().map(runtime_type_key).collect::<Vec<_>>().join(", ")
+        ),
+        TypeExpr::Unit => "()".to_string(),
+        TypeExpr::Tuple(items) => format!(
+            "({})",
+            items
+                .iter()
+                .map(runtime_type_key)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        TypeExpr::Array(inner) => format!("{}[]", runtime_type_key(inner)),
+        TypeExpr::SizedArray(inner, size) => format!("[{}; {}]", runtime_type_key(inner), size),
+        TypeExpr::Pointer(inner) => format!("*{}", runtime_type_key(inner)),
+        TypeExpr::MutPointer(inner) => format!("*mut {}", runtime_type_key(inner)),
+        TypeExpr::Fun(params, ret) => {
+            let params = params
+                .iter()
+                .map(runtime_type_key)
+                .collect::<Vec<_>>()
+                .join(", ");
+            match ret {
+                Some(ret) => format!("fun({params}) -> {}", runtime_type_key(ret)),
+                None => format!("fun({params})"),
+            }
+        }
+        TypeExpr::ImplAspect { bound, .. } => format!("impl {}", runtime_type_key(bound)),
+    }
+}
+
+fn runtime_type_ref(ty: &TypeExpr) -> RuntimeTypeRef {
+    RuntimeTypeRef::Named(runtime_type_key(ty))
+}
+
+fn runtime_signature(
+    params: impl IntoIterator<Item = TypeExpr>,
+    ret: Option<TypeExpr>,
+) -> RuntimeSignature {
+    RuntimeSignature {
+        params: params.into_iter().map(|ty| runtime_type_ref(&ty)).collect(),
+        ret: ret.map(|ty| runtime_type_ref(&ty)),
+    }
+}
+
+fn runtime_method_from_decl(
+    label: String,
+    method: &crate::typed_ast::TypedFunDecl,
+    body: RuntimeCallable,
+) -> RuntimeMethod {
+    let receiver = method.params.first().and_then(|param| param.receiver.clone());
+    let params = method
+        .params
+        .iter()
+        .filter_map(|param| {
+            if param.receiver.is_some() {
+                None
+            } else {
+                Some(
+                    param.type_ann.clone().unwrap_or_else(|| TypeExpr::Named("_".to_string(), vec![])),
+                )
+            }
+        })
+        .collect::<Vec<_>>();
+    let signature = runtime_signature(params, method.return_type.clone());
+
+    RuntimeMethod {
+        label,
+        receiver,
+        signature,
+        body,
+    }
+}
+
+fn seed_std_core_into_env(env: &mut Environment, runtime: &RuntimeRegistry) {
+    if let Some(values) = runtime.std_core_values() {
+        for (name, value) in values {
+            if env.get(name).is_none() {
+                env.define(name, value.clone());
+            }
+        }
     }
 }
 
@@ -618,6 +880,7 @@ pub fn evaluate_graph(graph: TypedModuleGraph) -> Result<(), MetelError> {
 
     for module in graph.modules {
         let mut env = Environment::new();
+        seed_std_core_into_env(&mut env, &runtime);
 
         // Seed names imported from already-initialised dependency modules.
         for (local_name, (source_module, canonical_name)) in &module.imported_names {
@@ -625,6 +888,8 @@ pub fn evaluate_graph(graph: TypedModuleGraph) -> Result<(), MetelError> {
                 if let Some(val) = src_env.get(canonical_name) {
                     env.define(local_name, val);
                 }
+            } else if let Some(val) = runtime.get_module_value(source_module, canonical_name) {
+                env.define(local_name, val);
             }
         }
 
@@ -665,6 +930,7 @@ pub fn evaluate(program: TypedProgram) -> Result<(), MetelError> {
     CALL_STACK.with(|s| s.borrow_mut().clear());
     let mut runtime = builtins::runtime_registry();
     let mut env = Environment::new();
+    seed_std_core_into_env(&mut env, &runtime);
     run_passes(
         &program,
         &std::collections::HashMap::new(),
@@ -680,6 +946,7 @@ pub fn evaluate_with_ctx(program: TypedProgram, ctx: TypeCtx) -> Result<(), Mete
     CALL_STACK.with(|s| s.borrow_mut().clear());
     let mut runtime = builtins::runtime_registry();
     let mut env = Environment::new();
+    seed_std_core_into_env(&mut env, &runtime);
     let type_ctx_rc = std::rc::Rc::new(ctx);
     run_passes(
         &program,
@@ -729,14 +996,14 @@ fn run_passes(
                 let captured = env.clone();
                 env.set(
                     &f.name,
-                    Value::Closure(Rc::new(ClosureValue {
+                    Value::Callable(RuntimeCallable::Closure(Rc::new(ClosureValue {
                         name: Some(f.name.clone()),
                         params: f.params.clone(),
                         body,
                         captured,
                         type_ctx: ctx,
                         fun_type: None,
-                    })),
+                    }))),
                 );
             }
             TypedDecl::Impl(impl_block) => {
@@ -749,7 +1016,7 @@ fn run_passes(
                             }
                         };
                         let captured = env.clone();
-                        let closure = Value::Closure(Rc::new(ClosureValue {
+                        let closure = RuntimeCallable::Closure(Rc::new(ClosureValue {
                             name: Some(method.name.clone()),
                             params: method.params.clone(),
                             body,
@@ -757,14 +1024,36 @@ fn run_passes(
                             type_ctx: ctx,
                             fun_type: None,
                         }));
-                        runtime.register_global(
+                        let runtime_method = runtime_method_from_decl(
                             format!("{type_name}::{}", method.name),
-                            closure.clone(),
-                        );
-                        runtime.register_method(
-                            RuntimeMethodKey::from_block(type_name, &method.name, impl_block),
+                            method,
                             closure,
                         );
+                        if let Some(aspect_name) = &impl_block.aspect_name {
+                            let aspect_type_args =
+                                impl_block.aspect_type_args.iter().map(runtime_type_key).collect();
+                            runtime.register_aspect_method(
+                                type_name,
+                                aspect_name,
+                                aspect_type_args,
+                                &method.name,
+                                runtime_method,
+                            );
+                        } else {
+                            if runtime_method.receiver.is_none() {
+                                runtime.register_type_value(
+                                    type_name,
+                                    &method.name,
+                                    runtime_method,
+                                );
+                            } else {
+                                runtime.register_inherent_method(
+                                    type_name,
+                                    &method.name,
+                                    runtime_method,
+                                );
+                            }
+                        }
                     }
                 }
             }
@@ -801,7 +1090,7 @@ fn run_main(env: &mut Environment, runtime: &RuntimeRegistry) -> Result<(), Mete
         col: 0,
     };
     let main_body = match env.get("main") {
-        Some(Value::Closure(rc)) => rc.body.clone(),
+        Some(Value::Callable(RuntimeCallable::Closure(rc))) => rc.body.clone(),
         Some(Value::Unit) => {
             return Err(MetelError::panic(
                 RuntimeErrorCode::R0002,
@@ -900,14 +1189,14 @@ fn eval_decl(
             // (enables self-recursion for functions defined inside other functions).
             env.define(&f.name, Value::Unit);
             let captured = env.clone();
-            let closure = Value::Closure(Rc::new(ClosureValue {
+            let closure = Value::Callable(RuntimeCallable::Closure(Rc::new(ClosureValue {
                 name: Some(f.name.clone()),
                 params: f.params.clone(),
                 body,
                 captured,
                 type_ctx: ctx,
                 fun_type: None,
-            }));
+            })));
             env.set(&f.name, closure);
             Ok(Signal::Value(Value::Unit))
         }
@@ -1095,7 +1384,7 @@ fn eval_for_in(
     let iter_cell = Rc::new(RefCell::new(deep_clone_value(iterable)));
     loop {
         let result = call::call_method_function(
-            next_fn.clone(),
+            next_fn.body.clone(),
             call::ReceiverBinding::Shared(Rc::clone(&iter_cell)),
             vec![],
             span,
@@ -1205,16 +1494,14 @@ pub fn eval_expr(
             Ok(Signal::Value(val))
         }
 
-        TypedExpr::Ident(name, _, span) => {
-            match env.get(name).or_else(|| runtime.get_global(name)) {
-                Some(val) => Ok(Signal::Value(val)),
-                None => Err(MetelError::panic(
-                    RuntimeErrorCode::R0003,
-                    format!("undefined variable `{name}`"),
-                    span,
-                )),
-            }
-        }
+        TypedExpr::Ident(name, _, span) => match env.get(name) {
+            Some(val) => Ok(Signal::Value(val)),
+            None => Err(MetelError::panic(
+                RuntimeErrorCode::R0003,
+                format!("undefined variable `{name}`"),
+                span,
+            )),
+        },
 
         TypedExpr::Path(segments, _, _) => {
             // Unit enum variant: `Colour::Red` → Value::Enum { name: "Colour", variant: "Red", fields: {} }
@@ -1222,7 +1509,7 @@ pub fn eval_expr(
             if segments.len() == 1 {
                 let name = &segments[0];
                 let span = expr.span();
-                match env.get(name).or_else(|| runtime.get_global(name)) {
+                match env.get(name) {
                     Some(val) => Ok(Signal::Value(val)),
                     None => Err(MetelError::panic(
                         RuntimeErrorCode::R0003,
@@ -1231,9 +1518,10 @@ pub fn eval_expr(
                     )),
                 }
             } else {
-                // Check full qualified name (e.g. "Circle::new" for static methods).
-                let key = segments.join("::");
-                if let Some(val) = runtime.get_global(&key).or_else(|| env.get(&key)) {
+                if let Some(val) = runtime
+                    .resolve_path_value(segments)
+                    .or_else(|| env.get(&segments.join("::")))
+                {
                     return Ok(Signal::Value(val));
                 }
                 let name = segments[segments.len() - 2].clone();
@@ -1369,7 +1657,7 @@ pub fn eval_expr(
                 let from_fn = runtime_type_name(&v)
                     .and_then(|source| runtime.get_from_method(target_name, source));
                 if let Some(f) = from_fn {
-                    return call::call_function(f, vec![v], span, runtime);
+                    return call::call_function(Value::Callable(f.body), vec![v], span, runtime);
                 }
             }
             // Identity cast fallback (same type, no from registered).
@@ -1752,7 +2040,7 @@ pub fn eval_expr(
                     span,
                 )
             })?;
-            let func = runtime
+            let method_entry = runtime
                 .get_regular_method(type_name, method)
                 .ok_or_else(|| {
                     MetelError::panic(
@@ -1761,14 +2049,9 @@ pub fn eval_expr(
                         span,
                     )
                 })?;
-            match &func {
-                Value::Closure(rc)
-                    if matches!(
-                        rc.params.first().and_then(|p| p.receiver.clone()),
-                        Some(crate::ast::ReceiverKind::Ref)
-                            | Some(crate::ast::ReceiverKind::RefMut)
-                    ) =>
-                {
+            let func = method_entry.body.clone();
+            match method_entry.receiver {
+                Some(crate::ast::ReceiverKind::Ref | crate::ast::ReceiverKind::RefMut) => {
                     // For field-access chains (e.g. `pair.a.tick()`) we can't hand the
                     // evaluator a direct Rc to the field because fields are stored by value
                     // inside the parent struct's HashMap.  Instead we clone the leaf value
@@ -1839,11 +2122,16 @@ pub fn eval_expr(
 
                     Ok(result)
                 }
-                _ => {
+                Some(crate::ast::ReceiverKind::Value) => {
                     let mut all_args = vec![recv_type_view];
                     all_args.extend(arg_vals);
-                    call::call_function(func, all_args, span, runtime)
+                    call::call_function(Value::Callable(func), all_args, span, runtime)
                 }
+                None => Err(MetelError::panic(
+                    RuntimeErrorCode::R0009,
+                    format!("no receiver method `{method}` on `{type_name}`"),
+                    span,
+                )),
             }
         }
 
@@ -1862,29 +2150,28 @@ pub fn eval_expr(
             params, body, ty, ..
         } => {
             let captured = env.capture_clone();
-            Ok(Signal::Value(Value::Closure(Rc::new(ClosureValue {
+            Ok(Signal::Value(Value::Callable(RuntimeCallable::Closure(Rc::new(ClosureValue {
                 name: None,
                 params: params.clone(),
                 body: ClosureBody::Typed(body.clone()),
                 captured,
                 type_ctx: None,
                 fun_type: Some(ty.clone()),
-            }))))
+            })))))
         }
 
         TypedExpr::GenericClosure {
             name, params, body, ..
         } => {
             let captured = env.capture_clone();
-            Ok(Signal::Value(Value::Closure(Rc::new(ClosureValue {
+            Ok(Signal::Value(Value::Callable(RuntimeCallable::Closure(Rc::new(ClosureValue {
                 name: name.clone(),
                 params: params.clone(),
                 body: ClosureBody::Untyped(body.clone()),
                 captured,
                 type_ctx: env.type_ctx.clone(),
                 fun_type: None,
-            }))))
+            })))))
         }
     }
 }
-

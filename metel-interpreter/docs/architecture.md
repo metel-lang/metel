@@ -61,7 +61,7 @@ metel-interpreter/
     ├── typed_ast/         — typed AST node definitions
     ├── evaluator/         — tree-walking evaluator, lexical env, runtime registry, runtime values
     │   ├── mod.rs         — core: Value, Signal, Environment, RuntimeRegistry, evaluate(), eval_block/stmt/expr
-    │   ├── builtins.rs    — register_builtins/runtime_registry: builtin globals and methods
+    │   ├── builtins.rs    — register_builtins/runtime_registry: std::core intrinsic values plus type-owned runtime methods with receiver/signature metadata
     │   ├── call.rs        — call_function and method-call dispatch
     │   ├── display.rs     — format_float, value_to_display_string, format_value
     │   ├── lvalue.rs      — eval_binop, apply_assign_op, lvalue path helpers

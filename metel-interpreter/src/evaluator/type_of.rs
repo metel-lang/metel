@@ -11,7 +11,7 @@ use crate::types::Type;
 /// - Generic structs/enums: type parameters are not recoverable from runtime values,
 ///   so `Named(name, [])` is returned. The construction pass must unify against the
 ///   scheme and fill in the parameters from context.
-/// - Closures: the concrete function type is not stored in `Value::Closure`, so
+/// - Closures: the concrete function type is not stored in the runtime callable, so
 ///   `Fun([], Box::new(Unit))` is returned as a placeholder.
 pub(super) fn value_to_type(value: &Value) -> Type {
     match value {
@@ -37,11 +37,13 @@ pub(super) fn value_to_type(value: &Value) -> Type {
         }
         Value::Struct { name, .. } => Type::Named(name.clone(), vec![]),
         Value::Enum { name, .. } => Type::Named(name.clone(), vec![]),
-        Value::Closure(rc) => rc
-            .fun_type
-            .clone()
-            .unwrap_or_else(|| Type::Fun(vec![], Box::new(Type::Unit))),
-        Value::Builtin(_, _) => Type::Fun(vec![], Box::new(Type::Unit)),
+        Value::Callable(callable) => match callable {
+            super::RuntimeCallable::Closure(rc) => rc
+                .fun_type
+                .clone()
+                .unwrap_or_else(|| Type::Fun(vec![], Box::new(Type::Unit))),
+            super::RuntimeCallable::Intrinsic { .. } => Type::Fun(vec![], Box::new(Type::Unit)),
+        },
         Value::Pointer(rc) => Type::Pointer(Box::new(value_to_type(&rc.borrow()))),
         Value::MutPointer(rc) => Type::MutPointer(Box::new(value_to_type(&rc.borrow()))),
         Value::MutFieldPointer { root, path } => {
