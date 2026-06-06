@@ -17,6 +17,7 @@ pub enum Type {
     // ─────────────────────────────────────────────────────────────────────────
     Tuple(Vec<Type>),
     Array(Box<Type>),
+    SizedArray(Box<Type>, u64),
     Pointer(Box<Type>),
     MutPointer(Box<Type>),
     Fun(Vec<Type>, Box<Type>),
@@ -70,6 +71,7 @@ impl std::fmt::Display for Type {
                 write!(f, ")")
             }
             Type::Array(t) => write!(f, "{}[]", t),
+            Type::SizedArray(t, n) => write!(f, "[{}; {}]", t, n),
             Type::Pointer(t) => write!(f, "*{}", t),
             Type::MutPointer(t) => write!(f, "*mut {}", t),
             Type::Fun(params, ret) => {

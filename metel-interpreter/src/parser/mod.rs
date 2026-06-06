@@ -600,6 +600,7 @@ fn parse_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Expr,
         Rule::path_expr     => parse_path_expr(pair, filename),
         Rule::tuple_or_paren => parse_tuple_or_paren(pair, filename),
         Rule::array_lit     => parse_array_lit(pair, filename),
+        Rule::repeat_array  => parse_repeat_array(pair, filename),
         Rule::match_expr    => Ok(Expr::Match(parse_match_expr(pair, filename)?)),
         Rule::if_expr       => parse_if_expr(pair, filename),
         Rule::loop_expr     => parse_loop_expr(pair, filename),
@@ -946,6 +947,7 @@ fn shift_expr_span(expr: &mut Expr, base_start: usize, base_line: u32, base_col:
         | Expr::Path(_, span)
         | Expr::Tuple(_, span)
         | Expr::Array(_, span)
+        | Expr::RepeatArray(_, _, span)
         | Expr::BinOp(_, _, _, span)
         | Expr::UnaryOp(_, _, span)
         | Expr::PropagateError { span, .. } => {
@@ -1173,6 +1175,12 @@ fn shift_pattern_span(pattern: &mut Pattern, base_start: usize, base_line: u32, 
             }
             shift_span(span, base_start, base_line, base_col);
         }
+        Pattern::Array { elems, span, .. } => {
+            for item in elems {
+                shift_pattern_span(item, base_start, base_line, base_col);
+            }
+            shift_span(span, base_start, base_line, base_col);
+        }
     }
 }
 
@@ -1206,6 +1214,22 @@ fn parse_array_lit(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<
         .map(|p| parse_expr(p, filename))
         .collect::<Result<_, _>>()?;
     Ok(Expr::Array(elems, span))
+}
+
+fn parse_repeat_array(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Expr, MetelError> {
+    let span = Span::of(&pair, filename);
+    let mut inner = pair.into_inner();
+    let elem = parse_expr(
+        inner.next().ok_or_else(|| MetelError::internal("repeat_array: expected element expr"))?,
+        filename,
+    )?;
+    let n_str = inner.next()
+        .ok_or_else(|| MetelError::internal("repeat_array: expected count"))?
+        .as_str();
+    let n: u64 = n_str.parse().map_err(|_| MetelError::internal(
+        format!("repeat_array: count '{n_str}' is not a valid u64")
+    ))?;
+    Ok(Expr::RepeatArray(Box::new(elem), n, span))
 }
 
 fn wrap_expr_as_block(expr: Expr) -> Block {
@@ -1675,6 +1699,30 @@ fn parse_pattern(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Pa
                 .as_str().to_string();
             Ok(Pattern::Binding(name, span))
         }
+        Rule::array_pattern => {
+            let span = Span::of(&pair, filename);
+            // array_pattern = { "[" ~ array_pat_body ~ "]" }
+            // array_pat_body = { (pattern ~ ("," ~ pattern)* ~ ("," ~ rest_pat)? | rest_pat)? }
+            let body_pair = pair.into_inner()
+                .find(|p| p.as_rule() == Rule::array_pat_body)
+                .ok_or_else(|| MetelError::internal("array_pattern: missing body"))?;
+            let mut elems = vec![];
+            let mut rest = None;
+            for child in body_pair.into_inner() {
+                match child.as_rule() {
+                    Rule::pattern => elems.push(parse_pattern(child, filename)?),
+                    Rule::rest_pat => {
+                        let name = child.into_inner()
+                            .find(|p| p.as_rule() == Rule::ident)
+                            .ok_or_else(|| MetelError::internal("rest_pat: expected ident"))?
+                            .as_str().to_string();
+                        rest = Some(name);
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Pattern::Array { elems, rest, span })
+        }
         // Wildcard: the `"_" ~ !(...)` alternative in `pattern` is anonymous;
         // pest emits no sub-rule, so `pair.as_rule() == Rule::pattern` and
         // `pair.as_str() == "_"` — handled by the outer `pattern` arm above
@@ -1757,6 +1805,20 @@ fn parse_type_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<
                 filename,
             )?;
             Ok(TypeExpr::MutPointer(Box::new(elem)))
+        }
+        Rule::sized_array_type => {
+            let mut inner = pair.into_inner();
+            let elem = parse_type_expr(
+                inner.next().ok_or_else(|| MetelError::internal("sized_array_type: expected element type"))?,
+                filename,
+            )?;
+            let n_str = inner.next()
+                .ok_or_else(|| MetelError::internal("sized_array_type: expected count"))?
+                .as_str();
+            let n: u64 = n_str.parse().map_err(|_| MetelError::internal(
+                format!("sized_array_type: count '{n_str}' is not a valid u64")
+            ))?;
+            Ok(TypeExpr::SizedArray(Box::new(elem), n))
         }
         Rule::array_type => {
             let elem = parse_type_expr(

@@ -247,6 +247,7 @@ pub enum TypedExpr {
     Path(Vec<String>, Type, Span),
     Tuple(Vec<TypedExpr>, Type, Span),
     Array(Vec<TypedExpr>, Type, Span),
+    RepeatArray(Box<TypedExpr>, u64, Type, Span),
     BinOp(Box<TypedExpr>, BinOp, Box<TypedExpr>, Type, Span),
     UnaryOp(UnaryOp, Box<TypedExpr>, Type, Span),
     Assign {
@@ -344,6 +345,7 @@ impl TypedExpr {
             | TypedExpr::Path(_, ty, _)
             | TypedExpr::Tuple(_, ty, _)
             | TypedExpr::Array(_, ty, _)
+            | TypedExpr::RepeatArray(_, _, ty, _)
             | TypedExpr::BinOp(_, _, _, ty, _)
             | TypedExpr::UnaryOp(_, _, ty, _) => ty,
             TypedExpr::Assign { ty, .. }
@@ -370,6 +372,7 @@ impl TypedExpr {
             | TypedExpr::Path(_, _, s)
             | TypedExpr::Tuple(_, _, s)
             | TypedExpr::Array(_, _, s)
+            | TypedExpr::RepeatArray(_, _, _, s)
             | TypedExpr::BinOp(_, _, _, _, s)
             | TypedExpr::UnaryOp(_, _, _, s) => s,
             TypedExpr::Assign { span, .. }

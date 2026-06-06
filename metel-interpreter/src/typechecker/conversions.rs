@@ -52,6 +52,10 @@ fn type_expr_to_infer_in_context(
         TypeExpr::Array(t) => InferType::Array(
             Box::new(type_expr_to_infer_in_context(t, generics, self_ty_name)),
         ),
+        TypeExpr::SizedArray(t, n) => InferType::SizedArray(
+            Box::new(type_expr_to_infer_in_context(t, generics, self_ty_name)),
+            *n,
+        ),
         TypeExpr::Pointer(t) => InferType::Pointer(
             Box::new(type_expr_to_infer_in_context(t, generics, self_ty_name)),
         ),
@@ -123,6 +127,7 @@ pub(super) fn infer_type_to_type(ty: &InferType, span: &Span) -> Result<Type, Me
             Ok(Type::Tuple(t?))
         }
         InferType::Array(t) => Ok(Type::Array(Box::new(infer_type_to_type(t, span)?))),
+        InferType::SizedArray(t, n) => Ok(Type::SizedArray(Box::new(infer_type_to_type(t, span)?), *n)),
         InferType::Pointer(t) => Ok(Type::Pointer(Box::new(infer_type_to_type(t, span)?))),
         InferType::MutPointer(t) => Ok(Type::MutPointer(Box::new(infer_type_to_type(t, span)?))),
         InferType::Named(name, args) => {
@@ -145,6 +150,7 @@ pub(super) fn type_to_infer(ty: &Type) -> InferType {
     match ty {
         Type::Never          => InferType::Never,
         Type::Array(t)       => InferType::Array(Box::new(type_to_infer(t))),
+        Type::SizedArray(t, n) => InferType::SizedArray(Box::new(type_to_infer(t)), *n),
         Type::Tuple(ts)      => InferType::Tuple(ts.iter().map(type_to_infer).collect()),
         Type::Pointer(t)     => InferType::Pointer(Box::new(type_to_infer(t))),
         Type::MutPointer(t)  => InferType::MutPointer(Box::new(type_to_infer(t))),

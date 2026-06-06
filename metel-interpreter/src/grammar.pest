@@ -166,6 +166,7 @@ primary_expr = {
   | closure_expr
   | unit_lit
   | tuple_or_paren
+  | repeat_array  // must come before array_lit — both start with "["
   | array_lit
   | match_expr
   | if_expr
@@ -175,6 +176,7 @@ primary_expr = {
 }
 
 tuple_or_paren = { "(" ~ expr ~ ("," ~ expr)+ ~ ")" | "(" ~ expr ~ ")" }
+repeat_array   = { "[" ~ expr ~ ";" ~ decimal_int ~ "]" }
 array_lit      = { "[" ~ (expr ~ ("," ~ expr)* ~ ","?)? ~ "]" }
 
 match_expr  = { "match" ~ expr ~ "{" ~ match_arm ~ ("," ~ match_arm)* ~ ","? ~ "}" }
@@ -198,6 +200,7 @@ type_path = { path_root ~ ("::" ~ ident)* }
 pattern = {
     ("_" ~ !(ASCII_ALPHANUMERIC | "_"))   // wildcard — must not match _foo
   | none_lit                              // None literal (with word-boundary guard)
+  | array_pattern                         // must come before tuple_pattern
   | tuple_pattern
   | enum_pattern
   | literal_pattern
@@ -205,6 +208,9 @@ pattern = {
 }
 
 tuple_pattern   = { "(" ~ pattern ~ ("," ~ pattern)* ~ ")" }
+array_pattern   = { "[" ~ array_pat_body ~ "]" }
+array_pat_body  = { (pattern ~ ("," ~ pattern)* ~ ("," ~ rest_pat)? | rest_pat)? }
+rest_pat        = { ".." ~ ident }
 enum_pattern    = { ident ~ "::" ~ ident ~ ("{" ~ ident ~ ("," ~ ident)* ~ "}")? }
 literal_pattern = { float_lit_suffixed | float_lit | int_lit_suffixed | int_lit | string_lit | char_lit | bool_lit }
 bind_pattern    = { ident }
@@ -217,6 +223,7 @@ type_expr = {
   | tuple_type
   | mut_pointer_type
   | pointer_type
+  | sized_array_type  // must come before array_type — both start with "["
   | array_type
   | impl_type
   | named_type
@@ -229,6 +236,7 @@ tuple_type = { "(" ~ type_expr ~ ("," ~ type_expr)+ ~ ")" }
 fun_type   = { "(" ~ type_list? ~ ")" ~ "->" ~ type_expr }
 pointer_type = { "*" ~ type_expr }
 mut_pointer_type = { "*" ~ mut_kw ~ type_expr }
+sized_array_type = { "[" ~ type_expr ~ ";" ~ decimal_int ~ "]" }
 array_type = { named_type ~ "[]" }
 named_type = { type_path ~ ("<" ~ type_args ~ ">")? }
 type_args  = { type_expr ~ ("," ~ type_expr)* }

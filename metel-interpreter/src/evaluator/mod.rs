@@ -767,6 +767,569 @@ fn range_field(fields: &HashMap<String, Value>, name: &str, _span: &Span) -> Res
     }
 }
 
+// ── Untyped evaluation (for generic / let-polymorphic closures) ───────────────
+//
+// These functions mirror eval_block / eval_decl / eval_stmt / eval_expr but operate
+// on the untyped AST (`ast::Block`, `ast::Decl`, etc.).  Type annotations are absent
+// or ignored; all dispatch is on the runtime `Value` kind.
+
+pub(super) fn eval_untyped_block(block: &Block, env: &mut Environment) -> Result<Signal, MetelError> {
+    env.push_scope();
+    for decl in &block.stmts {
+        let sig = eval_untyped_decl(decl, env)?;
+        match sig {
+            Signal::Value(_) => {}
+            other => {
+                env.pop_scope();
+                return Ok(other);
+            }
+        }
+    }
+    let result = match &block.tail {
+        Some(tail) => eval_untyped_expr(tail, env),
+        None       => Ok(Signal::Value(Value::Unit)),
+    };
+    env.pop_scope();
+    result
+}
+
+fn eval_untyped_decl(decl: &Decl, env: &mut Environment) -> Result<Signal, MetelError> {
+    match decl {
+        Decl::Let(d) => {
+            match eval_untyped_expr(&d.value, env)? {
+                Signal::Value(val) => { env.define(&d.name, val); Ok(Signal::Value(Value::Unit)) }
+                other => Ok(other),
+            }
+        }
+        Decl::Mut(d) => {
+            match eval_untyped_expr(&d.value, env)? {
+                Signal::Value(val) => { env.define(&d.name, val); Ok(Signal::Value(Value::Unit)) }
+                other => Ok(other),
+            }
+        }
+        Decl::Fun(f) => {
+            let body = ClosureBody::Untyped(f.body.clone());
+            env.define(&f.name, Value::Unit);
+            let captured = env.clone();
+            let closure = Value::Closure(Rc::new(ClosureValue {
+                name:     Some(f.name.clone()),
+                params:   f.params.clone(),
+                body,
+                captured,
+            }));
+            env.set(&f.name, closure);
+            Ok(Signal::Value(Value::Unit))
+        }
+        Decl::Struct(_) | Decl::Enum(_) | Decl::Impl(_) | Decl::Aspect(_) => {
+            Ok(Signal::Value(Value::Unit))
+        }
+        Decl::Stmt(stmt) => eval_untyped_stmt(stmt, env),
+    }
+}
+
+fn eval_untyped_stmt(stmt: &Stmt, env: &mut Environment) -> Result<Signal, MetelError> {
+    use crate::ast::{ForInit, Stmt};
+    match stmt {
+        Stmt::Expr(e) => {
+            match eval_untyped_expr(e, env)? {
+                Signal::Value(_) => Ok(Signal::Value(Value::Unit)),
+                other            => Ok(other),
+            }
+        }
+        Stmt::Return(r) => {
+            let val = match &r.value {
+                Some(e) => eval_untyped_expr(e, env)?.into_value(),
+                None    => Value::Unit,
+            };
+            Ok(Signal::Return(val))
+        }
+        Stmt::Break(b) => {
+            let val = match &b.value {
+                Some(e) => eval_untyped_expr(e, env)?.into_value(),
+                None    => Value::Unit,
+            };
+            Ok(Signal::Break(val))
+        }
+        Stmt::Continue(_) => Ok(Signal::Continue),
+
+        Stmt::While(w) => {
+            loop {
+                match eval_untyped_expr(&w.condition, env)? {
+                    Signal::Value(Value::Bool(false)) => break,
+                    Signal::Value(Value::Bool(true))  => {}
+                    Signal::Value(_) => return Err(MetelError::internal("while: expected Bool condition")),
+                    other => return Ok(other),
+                }
+                match eval_untyped_block(&w.body, env)? {
+                    Signal::Value(_) | Signal::Continue => {}
+                    Signal::Break(_)        => break,
+                    Signal::Return(v)       => return Ok(Signal::Return(v)),
+                }
+            }
+            Ok(Signal::Value(Value::Unit))
+        }
+
+        Stmt::For(f) => {
+            env.push_scope();
+            if let Some(init) = &f.init {
+                match init {
+                    ForInit::Let(d) => {
+                        let val = eval_untyped_expr(&d.value, env)?.into_value();
+                        env.define(&d.name, val);
+                    }
+                    ForInit::Mut(d) => {
+                        let val = eval_untyped_expr(&d.value, env)?.into_value();
+                        env.define(&d.name, val);
+                    }
+                    ForInit::Expr(e) => { eval_untyped_expr(e, env)?; }
+                }
+            }
+            let result = loop {
+                if let Some(cond) = &f.condition {
+                    match eval_untyped_expr(cond, env)? {
+                        Signal::Value(Value::Bool(false)) => break Ok(Signal::Value(Value::Unit)),
+                        Signal::Value(Value::Bool(true))  => {}
+                        Signal::Value(_) => break Err(MetelError::internal("for: expected Bool condition")),
+                        other => break Ok(other),
+                    }
+                }
+                match eval_untyped_block(&f.body, env)? {
+                    Signal::Value(_) | Signal::Continue => {}
+                    Signal::Break(_)        => break Ok(Signal::Value(Value::Unit)),
+                    Signal::Return(v)       => break Ok(Signal::Return(v)),
+                }
+                if let Some(step) = &f.step {
+                    eval_untyped_expr(step, env)?;
+                }
+            };
+            env.pop_scope();
+            result
+        }
+
+        Stmt::ForIn(fi) => {
+            let iterable = eval_untyped_expr(&fi.iterable, env)?.into_value();
+            let items: Vec<Value> = match iterable {
+                Value::Array(ref rc) => rc.borrow().clone(),
+                Value::Struct { ref name, ref fields } if name == "Range" => {
+                    let s = range_field(fields, "start", &fi.span)?;
+                    let e = range_field(fields, "end",   &fi.span)?;
+                    (s..e).map(Value::I64).collect()
+                }
+                Value::Struct { ref name, ref fields } if name == "RangeInclusive" => {
+                    let s = range_field(fields, "start", &fi.span)?;
+                    let e = range_field(fields, "end",   &fi.span)?;
+                    (s..=e).map(Value::I64).collect()
+                }
+                _ => return Err(MetelError::panic(RuntimeErrorCode::R0011, "for-in: expected Array or Range", &fi.span)),
+            };
+            for item in items {
+                env.push_scope();
+                env.define(&fi.binding, item);
+                let sig = eval_untyped_block(&fi.body, env)?;
+                env.pop_scope();
+                match sig {
+                    Signal::Value(_) | Signal::Continue => {}
+                    Signal::Break(_)        => break,
+                    Signal::Return(v)       => return Ok(Signal::Return(v)),
+                }
+            }
+            Ok(Signal::Value(Value::Unit))
+        }
+    }
+}
+
+fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, MetelError> {
+    use crate::ast::{AssignOp, AssignTarget, Expr};
+    match expr {
+        Expr::Literal(lit, _) => {
+            let val = match lit {
+                Literal::Int(n)   => Value::I64(*n),
+                Literal::Float(f) => Value::F64(*f),
+                Literal::Bool(b)  => Value::Bool(*b),
+                Literal::Str(s)   => Value::Str(s.clone()),
+                Literal::None     => Value::Enum { name: "Perhaps".into(), variant: "None".into(), fields: HashMap::new() },
+                Literal::Unit     => Value::Unit,
+            };
+            Ok(Signal::Value(val))
+        }
+
+        Expr::Ident(name, span) => {
+            match env.get(name) {
+                Some(val) => Ok(Signal::Value(val)),
+                None => Err(MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span)),
+            }
+        }
+
+        Expr::ResolvedPath { resolved, span, .. } => {
+            match env.get(resolved) {
+                Some(val) => Ok(Signal::Value(val)),
+                None => Err(MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{resolved}`"), span)),
+            }
+        }
+
+        Expr::Path(segments, _) => {
+            if segments.len() == 1 {
+                let name = &segments[0];
+                let span = expr.span();
+                match env.get(name) {
+                    Some(val) => Ok(Signal::Value(val)),
+                    None => Err(MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span)),
+                }
+            } else {
+                // Check full qualified name (e.g. "Circle::new" for static methods).
+                let key = segments.join("::");
+                if let Some(val) = env.get(&key) {
+                    return Ok(Signal::Value(val));
+                }
+                let name    = segments[segments.len() - 2].clone();
+                let variant = segments[segments.len() - 1].clone();
+                Ok(Signal::Value(Value::Enum { name, variant, fields: HashMap::new() }))
+            }
+        }
+
+        Expr::Tuple(elems, _) => {
+            let vals = elems.iter()
+                .map(|e| eval_untyped_expr(e, env).map(Signal::into_value))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(Signal::Value(Value::Tuple(vals)))
+        }
+
+        Expr::Array(elems, _) => {
+            let vals = elems.iter()
+                .map(|e| eval_untyped_expr(e, env).map(Signal::into_value))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(Signal::Value(Value::Array(Rc::new(RefCell::new(vals)))))
+        }
+
+        Expr::RepeatArray(elem, n, _) => {
+            let val = eval_untyped_expr(elem, env)?.into_value();
+            let vals = (0..*n).map(|_| val.clone()).collect::<Vec<_>>();
+            Ok(Signal::Value(Value::Array(Rc::new(RefCell::new(vals)))))
+        }
+
+        Expr::BinOp(lhs, op, rhs, span) => {
+            if matches!(op, BinOp::And) {
+                let l = eval_untyped_expr(lhs, env)?.into_value();
+                return match l {
+                    Value::Bool(false) => Ok(Signal::Value(Value::Bool(false))),
+                    Value::Bool(true)  => eval_untyped_expr(rhs, env),
+                    _ => Err(MetelError::internal("&&: expected Bool")),
+                };
+            }
+            if matches!(op, BinOp::Or) {
+                let l = eval_untyped_expr(lhs, env)?.into_value();
+                return match l {
+                    Value::Bool(true)  => Ok(Signal::Value(Value::Bool(true))),
+                    Value::Bool(false) => eval_untyped_expr(rhs, env),
+                    _ => Err(MetelError::internal("||: expected Bool")),
+                };
+            }
+            let lv = eval_untyped_expr(lhs, env)?.into_value();
+            let rv = eval_untyped_expr(rhs, env)?.into_value();
+            lvalue::eval_binop(op, lv, rv, span)
+        }
+
+        Expr::UnaryOp(op, operand, span) => {
+            match op {
+                UnaryOp::Ref => return match &**operand {
+                    Expr::Ident(name, _) => env.get_rc(name)
+                        .map(|rc| Signal::Value(Value::Pointer(rc)))
+                        .ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span)),
+                    other if is_lvalue_path_untyped(other) => {
+                        let v = eval_untyped_expr(operand, env)?.into_value();
+                        Ok(Signal::Value(Value::Pointer(Rc::new(RefCell::new(v)))))
+                    }
+                    _ => Err(MetelError::internal("address-of requires an addressable lvalue (identifier, field access, tuple access, or array index)")),
+                },
+                UnaryOp::RefMut => return match &**operand {
+                    Expr::Ident(name, _) => env.get_rc(name)
+                        .map(|rc| Signal::Value(Value::MutPointer(rc)))
+                        .ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span)),
+                    _ => Err(MetelError::internal("mutable address-of currently requires an identifier operand")),
+                },
+                _ => {}
+            }
+            let v = eval_untyped_expr(operand, env)?.into_value();
+            let result = match (op, v) {
+                (UnaryOp::Neg, Value::I64(n))   => Value::I64(-n),
+                (UnaryOp::Neg, Value::F64(f)) => Value::F64(-f),
+                (UnaryOp::Not, Value::Bool(b))  => Value::Bool(!b),
+                (UnaryOp::Deref, Value::Pointer(rc)) | (UnaryOp::Deref, Value::MutPointer(rc)) => rc.borrow().clone(),
+                (UnaryOp::Neg, _) => return Err(MetelError::internal("unary `-`: expected Int or Float")),
+                (UnaryOp::Not, _) => return Err(MetelError::internal("unary `!`: expected Bool")),
+                (UnaryOp::Deref, _) => return Err(MetelError::internal("unary `*`: expected pointer")),
+                _ => unreachable!("Ref/RefMut handled above"),
+            };
+            Ok(Signal::Value(result))
+        }
+
+        Expr::Cast { expr: inner, target_type, .. } => {
+            let v = eval_untyped_expr(inner, env)?.into_value();
+            let result = match (&v, target_type) {
+                (Value::I64(n), crate::ast::TypeExpr::Named(t, _)) if t == "Float" => Value::F64(*n as f64),
+                (Value::I64(_),   crate::ast::TypeExpr::Named(t, _)) if t == "Int"   => v,
+                (Value::F64(_), crate::ast::TypeExpr::Named(t, _)) if t == "Float" => v,
+                _ => return Err(MetelError::internal("cast: unsupported coercion")),
+            };
+            Ok(Signal::Value(result))
+        }
+
+        Expr::Ascribe { expr: inner, .. } => eval_untyped_expr(inner, env),
+
+        Expr::TupleAccess { object, index, span } => {
+            let v = eval_untyped_expr(object, env)?.into_value();
+            match v {
+                Value::Tuple(elems) => elems.into_iter().nth(*index).map(Signal::Value).ok_or_else(|| {
+                    MetelError::panic(RuntimeErrorCode::R0005, format!("tuple index {index} out of bounds"), span)
+                }),
+                _ => Err(MetelError::internal("tuple access on non-tuple")),
+            }
+        }
+
+        Expr::Index { object, index, span } => {
+            let arr = eval_untyped_expr(object, env)?.into_value();
+            let idx = eval_untyped_expr(index, env)?.into_value();
+            match (arr, idx) {
+                (Value::Array(rc), Value::I64(i)) => {
+                    let borrowed = rc.borrow();
+                    let len = borrowed.len() as i64;
+                    if i < 0 || i >= len {
+                        Err(MetelError::panic(RuntimeErrorCode::R0004, format!("index {i} out of bounds (len {len})"), span))
+                    } else {
+                        Ok(Signal::Value(borrowed[i as usize].clone()))
+                    }
+                }
+                _ => Err(MetelError::internal("index: expected Array[Int]")),
+            }
+        }
+
+        Expr::If { condition, then_branch, else_branch, .. } => {
+            match eval_untyped_expr(condition, env)? {
+                Signal::Value(Value::Bool(true))  => eval_untyped_block(then_branch, env),
+                Signal::Value(Value::Bool(false)) => match else_branch {
+                    Some(branch) => eval_untyped_block(branch, env),
+                    None         => Ok(Signal::Value(Value::Unit)),
+                },
+                Signal::Value(_) => Err(MetelError::internal("if: expected Bool condition")),
+                other => Ok(other),
+            }
+        }
+
+        Expr::Loop { body, .. } => {
+            loop {
+                match eval_untyped_block(body, env)? {
+                    Signal::Value(_) | Signal::Continue => {}
+                    Signal::Break(val)      => return Ok(Signal::Value(val)),
+                    Signal::Return(v)       => return Ok(Signal::Return(v)),
+                }
+            }
+        }
+
+        Expr::Match(m) => {
+            let scrutinee = eval_untyped_expr(&m.scrutinee, env)?.into_value();
+            for arm in &m.arms {
+                let mut bindings = HashMap::new();
+                if !pattern::match_pattern(&arm.pattern, &scrutinee, &mut bindings) { continue; }
+                if let Some(guard) = &arm.guard {
+                    env.push_scope();
+                    for (k, v) in &bindings { env.define(k, v.clone()); }
+                    let guard_val = eval_untyped_expr(guard, env)?.into_value();
+                    env.pop_scope();
+                    match guard_val {
+                        Value::Bool(true)  => {}
+                        Value::Bool(false) => continue,
+                        _ => return Err(MetelError::internal("match guard: expected Bool")),
+                    }
+                }
+                env.push_scope();
+                for (k, v) in bindings { env.define(&k, v); }
+                let result = eval_untyped_block(&arm.body, env);
+                env.pop_scope();
+                return result;
+            }
+            Err(MetelError::panic(RuntimeErrorCode::R0006, "match: no arm matched scrutinee", &m.span))
+        }
+
+        Expr::Assign { target, op, value, span } => {
+            let rhs = eval_untyped_expr(value, env)?.into_value();
+            match target {
+                AssignTarget::Ident(name, _) => {
+                    let new_val = if matches!(op, AssignOp::Assign) {
+                        rhs
+                    } else {
+                        let cur = env.get(name).ok_or_else(|| {
+                            MetelError::panic(RuntimeErrorCode::R0003, format!("assign: undefined `{name}`"), span)
+                        })?;
+                        lvalue::apply_assign_op(op, cur, rhs, span)?
+                    };
+                    if !env.set(name, new_val) {
+                        return Err(MetelError::panic(RuntimeErrorCode::R0003, format!("assign: undefined `{name}`"), span));
+                    }
+                    Ok(Signal::Value(Value::Unit))
+                }
+                AssignTarget::Deref { object, span: tspan } => {
+                    let ptr = eval_untyped_expr(object, env)?.into_value();
+                    let rc = match ptr {
+                        Value::Pointer(rc) | Value::MutPointer(rc) => rc,
+                        _ => return Err(MetelError::panic(RuntimeErrorCode::R0003, "assign: dereference target is not a pointer", tspan)),
+                    };
+                    let new_val = if matches!(op, AssignOp::Assign) {
+                        rhs
+                    } else {
+                        let cur = rc.borrow().clone();
+                        lvalue::apply_assign_op(op, cur, rhs, span)?
+                    };
+                    *rc.borrow_mut() = new_val;
+                    Ok(Signal::Value(Value::Unit))
+                }
+                AssignTarget::Index { object, index, span: tspan } => {
+                    let i = lvalue::eval_untyped_index(index, env, tspan)?;
+                    let arr_val = lvalue::eval_untyped_lvalue_value(object, env, tspan)?;
+                    match arr_val {
+                        Value::Array(rc) => {
+                            let len = rc.borrow().len() as i64;
+                            if i < 0 || i >= len {
+                                return Err(MetelError::panic(RuntimeErrorCode::R0004, format!("index {i} out of bounds (len {len})"), span));
+                            }
+                            let new_val = if matches!(op, AssignOp::Assign) {
+                                rhs
+                            } else {
+                                let cur = rc.borrow()[i as usize].clone();
+                                lvalue::apply_assign_op(op, cur, rhs, span)?
+                            };
+                            rc.borrow_mut()[i as usize] = new_val;
+                            Ok(Signal::Value(Value::Unit))
+                        }
+                        _ => Err(MetelError::internal("index assign: receiver is not an Array")),
+                    }
+                }
+                AssignTarget::FieldAccess { object, field, span: tspan } => {
+                    let (root, path) = lvalue::extract_lvalue_path(object, tspan)?;
+                    let rc = env.get_rc(root).ok_or_else(|| {
+                        MetelError::panic(RuntimeErrorCode::R0003, format!("assign: `{root}` not found"), tspan)
+                    })?;
+                    let mut borrowed = rc.borrow_mut();
+                    let mut cur: &mut Value = &mut borrowed;
+                    for segment in &path {
+                        cur = match cur {
+                            Value::Struct { fields, .. } | Value::Enum { fields, .. } => {
+                                fields.get_mut(*segment).ok_or_else(|| {
+                                    MetelError::panic(RuntimeErrorCode::R0008, format!("field assign: no field `{segment}`"), tspan)
+                                })?
+                            }
+                            _ => return Err(MetelError::internal(format!("field assign: `{segment}` is not a struct/enum"))),
+                        };
+                    }
+                    let fields = match cur {
+                        Value::Struct { fields, .. } | Value::Enum { fields, .. } => fields,
+                        _ => return Err(MetelError::internal("field assign: receiver is not a struct/enum")),
+                    };
+                    let new_val = if matches!(op, AssignOp::Assign) {
+                        rhs
+                    } else {
+                        let cur = fields.get(field).cloned().ok_or_else(|| {
+                            MetelError::panic(RuntimeErrorCode::R0008, format!("field assign: no field `{field}`"), tspan)
+                        })?;
+                        lvalue::apply_assign_op(op, cur, rhs, span)?
+                    };
+                    fields.insert(field.clone(), new_val);
+                    Ok(Signal::Value(Value::Unit))
+                }
+            }
+        }
+
+        Expr::StructLiteral { path, fields, span: _ } => {
+            let mut field_vals: HashMap<String, Value> = HashMap::new();
+            for (name, expr) in fields {
+                field_vals.insert(name.clone(), eval_untyped_expr(expr, env)?.into_value());
+            }
+            if path.len() == 2 {
+                Ok(Signal::Value(Value::Enum { name: path[0].clone(), variant: path[1].clone(), fields: field_vals }))
+            } else {
+                let name = path.last().ok_or_else(|| MetelError::internal("struct literal: empty path"))?.clone();
+                Ok(Signal::Value(Value::Struct { name, fields: field_vals }))
+            }
+        }
+
+        Expr::FieldAccess { object, field, span } => {
+            let mut val = eval_untyped_expr(object, env)?.into_value();
+            if let Some(deref) = read_pointer_value(&val) {
+                val = deref;
+            }
+            let fields = match &val {
+                Value::Struct { fields, .. } | Value::Enum { fields, .. } => fields,
+                _ => return Err(MetelError::internal("field access on non-struct/enum")),
+            };
+            fields.get(field).cloned().map(Signal::Value).ok_or_else(|| {
+                MetelError::panic(RuntimeErrorCode::R0008, format!("no field `{field}` on value"), span)
+            })
+        }
+
+        Expr::MethodCall { receiver, method, args, span } => {
+            let recv_val = eval_untyped_expr(receiver, env)?.into_value();
+            let arg_vals: Vec<Value> = args.iter()
+                .map(|a| eval_untyped_expr(a, env).map(Signal::into_value))
+                .collect::<Result<_, _>>()?;
+            if let (Value::Str(s), "len") = (&recv_val, method.as_str()) {
+                return Ok(Signal::Value(Value::I64(s.chars().count() as i64)));
+            }
+            let recv_type_view = read_pointer_value(&recv_val).unwrap_or_else(|| recv_val.clone());
+            let type_name = match &recv_type_view {
+                Value::Struct { name, .. } | Value::Enum { name, .. } => name.clone(),
+                _ => return Err(MetelError::panic(RuntimeErrorCode::R0009, format!("method `{method}` not found on this value"), span)),
+            };
+            let key = format!("{type_name}::{method}");
+            let func = env.get(&key).ok_or_else(|| {
+                MetelError::panic(RuntimeErrorCode::R0009, format!("no method `{method}` on `{type_name}`"), span)
+            })?;
+            match &func {
+                Value::Closure(rc)
+                    if matches!(
+                        rc.params.first().and_then(|p| p.receiver.clone()),
+                        Some(crate::ast::ReceiverKind::Ref) | Some(crate::ast::ReceiverKind::RefMut)
+                    ) =>
+                {
+                    let receiver_binding = if let Some(cell) = match receiver.as_ref() {
+                        Expr::Ident(name, _) => env.get_rc(name),
+                        _ => receiver_cell_from_value(&recv_val),
+                    } {
+                        call::ReceiverBinding::Shared(cell)
+                    } else {
+                        call::ReceiverBinding::Value(recv_type_view.clone())
+                    };
+                    call::call_method_function(func, receiver_binding, arg_vals, span)
+                }
+                _ => {
+                    let mut all_args = vec![recv_type_view];
+                    all_args.extend(arg_vals);
+                    call::call_function(func, all_args, span)
+                }
+            }
+        }
+
+        Expr::Call { callee, args, span } => {
+            let func_val = eval_untyped_expr(callee, env)?.into_value();
+            let arg_vals: Vec<Value> = args.iter()
+                .map(|a| eval_untyped_expr(a, env).map(Signal::into_value))
+                .collect::<Result<_, _>>()?;
+            call::call_function(func_val, arg_vals, span)
+        }
+
+        Expr::Closure { params, body, .. } => {
+            let captured = env.capture_clone();
+            Ok(Signal::Value(Value::Closure(Rc::new(ClosureValue {
+                name:     None,
+                params:   params.clone(),
+                body:     ClosureBody::Untyped(body.clone()),
+                captured,
+            }))))
+        }
+
+        Expr::PropagateError { .. } => {
+            unreachable!("PropagateError must be desugared before evaluation")
+        }
+    }
+}
 
 // ── Expression evaluation ─────────────────────────────────────────────────────
 
@@ -852,6 +1415,12 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
             for e in elems {
                 vals.push(eval_expr(e, env)?.into_value());
             }
+            Ok(Signal::Value(Value::Array(Rc::new(RefCell::new(vals)))))
+        }
+
+        TypedExpr::RepeatArray(elem, n, _, _) => {
+            let val = eval_expr(elem, env)?.into_value();
+            let vals = (0..*n).map(|_| val.clone()).collect::<Vec<_>>();
             Ok(Signal::Value(Value::Array(Rc::new(RefCell::new(vals)))))
         }
 

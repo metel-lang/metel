@@ -620,7 +620,7 @@ fn construct_stmt(stmt: &Stmt, ctx: &mut ConstructCtx) -> Result<TypedStmt, Mete
         Stmt::ForIn(fi) => {
             let iterable = construct_expr(&fi.iterable, None, ctx)?;
             let elem_ty = match iterable.ty() {
-                Type::Array(elem) => *elem.clone(),
+                Type::Array(elem) | Type::SizedArray(elem, _) => *elem.clone(),
                 Type::Named(name, _) if name == "Range" => Type::I64,
                 Type::Named(type_name, _) => {
                     // User-defined Iterable: derive elem type from next() -> Perhaps<T>.
@@ -693,12 +693,33 @@ fn construct_expr(
                 ))?;
                 return Ok(TypedExpr::Array(vec![], ty, span.clone()));
             }
+            // When the expected type is SizedArray, validate element count and use that type.
+            if let Some(Type::SizedArray(expected_elem, n)) = expected_ty {
+                if elems.len() as u64 != *n {
+                    return Err(MetelError::type_error(
+                        TypeErrorCode::T0001,
+                        format!("expected array of {} element(s), got {}", n, elems.len()),
+                        span,
+                    ));
+                }
+                let typed: Vec<TypedExpr> = elems.iter()
+                    .map(|e| construct_expr(e, Some(expected_elem.as_ref()), ctx))
+                    .collect::<Result<_, _>>()?;
+                let ty = Type::SizedArray(expected_elem.clone(), *n);
+                return Ok(TypedExpr::Array(typed, ty, span.clone()));
+            }
             let typed: Vec<TypedExpr> = elems.iter()
                 .map(|e| construct_expr(e, None, ctx))
                 .collect::<Result<_, _>>()?;
             let elem_ty = typed[0].ty().clone();
             let ty = Type::Array(Box::new(elem_ty));
             Ok(TypedExpr::Array(typed, ty, span.clone()))
+        }
+        Expr::RepeatArray(elem, n, span) => {
+            let typed_elem = construct_expr(elem, None, ctx)?;
+            let elem_ty = typed_elem.ty().clone();
+            let ty = Type::SizedArray(Box::new(elem_ty), *n);
+            Ok(TypedExpr::RepeatArray(Box::new(typed_elem), *n, ty, span.clone()))
         }
         Expr::Call { callee, type_args, args, span } => construct_call(callee, type_args, args, span, expected_ty, ctx),
         Expr::Index { object, index, span } => {
@@ -712,7 +733,7 @@ fn construct_expr(
                 ));
             }
             let elem_ty = match typed_obj.ty() {
-                Type::Array(elem) => *elem.clone(),
+                Type::Array(elem) | Type::SizedArray(elem, _) => *elem.clone(),
                 _ => return Err(MetelError::type_error(
                     TypeErrorCode::T0001,
                     "indexed value is not an array",
@@ -1191,6 +1212,18 @@ fn check_match_exhaustiveness(
         }
         // Never is uninhabited — a match on it is vacuously exhaustive.
         Type::Never => true,
+        // SizedArray [T; N]: exhaustive if there is an arm with an exact N-element array
+        // pattern (each element itself exhaustive) or a rest pattern.
+        Type::SizedArray(_, n) => {
+            arms.iter().any(|a| {
+                a.guard.is_none() && match &a.pattern {
+                    Pattern::Array { elems, rest: Some(_), .. } => elems.iter().all(is_catch_all_pattern),
+                    Pattern::Array { elems, rest: None, .. } =>
+                        elems.len() as u64 == *n && elems.iter().all(is_catch_all_pattern),
+                    _ => false,
+                }
+            })
+        }
         // Int, Float, Str, Tuple, Array, Fun — value-infinite; only a catch-all suffices.
         _ => false,
     };
@@ -1209,6 +1242,8 @@ fn is_catch_all_pattern(pattern: &Pattern) -> bool {
         Pattern::Wildcard(_) | Pattern::Binding(_, _) => true,
         // A tuple pattern is irrefutable when every element is also irrefutable.
         Pattern::Tuple(pats, _) => pats.iter().all(is_catch_all_pattern),
+        // An array pattern with a rest binding is irrefutable if all explicit elems are.
+        Pattern::Array { elems, rest: Some(_), .. } => elems.iter().all(is_catch_all_pattern),
         _ => false,
     }
 }
@@ -1255,6 +1290,18 @@ fn construct_pattern_bindings(
             };
             let _ = span;
             bind_enum_variant_fields(enum_name, variant_name, fields, scrutinee_ty, ctx)?;
+        }
+        Pattern::Array { elems, rest, span: _ } => {
+            let elem_ty = match scrutinee_ty {
+                Type::Array(t) | Type::SizedArray(t, _) => *t.clone(),
+                _ => return Err(MetelError::internal("array pattern on non-array type")),
+            };
+            if let Some(rest_name) = rest {
+                ctx.bind(rest_name, Type::Array(Box::new(elem_ty.clone())));
+            }
+            for pat in elems {
+                construct_pattern_bindings(pat, &elem_ty, ctx)?;
+            }
         }
     }
     Ok(())
@@ -1839,6 +1886,7 @@ fn type_to_type_expr(ty: &Type) -> TypeExpr {
         Type::F32   => named("f32"),
         Type::Tuple(items) => TypeExpr::Tuple(items.iter().map(type_to_type_expr).collect()),
         Type::Array(item) => TypeExpr::Array(Box::new(type_to_type_expr(item))),
+        Type::SizedArray(item, n) => TypeExpr::SizedArray(Box::new(type_to_type_expr(item)), *n),
         Type::Pointer(item) => TypeExpr::Pointer(Box::new(type_to_type_expr(item))),
         Type::MutPointer(item) => TypeExpr::MutPointer(Box::new(type_to_type_expr(item))),
         Type::Fun(params, ret) => TypeExpr::Fun(

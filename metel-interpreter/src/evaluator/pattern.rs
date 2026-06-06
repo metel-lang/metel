@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use crate::ast::{Literal, Pattern};
 
@@ -68,6 +70,38 @@ pub(super) fn match_pattern(pattern: &Pattern, value: &Value, out: &mut HashMap<
                             Some(v) => { out.insert(field_name.clone(), v.clone()); }
                             None    => return false,
                         }
+                    }
+                    true
+                }
+                _ => false,
+            }
+        }
+
+        Pattern::Array { elems, rest, .. } => {
+            match value {
+                Value::Array(rc) => {
+                    let arr = rc.borrow();
+                    if rest.is_none() {
+                        // Exact match: array must have exactly `elems.len()` elements.
+                        if arr.len() != elems.len() {
+                            return false;
+                        }
+                    } else {
+                        // Rest pattern: array must have at least `elems.len()` elements.
+                        if arr.len() < elems.len() {
+                            return false;
+                        }
+                    }
+                    // Match explicit element patterns.
+                    for (pat, val) in elems.iter().zip(arr.iter()) {
+                        if !match_pattern(pat, val, out) {
+                            return false;
+                        }
+                    }
+                    // Bind rest to the remaining tail.
+                    if let Some(rest_name) = rest {
+                        let tail: Vec<Value> = arr[elems.len()..].to_vec();
+                        out.insert(rest_name.clone(), Value::Array(Rc::new(RefCell::new(tail))));
                     }
                     true
                 }

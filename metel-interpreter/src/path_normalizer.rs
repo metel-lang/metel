@@ -186,6 +186,7 @@ fn normalize_expr(
             for e in elems { normalize_expr(e, scope, module_names)?; }
             Ok(())
         }
+        Expr::RepeatArray(elem, _, _) => normalize_expr(elem, scope, module_names),
         Expr::BinOp(lhs, _, rhs, _) => {
             normalize_expr(lhs, scope, module_names)?;
             normalize_expr(rhs, scope, module_names)

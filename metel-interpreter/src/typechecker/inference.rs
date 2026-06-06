@@ -531,6 +531,9 @@ fn infer_stmt(
                 InferType::Array(elem) => {
                     ctx.add_constraint(elem_ty.clone(), *elem.clone(), fi.span.clone());
                 }
+                InferType::SizedArray(elem, _) => {
+                    ctx.add_constraint(elem_ty.clone(), *elem.clone(), fi.span.clone());
+                }
                 InferType::Var(_) => {
                     // Unknown type — constrain to Array as default.
                     ctx.add_constraint(iter_ty, InferType::Array(Box::new(elem_ty.clone())), fi.span.clone());
@@ -604,6 +607,10 @@ fn infer_expr(
                 ctx.add_constraint(ty, first_ty.clone(), span.clone());
             }
             Ok(InferType::Array(Box::new(first_ty)))
+        }
+        Expr::RepeatArray(elem, n, _span) => {
+            let elem_ty = infer_expr(elem, ctx, fun_generalizations)?;
+            Ok(InferType::SizedArray(Box::new(elem_ty), *n))
         }
         Expr::Call { callee, args, span, .. } => {
             let callee_ty = infer_expr(callee, ctx, fun_generalizations)?;
@@ -1079,6 +1086,31 @@ fn infer_pattern(
             };
             infer_enum_variant_pattern(enum_name, variant_name, fields, scrutinee_ty, pat_span, ctx)?;
         }
+        Pattern::Array { elems, rest, span: pat_span } => {
+            let elem_var = ctx.fresh_var();
+            if rest.is_some() {
+                // Rest pattern: scrutinee must be an Array or SizedArray, bind rest as Array
+                ctx.add_constraint(
+                    scrutinee_ty.clone(),
+                    InferType::Array(Box::new(elem_var.clone())),
+                    pat_span.clone(),
+                );
+                if let Some(rest_name) = rest {
+                    ctx.bind_mono(rest_name, InferType::Array(Box::new(elem_var.clone())), false);
+                }
+            } else {
+                // Exact pattern: scrutinee must be [T; N] where N = elems.len()
+                let n = elems.len() as u64;
+                ctx.add_constraint(
+                    scrutinee_ty.clone(),
+                    InferType::SizedArray(Box::new(elem_var.clone()), n),
+                    pat_span.clone(),
+                );
+            }
+            for pat in elems {
+                infer_pattern(pat, &elem_var, ctx)?;
+            }
+        }
     }
     Ok(())
 }
@@ -1087,7 +1119,8 @@ fn pattern_span(pattern: &Pattern) -> &Span {
     match pattern {
         Pattern::Wildcard(s) | Pattern::None(s) | Pattern::Binding(_, s)
         | Pattern::Literal(_, s) | Pattern::Tuple(_, s)
-        | Pattern::EnumVariant { span: s, .. } => s,
+        | Pattern::EnumVariant { span: s, .. }
+        | Pattern::Array { span: s, .. } => s,
     }
 }
 

@@ -91,6 +91,8 @@ pub enum InferType {
     Tuple(Vec<InferType>),
     /// A homogeneous array type.
     Array(Box<InferType>),
+    /// A fixed-size array type `[T; N]`.
+    SizedArray(Box<InferType>, u64),
     /// A shared pointer type.
     Pointer(Box<InferType>),
     /// A mutable pointer type.
@@ -133,6 +135,7 @@ impl std::fmt::Display for InferType {
                 write!(f, ")")
             }
             InferType::Array(t) => write!(f, "{}[]", t),
+            InferType::SizedArray(t, n) => write!(f, "[{}; {}]", t, n),
             InferType::Pointer(t) => write!(f, "*{}", t),
             InferType::MutPointer(t) => write!(f, "*mut {}", t),
             InferType::Named(name, args) => {
@@ -189,6 +192,7 @@ impl Substitution {
             ),
             InferType::Tuple(ts) => InferType::Tuple(ts.iter().map(|t| self.apply(t)).collect()),
             InferType::Array(t) => InferType::Array(Box::new(self.apply(t))),
+            InferType::SizedArray(t, n) => InferType::SizedArray(Box::new(self.apply(t)), *n),
             InferType::Pointer(t) => InferType::Pointer(Box::new(self.apply(t))),
             InferType::MutPointer(t) => InferType::MutPointer(Box::new(self.apply(t))),
             InferType::Named(name, args) => {
@@ -230,6 +234,7 @@ fn occurs_in(var: TypeVar, ty: &InferType) -> bool {
         }
         InferType::Tuple(ts) => ts.iter().any(|t| occurs_in(var, t)),
         InferType::Array(t) => occurs_in(var, t),
+        InferType::SizedArray(t, _) => occurs_in(var, t),
         InferType::Pointer(t) | InferType::MutPointer(t) => occurs_in(var, t),
         InferType::Named(_, args) => args.iter().any(|a| occurs_in(var, a)),
     }
@@ -294,6 +299,15 @@ pub fn unify(a: &InferType, b: &InferType) -> Result<Substitution, MetelError> {
             Ok(subst)
         }
         (InferType::Array(t1), InferType::Array(t2)) => unify(t1, t2),
+        (InferType::SizedArray(t1, n1), InferType::SizedArray(t2, n2)) => {
+            if n1 != n2 {
+                return Err(MetelError::internal(format!("cannot unify {} with {}", a, b)));
+            }
+            unify(t1, t2)
+        }
+        // [T; N] coerces to T[] (one-directional)
+        (InferType::SizedArray(t1, _), InferType::Array(t2))
+        | (InferType::Array(t1), InferType::SizedArray(t2, _)) => unify(t1, t2),
         (InferType::Pointer(t1), InferType::Pointer(t2))
         | (InferType::MutPointer(t1), InferType::MutPointer(t2))
         | (InferType::Pointer(t1), InferType::MutPointer(t2))
@@ -362,6 +376,7 @@ pub fn free_vars(ty: &InferType) -> HashSet<TypeVar> {
         }
         InferType::Tuple(ts) => ts.iter().flat_map(free_vars).collect(),
         InferType::Array(t) => free_vars(t),
+        InferType::SizedArray(t, _) => free_vars(t),
         InferType::Pointer(t) | InferType::MutPointer(t) => free_vars(t),
         InferType::Named(_, args) => args.iter().flat_map(free_vars).collect(),
     }

@@ -328,6 +328,7 @@ pub enum Expr {
     ResolvedPath { resolved: String, original: Vec<String>, span: Span },
     Tuple(Vec<Expr>, Span),
     Array(Vec<Expr>, Span),
+    RepeatArray(Box<Expr>, u64, Span),
     BinOp(Box<Expr>, BinOp, Box<Expr>, Span),
     UnaryOp(UnaryOp, Box<Expr>, Span),
     Assign { target: AssignTarget, op: AssignOp, value: Box<Expr>, span: Span },
@@ -351,7 +352,8 @@ impl Expr {
         match self {
             Expr::Literal(_, s) | Expr::Ident(_, s) | Expr::Path(_, s)
             | Expr::ResolvedPath { span: s, .. }
-            | Expr::Tuple(_, s) | Expr::Array(_, s) | Expr::BinOp(_, _, _, s)
+            | Expr::Tuple(_, s) | Expr::Array(_, s) | Expr::RepeatArray(_, _, s)
+            | Expr::BinOp(_, _, _, s)
             | Expr::UnaryOp(_, _, s)
             | Expr::Assign    { span: s, .. } | Expr::Call          { span: s, .. }
             | Expr::MethodCall { span: s, .. } | Expr::FieldAccess  { span: s, .. }
@@ -395,6 +397,7 @@ pub enum Pattern {
     Binding(String, Span),
     EnumVariant { path: Vec<String>, fields: Vec<String>, span: Span },
     Tuple(Vec<Pattern>, Span),
+    Array { elems: Vec<Pattern>, rest: Option<String>, span: Span },
 }
 
 
@@ -436,6 +439,7 @@ pub enum TypeExpr {
     Unit,
     Tuple(Vec<TypeExpr>),
     Array(Box<TypeExpr>),
+    SizedArray(Box<TypeExpr>, u64),
     Pointer(Box<TypeExpr>),
     MutPointer(Box<TypeExpr>),
     Fun(Vec<TypeExpr>, Option<Box<TypeExpr>>),
