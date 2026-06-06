@@ -36,6 +36,7 @@ pub fn load_root(path: impl AsRef<Path>) -> Result<ModuleGraph, MetelError> {
 
 /// Parse a single `.mtl` file and return its `Program`.
 /// Single-file shim for tests that only need one-module typechecking.
+#[allow(dead_code)] // public API used by module-loading test harness
 pub fn load_program(path: impl AsRef<Path>) -> Result<Program, MetelError> {
     let path = canonicalize_existing(path.as_ref())?;
     let source = fs::read_to_string(&path)

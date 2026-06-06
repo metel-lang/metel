@@ -1,0 +1,21 @@
+// dbg(x) — print-and-return: prints to stderr, returns value unchanged.
+
+fun main() {
+    // Scalar types pass through unchanged.
+    let x: i64 = dbg(42);
+    assert(x == 42);
+
+    let b: Bool = dbg(true);
+    assert(b == true);
+
+    let s: String = dbg("hello");
+    assert(s == "hello");
+
+    // Arithmetic expression passed through.
+    let y: i64 = dbg(2 + 3);
+    assert(y == 5);
+
+    // Inline: dbg(x) inside a larger expression.
+    let z: i64 = dbg(10) * 2;
+    assert(z == 20);
+}

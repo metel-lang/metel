@@ -5,6 +5,7 @@ use super::display::{format_float, format_value, value_to_display_string};
 
 /// The free-function builtin names registered by this module.
 /// Must stay in sync with `StdPrelude::schemes()`. See METEL-5 / ADR-0027.
+#[allow(dead_code)] // called by the parity test in typechecker::tests
 pub(crate) fn free_function_names() -> std::collections::HashSet<&'static str> {
     [
         "print", "println", "string_len", "string_concat",

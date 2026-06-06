@@ -108,8 +108,8 @@ impl InferType {
     pub fn str() -> Self { InferType::Concrete(Type::Str) }
     pub fn unit() -> Self { InferType::Concrete(Type::Unit) }
     pub fn never() -> Self { InferType::Never }
+    #[allow(dead_code)] // public API used by typeinference test suite
     pub fn var(v: TypeVar) -> Self { InferType::Var(v) }
-    pub fn is_var(&self) -> bool { matches!(self, InferType::Var(_)) }
 }
 
 impl std::fmt::Display for InferType {
@@ -702,10 +702,6 @@ impl TypeDefinitionRegistry {
         self.aspect_method_defs.insert(name, methods);
     }
 
-    pub fn aspect_methods(&self, name: &str) -> Option<&Vec<String>> {
-        self.aspect_env.get(name)
-    }
-
     pub fn aspect_method_defs(&self, name: &str) -> Option<&Vec<AspectMethod>> {
         self.aspect_method_defs.get(name)
     }
@@ -747,10 +743,6 @@ impl TypeDefinitionRegistry {
 
     pub(crate) fn raw_method_env(&self) -> &HashMap<String, HashMap<String, InferType>> {
         &self.method_env
-    }
-
-    pub(crate) fn raw_method_receiver_env(&self) -> &HashMap<String, HashMap<String, ReceiverKind>> {
-        &self.method_receiver_env
     }
 
     /// Copy all entries from `other` into `self`, without overwriting existing entries.
@@ -877,15 +869,6 @@ impl InferContext {
         self.registry.register_method(type_name, method_name, fun_ty);
     }
 
-    pub fn register_method_receiver(
-        &mut self,
-        type_name: String,
-        method_name: String,
-        receiver_kind: ReceiverKind,
-    ) {
-        self.registry.register_method_receiver(type_name, method_name, receiver_kind);
-    }
-
     pub fn get_struct_fields(&self, name: &str) -> Option<&Vec<crate::typeinference::FieldEntry>> {
         self.registry.struct_fields(name)
     }
@@ -904,10 +887,6 @@ impl InferContext {
 
     pub fn get_enum(&self, name: &str) -> Option<&EnumInfo> {
         self.registry.enum_info(name)
-    }
-
-    pub fn aspect_methods(&self, name: &str) -> Option<&Vec<String>> {
-        self.registry.aspect_methods(name)
     }
 
     pub fn aspect_method_defs(&self, name: &str) -> Option<&Vec<AspectMethod>> {
@@ -970,10 +949,6 @@ impl InferContext {
 
     pub fn register_fun_bounds(&mut self, name: String, bounds: HashMap<TypeVar, Vec<String>>) {
         self.registry.register_fun_bounds(name, bounds);
-    }
-
-    pub fn fun_bounds_for(&self, name: &str) -> Option<&HashMap<TypeVar, Vec<String>>> {
-        self.registry.fun_bounds_for(name)
     }
 
     pub fn struct_generic_names_for(&self, name: &str) -> Option<&Vec<String>> {

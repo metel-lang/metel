@@ -173,14 +173,7 @@ fn write_path(root: &mut Value, path: &[PathSegment], new_val: Value, span: &Spa
     }
 }
 
-fn read_pointer_value(value: &Value) -> Option<Value> {
-    match value {
-        Value::Pointer(rc) | Value::MutPointer(rc) => Some(rc.borrow().clone()),
-        _ => None,
-    }
-}
-
-/// Like `read_pointer_value` but also handles `MutFieldPointer` with a proper span.
+/// Like `Pointer`/`MutPointer` deref but also handles `MutFieldPointer` with a proper span.
 fn deref_value(value: &Value, span: &Span) -> Result<Option<Value>, MetelError> {
     match value {
         Value::Pointer(rc) | Value::MutPointer(rc) => Ok(Some(rc.borrow().clone())),
@@ -488,6 +481,7 @@ pub fn evaluate_graph(graph: TypedModuleGraph) -> Result<(), MetelError> {
     run_main(env)
 }
 
+#[allow(dead_code)] // public API used by single-file test harness
 pub fn evaluate(program: TypedProgram) -> Result<(), MetelError> {
     CALL_STACK.with(|s| s.borrow_mut().clear());
     let mut env = Environment::new();
@@ -496,6 +490,7 @@ pub fn evaluate(program: TypedProgram) -> Result<(), MetelError> {
     run_main(&mut env)
 }
 
+#[allow(dead_code)] // public API used by single-file test harness
 pub fn evaluate_with_ctx(
     program: TypedProgram,
     ctx: TypeCtx,
@@ -1162,7 +1157,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
             use crate::typed_ast::TypedPlace;
             let rhs = eval_expr(value, env)?.into_value();
             match target {
-                TypedPlace::Ident(name, _) => {
+                TypedPlace::Ident(name) => {
                     let new_val = if matches!(op, AssignOp::Assign) {
                         rhs
                     } else {

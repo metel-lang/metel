@@ -39,7 +39,6 @@ pub enum BindingKind {
 /// The resolved import scope for a single module.
 #[derive(Debug, Clone)]
 pub struct ModuleScope {
-    pub module_path: Vec<String>,
     /// Explicit bindings: local_name → ImportBinding.
     /// Two explicit bindings with the same local_name are a compile error.
     pub explicit: HashMap<String, ImportBinding>,
@@ -169,7 +168,6 @@ fn resolve_module(
 ) -> Result<ModuleScope, MetelError> {
     let re_exports = collect_re_exports(loaded, known_modules, pub_surface, path_aliases)?;
     let mut scope = ModuleScope {
-        module_path: loaded.module_path.clone(),
         explicit: HashMap::new(),
         globs: Vec::new(),
         re_exports,
@@ -367,26 +365,6 @@ fn add_explicit(
     }
     scope.explicit.insert(local_name, binding);
     Ok(())
-}
-
-// ── Query helpers ─────────────────────────────────────────────────────────────
-
-impl ModuleScope {
-    /// Look up a local name in this scope.
-    /// Returns the explicit binding if one exists, or the glob source modules
-    /// that may provide the name (for deferred ambiguity checking).
-    pub fn lookup(&self, name: &str) -> ScopeLookup<'_> {
-        if let Some(binding) = self.explicit.get(name) {
-            return ScopeLookup::Explicit(binding);
-        }
-        ScopeLookup::MaybeGlob(&self.globs)
-    }
-}
-
-pub enum ScopeLookup<'a> {
-    Explicit(&'a ImportBinding),
-    /// The name was not explicitly imported; these tiered glob sources may provide it.
-    MaybeGlob(&'a Vec<(GlobTier, Vec<String>)>),
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

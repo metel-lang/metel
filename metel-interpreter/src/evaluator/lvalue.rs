@@ -7,31 +7,6 @@ use crate::typed_ast::TypedPlace;
 use super::{eval_expr, Environment, Signal, Value};
 
 
-pub(super) fn extract_lvalue_path<'a>(
-    expr: &'a crate::ast::Expr,
-    span: &Span,
-) -> Result<(&'a str, Vec<&'a str>), MetelError> {
-    use crate::ast::Expr;
-    fn walk<'a>(expr: &'a Expr, path: &mut Vec<&'a str>, span: &Span) -> Result<&'a str, MetelError> {
-        match expr {
-            Expr::Ident(name, _) => Ok(name.as_str()),
-            Expr::FieldAccess { object, field, .. } => {
-                let root = walk(object, path, span)?;
-                path.push(field.as_str());
-                Ok(root)
-            }
-            _ => Err(MetelError::panic(
-                RuntimeErrorCode::R0003,
-                "field assign: receiver must be a variable or field access chain",
-                span,
-            )),
-        }
-    }
-    let mut path = Vec::new();
-    let root = walk(expr, &mut path, span)?;
-    Ok((root, path))
-}
-
 /// Resolve the root `Rc<RefCell<Value>>` for a field-assign target and collect
 /// the full field path (including `final_field`) to navigate within it.
 ///
@@ -52,7 +27,7 @@ pub(super) fn resolve_field_assign_root<'a>(
         span: &Span,
     ) -> Result<std::rc::Rc<std::cell::RefCell<Value>>, MetelError> {
         match place {
-            TypedPlace::Ident(name, _) => {
+            TypedPlace::Ident(name) => {
                 let rc = env.get_rc(name).ok_or_else(|| {
                     MetelError::panic(RuntimeErrorCode::R0003, format!("assign: `{name}` not found"), span)
                 })?;
@@ -97,7 +72,7 @@ pub(super) fn eval_typed_place_value(
     span: &Span,
 ) -> Result<Value, MetelError> {
     match place {
-        TypedPlace::Ident(name, _) =>
+        TypedPlace::Ident(name) =>
             env.get(name).ok_or_else(|| {
                 MetelError::panic(RuntimeErrorCode::R0003, format!("assign: `{name}` not found"), span)
             }),
@@ -162,16 +137,6 @@ pub(super) fn apply_assign_op(
         AssignOp::Assign    => unreachable!("plain Assign handled before apply_assign_op"),
     };
     eval_binop(&fake_binop, cur, rhs, span).map(Signal::into_value)
-}
-
-macro_rules! int_arith {
-    ($op:ident, $wrap:ident, $a:expr, $b:expr, $ctor:expr, $span:expr) => {{
-        $a.$op($b).map($ctor).ok_or_else(|| MetelError::panic(
-            RuntimeErrorCode::R0007,
-            concat!("integer overflow in ", stringify!($op)),
-            $span,
-        ))?
-    }};
 }
 
 pub(super) fn eval_binop(op: &BinOp, lv: Value, rv: Value, span: &Span) -> Result<Signal, MetelError> {

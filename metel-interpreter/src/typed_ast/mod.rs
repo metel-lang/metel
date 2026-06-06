@@ -230,7 +230,7 @@ pub struct TypedBlock {
 /// `eval_expr` instead of falling back to the untyped evaluator.
 #[derive(Debug, Clone)]
 pub enum TypedPlace {
-    Ident(String, Span),
+    Ident(String),
     Deref { object: Box<TypedExpr>, span: Span },
     Field { object: Box<TypedPlace>, field: String, span: Span },
     Index { object: Box<TypedPlace>, index: Box<TypedExpr>, span: Span },

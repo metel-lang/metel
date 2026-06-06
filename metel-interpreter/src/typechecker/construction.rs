@@ -82,7 +82,6 @@ struct ConstructCtx<'a> {
     current_return_ty: Option<Type>,
     /// Break value type of the innermost enclosing `loop` (None = no loop or bare break).
     current_break_ty:  Option<Type>,
-    current_module_path: Vec<String>,
     /// Generic type param name → fresh TypeVar; populated during construction-at-call-time
     /// so type annotations like `T[]` in a generic body resolve to concrete types.
     generic_params: HashMap<String, TypeVar>,
@@ -94,7 +93,6 @@ impl<'a> ConstructCtx<'a> {
         scheme_env: &'a SchemeEnv,
         registry:   &'a TypeDefinitionRegistry,
         gen:        TypeVarGenerator,
-        current_module_path: Vec<String>,
     ) -> Result<Self, MetelError> {
         let concrete_struct_env = build_concrete_struct_env(registry, subst)?;
         let method_env = build_concrete_method_env(registry, subst)?;
@@ -106,7 +104,6 @@ impl<'a> ConstructCtx<'a> {
             method_env, gen,
             current_return_ty: None,
             current_break_ty:  None,
-            current_module_path,
             generic_params: HashMap::new(),
         };
         // Derive concrete types for all monomorphic entries in scheme_env.
@@ -231,7 +228,6 @@ pub(super) fn construct_generic_body(
         &type_ctx.scheme_env,
         &type_ctx.registry,
         gen,
-        vec![],
     )?;
 
     // Build name → fresh TypeVar mapping so type annotations like `T[]` in the body
@@ -267,9 +263,8 @@ pub(super) fn construct_program(
     scheme_env: &SchemeEnv,
     registry:   &TypeDefinitionRegistry,
     gen:        TypeVarGenerator,
-    current_module_path: Vec<String>,
 ) -> Result<TypedProgram, MetelError> {
-    let mut ctx = ConstructCtx::new(subst, scheme_env, registry, gen, current_module_path)?;
+    let mut ctx = ConstructCtx::new(subst, scheme_env, registry, gen)?;
 
     let mut out = vec![];
     for decl in &program.decls {
@@ -2044,7 +2039,7 @@ fn assign_target_to_typed_place(
 ) -> Result<TypedPlace, MetelError> {
     match target {
         AssignTarget::Ident(name, span) =>
-            Ok(TypedPlace::Ident(name.clone(), span.clone())),
+            Ok(TypedPlace::Ident(name.clone())),
         AssignTarget::Deref { object, span } =>
             Ok(TypedPlace::Deref {
                 object: Box::new(construct_expr(object, None, ctx)?),
@@ -2077,7 +2072,7 @@ fn assign_target_to_typed_place(
 fn expr_to_typed_place(expr: &Expr, ctx: &mut ConstructCtx<'_>) -> Result<TypedPlace, MetelError> {
     match expr {
         Expr::Ident(name, span) =>
-            Ok(TypedPlace::Ident(name.clone(), span.clone())),
+            Ok(TypedPlace::Ident(name.clone())),
         Expr::FieldAccess { object, field, span } =>
             Ok(TypedPlace::Field {
                 object: Box::new(expr_to_typed_place(object, ctx)?),

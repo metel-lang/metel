@@ -54,6 +54,7 @@ pub struct StdPrelude {
 
 impl StdPrelude {
     /// No standard library names pre-loaded. Use in tests that do not need std.
+    #[allow(dead_code)] // public API used by module-loading test harness
     pub fn empty() -> Self {
         Self { schemes: HashMap::new() }
     }
@@ -429,6 +430,7 @@ fn filter_pub_schemes(
 }
 
 /// Run the type checker over an untyped AST, producing a fully typed AST.
+#[allow(dead_code)] // public API used by single-file test harness
 pub fn check(program: Program) -> Result<TypedProgram, MetelError> {
     let (decls, _, _) = check_impl(
         &program,
@@ -442,6 +444,7 @@ pub fn check(program: Program) -> Result<TypedProgram, MetelError> {
 
 /// Run the type checker and also return the type context needed for
 /// construction-at-call-time of generic function bodies.
+#[allow(dead_code)] // public API used by single-file test harness
 pub fn check_with_ctx(
     program: Program,
 ) -> Result<(TypedProgram, crate::typeinference::TypeCtx), MetelError> {
@@ -536,7 +539,6 @@ fn check_impl(
         &scheme_env,
         ctx.registry(),
         gen,
-        current_module_path.to_vec(),
     )?;
 
     // Return only user-defined names. Builtins (from StdPrelude) are available to

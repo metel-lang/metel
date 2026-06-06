@@ -483,6 +483,8 @@ mod tests {
     fn builtins() { check("builtins/38_builtins.mtl"); }
     #[test]
     fn char_type() { check("builtins/81_char.mtl"); }
+    #[test]
+    fn dbg_builtin() { check("builtins/dbg_builtin.mtl"); }
 
     // ── Integration ───────────────────────────────────────────────────────────
 

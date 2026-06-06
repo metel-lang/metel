@@ -447,9 +447,9 @@ pub enum TypeExpr {
     /// inference. Retained in the AST only until the lowering pass runs.
     ImplAspect {
         bound:        Box<TypeExpr>,
-        /// Source text ("impl Display") preserved for error messages after lowering.
-        source_spell: String,
-        span:         Span,
+        // Reserved for aspect-related error messages (e.g. "expected `impl Display`") — not yet surfaced.
+        #[allow(dead_code)] source_spell: String,
+        #[allow(dead_code)] span:         Span,
     },
 }
 
