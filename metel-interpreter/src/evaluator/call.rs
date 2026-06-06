@@ -4,7 +4,10 @@ use std::rc::Rc;
 use crate::ast::Span;
 use crate::error::{MetelError, RuntimeErrorCode};
 
-use super::{ClosureBody, Signal, Value, attach_stack, eval_block, pop_frame, push_frame, type_of};
+use super::{
+    attach_stack, eval_block, pop_frame, push_frame, type_of, ClosureBody, RuntimeRegistry, Signal,
+    Value,
+};
 
 /// How the receiver is bound into the callee's environment.
 /// `Value` → cloned (value/&self receivers); `Shared` → Rc shared (mut self / &mut self).
@@ -16,7 +19,12 @@ pub(super) enum ReceiverBinding {
 
 /// Dispatch a function call to a `Value::Builtin` or `Value::Closure`.
 /// Converts `Signal::Return` at the function boundary.
-pub(super) fn call_function(func: Value, args: Vec<Value>, span: &Span) -> Result<Signal, MetelError> {
+pub(super) fn call_function(
+    func: Value,
+    args: Vec<Value>,
+    span: &Span,
+    runtime: &RuntimeRegistry,
+) -> Result<Signal, MetelError> {
     // Auto-deref: calling through a function pointer transparently unwraps one pointer layer.
     let func = match func {
         Value::Pointer(rc) | Value::MutPointer(rc) => rc.borrow().clone(),
@@ -27,7 +35,10 @@ pub(super) fn call_function(func: Value, args: Vec<Value>, span: &Span) -> Resul
 
         Value::Closure(rc) => {
             let closure = (*rc).clone();
-            let fn_name = closure.name.clone().unwrap_or_else(|| "<closure>".to_string());
+            let fn_name = closure
+                .name
+                .clone()
+                .unwrap_or_else(|| "<closure>".to_string());
             push_frame(fn_name, span.clone());
             let mut call_env = closure.captured.clone();
             call_env.push_scope();
@@ -35,18 +46,22 @@ pub(super) fn call_function(func: Value, args: Vec<Value>, span: &Span) -> Resul
                 call_env.define(&param.name, val.clone());
             }
             let result = match &closure.body {
-                ClosureBody::Typed(b) => eval_block(b, &mut call_env),
+                ClosureBody::Typed(b) => eval_block(b, &mut call_env, runtime),
                 ClosureBody::Untyped(b) => {
-                    let scheme_and_ctx = closure.name.as_deref()
+                    let scheme_and_ctx = closure
+                        .name
+                        .as_deref()
                         .and_then(|name| closure.type_ctx.as_ref().map(|ctx| (name, ctx)))
-                        .and_then(|(name, type_ctx)| type_ctx.scheme_env.get(name).map(|s| (s, type_ctx)));
+                        .and_then(|(name, type_ctx)| {
+                            type_ctx.scheme_env.get(name).map(|s| (s, type_ctx))
+                        });
                     match scheme_and_ctx {
                         Some((scheme, type_ctx)) => {
                             let arg_types: Vec<_> = args.iter().map(type_of::value_to_type).collect();
                             let tb = crate::typechecker::construct_generic_body(
                                 scheme, &closure.params, &arg_types, b, span, type_ctx
                             )?;
-                            eval_block(&tb, &mut call_env)
+                            eval_block(&tb, &mut call_env, runtime)
                         }
                         None => Err(attach_stack(MetelError::panic(
                             crate::error::RuntimeErrorCode::R0002,
@@ -66,12 +81,18 @@ pub(super) fn call_function(func: Value, args: Vec<Value>, span: &Span) -> Resul
             })
         }
 
-        Value::Unit =>
-            Err(attach_stack(MetelError::panic(RuntimeErrorCode::R0002, "call: target is Unit, not a function", span))),
+        Value::Unit => Err(attach_stack(MetelError::panic(
+            RuntimeErrorCode::R0002,
+            "call: target is Unit, not a function",
+            span,
+        ))),
 
         other => Err(attach_stack(MetelError::panic(
             RuntimeErrorCode::R0010,
-            format!("call: expected a closure or builtin, got {:?}", std::mem::discriminant(&other)),
+            format!(
+                "call: expected a closure or builtin, got {:?}",
+                std::mem::discriminant(&other)
+            ),
             span,
         ))),
     }
@@ -82,11 +103,15 @@ pub(super) fn call_method_function(
     receiver: ReceiverBinding,
     args: Vec<Value>,
     span: &Span,
+    runtime: &RuntimeRegistry,
 ) -> Result<Signal, MetelError> {
     match func {
         Value::Closure(rc) => {
             let closure = (*rc).clone();
-            let fn_name = closure.name.clone().unwrap_or_else(|| "<closure>".to_string());
+            let fn_name = closure
+                .name
+                .clone()
+                .unwrap_or_else(|| "<closure>".to_string());
             push_frame(fn_name, span.clone());
             let mut call_env = closure.captured.clone();
             call_env.push_scope();
@@ -100,18 +125,22 @@ pub(super) fn call_method_function(
                 call_env.define(&param.name, val.clone());
             }
             let result = match &closure.body {
-                ClosureBody::Typed(b) => eval_block(b, &mut call_env),
+                ClosureBody::Typed(b) => eval_block(b, &mut call_env, runtime),
                 ClosureBody::Untyped(b) => {
-                    let scheme_and_ctx = closure.name.as_deref()
+                    let scheme_and_ctx = closure
+                        .name
+                        .as_deref()
                         .and_then(|name| closure.type_ctx.as_ref().map(|ctx| (name, ctx)))
-                        .and_then(|(name, type_ctx)| type_ctx.scheme_env.get(name).map(|s| (s, type_ctx)));
+                        .and_then(|(name, type_ctx)| {
+                            type_ctx.scheme_env.get(name).map(|s| (s, type_ctx))
+                        });
                     match scheme_and_ctx {
                         Some((scheme, type_ctx)) => {
                             let arg_types: Vec<_> = args.iter().map(type_of::value_to_type).collect();
                             let tb = crate::typechecker::construct_generic_body(
                                 scheme, &closure.params, &arg_types, b, span, type_ctx
                             )?;
-                            eval_block(&tb, &mut call_env)
+                            eval_block(&tb, &mut call_env, runtime)
                         }
                         None => Err(attach_stack(MetelError::panic(
                             crate::error::RuntimeErrorCode::R0002,
@@ -130,6 +159,6 @@ pub(super) fn call_method_function(
                 other => other,
             })
         }
-        other => call_function(other, args, span),
+        other => call_function(other, args, span, runtime),
     }
 }

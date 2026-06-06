@@ -4,8 +4,7 @@ use crate::ast::{BinOp, Span};
 use crate::error::{MetelError, RuntimeErrorCode};
 use crate::typed_ast::TypedPlace;
 
-use super::{eval_expr, Environment, Signal, Value};
-
+use super::{eval_expr, Environment, RuntimeRegistry, Signal, Value};
 
 /// Resolve the root `Rc<RefCell<Value>>` for a field-assign target and collect
 /// the full field path (including `final_field`) to navigate within it.
@@ -18,35 +17,52 @@ pub(super) fn resolve_field_assign_root<'a>(
     place: &'a TypedPlace,
     final_field: &'a str,
     env: &mut Environment,
+    runtime: &RuntimeRegistry,
     span: &Span,
 ) -> Result<(std::rc::Rc<std::cell::RefCell<Value>>, Vec<&'a str>), MetelError> {
     fn walk<'a>(
         place: &'a TypedPlace,
         path: &mut Vec<&'a str>,
         env: &mut Environment,
+        runtime: &RuntimeRegistry,
         span: &Span,
     ) -> Result<std::rc::Rc<std::cell::RefCell<Value>>, MetelError> {
         match place {
             TypedPlace::Ident(name) => {
                 let rc = env.get_rc(name).ok_or_else(|| {
-                    MetelError::panic(RuntimeErrorCode::R0003, format!("assign: `{name}` not found"), span)
+                    MetelError::panic(
+                        RuntimeErrorCode::R0003,
+                        format!("assign: `{name}` not found"),
+                        span,
+                    )
                 })?;
                 // Auto-deref: if the binding holds a *mut pointer, follow it.
                 let inner = {
                     let v = rc.borrow();
-                    if let Value::MutPointer(inner_rc) = &*v { Some(inner_rc.clone()) } else { None }
+                    if let Value::MutPointer(inner_rc) = &*v {
+                        Some(inner_rc.clone())
+                    } else {
+                        None
+                    }
                 };
                 Ok(inner.unwrap_or(rc))
             }
-            TypedPlace::Deref { object, span: tspan } => {
-                let ptr = eval_expr(object, env)?.into_value();
+            TypedPlace::Deref {
+                object,
+                span: tspan,
+            } => {
+                let ptr = eval_expr(object, env, runtime)?.into_value();
                 match ptr {
                     Value::MutPointer(inner_rc) => Ok(inner_rc),
-                    _ => Err(MetelError::panic(RuntimeErrorCode::R0003, "field assign: not a *mut pointer", tspan)),
+                    _ => Err(MetelError::panic(
+                        RuntimeErrorCode::R0003,
+                        "field assign: not a *mut pointer",
+                        tspan,
+                    )),
                 }
             }
             TypedPlace::Field { object, field, .. } => {
-                let root_rc = walk(object, path, env, span)?;
+                let root_rc = walk(object, path, env, runtime, span)?;
                 path.push(field.as_str());
                 Ok(root_rc)
             }
@@ -58,7 +74,7 @@ pub(super) fn resolve_field_assign_root<'a>(
         }
     }
     let mut path = Vec::new();
-    let root_rc = walk(place, &mut path, env, span)?;
+    let root_rc = walk(place, &mut path, env, runtime, span)?;
     path.push(final_field);
     Ok((root_rc, path))
 }
@@ -69,49 +85,85 @@ pub(super) fn resolve_field_assign_root<'a>(
 pub(super) fn eval_typed_place_value(
     place: &TypedPlace,
     env: &mut Environment,
+    runtime: &RuntimeRegistry,
     span: &Span,
 ) -> Result<Value, MetelError> {
     match place {
-        TypedPlace::Ident(name) =>
-            env.get(name).ok_or_else(|| {
-                MetelError::panic(RuntimeErrorCode::R0003, format!("assign: `{name}` not found"), span)
-            }),
-        TypedPlace::Deref { object, span: tspan } => {
-            let ptr = eval_expr(object, env)?.into_value();
+        TypedPlace::Ident(name) => env.get(name).ok_or_else(|| {
+            MetelError::panic(
+                RuntimeErrorCode::R0003,
+                format!("assign: `{name}` not found"),
+                span,
+            )
+        }),
+        TypedPlace::Deref {
+            object,
+            span: tspan,
+        } => {
+            let ptr = eval_expr(object, env, runtime)?.into_value();
             match ptr {
                 Value::Pointer(rc) | Value::MutPointer(rc) => Ok(rc.borrow().clone()),
-                _ => Err(MetelError::panic(RuntimeErrorCode::R0003, "assign: not a pointer", tspan)),
+                _ => Err(MetelError::panic(
+                    RuntimeErrorCode::R0003,
+                    "assign: not a pointer",
+                    tspan,
+                )),
             }
         }
-        TypedPlace::Field { object, field, span: tspan } => {
-            let parent = eval_typed_place_value(object, env, tspan)?;
+        TypedPlace::Field {
+            object,
+            field,
+            span: tspan,
+        } => {
+            let parent = eval_typed_place_value(object, env, runtime, tspan)?;
             match parent {
-                Value::Struct { fields, .. } | Value::Enum { fields, .. } =>
+                Value::Struct { fields, .. } | Value::Enum { fields, .. } => {
                     fields.get(field).cloned().ok_or_else(|| {
-                        MetelError::panic(RuntimeErrorCode::R0008, format!("field access: no field `{field}`"), tspan)
-                    }),
-                _ => Err(MetelError::internal(format!("field `{field}`: receiver is not a struct/enum"))),
+                        MetelError::panic(
+                            RuntimeErrorCode::R0008,
+                            format!("field access: no field `{field}`"),
+                            tspan,
+                        )
+                    })
+                }
+                _ => Err(MetelError::internal(format!(
+                    "field `{field}`: receiver is not a struct/enum"
+                ))),
             }
         }
-        TypedPlace::Index { object, index, span: tspan } => {
-            let arr = eval_typed_place_value(object, env, tspan)?;
-            let idx = eval_expr(index, env)?.into_value();
+        TypedPlace::Index {
+            object,
+            index,
+            span: tspan,
+        } => {
+            let arr = eval_typed_place_value(object, env, runtime, tspan)?;
+            let idx = eval_expr(index, env, runtime)?.into_value();
             let i: i64 = match idx {
-                Value::U64(u)  => {
+                Value::U64(u) => {
                     if u > i64::MAX as u64 {
-                        return Err(MetelError::panic(RuntimeErrorCode::R0004,
-                            format!("index {u} out of bounds"), tspan));
+                        return Err(MetelError::panic(
+                            RuntimeErrorCode::R0004,
+                            format!("index {u} out of bounds"),
+                            tspan,
+                        ));
                     }
                     u as i64
                 }
-                _ => return Err(MetelError::internal("index: expected u64 index (typechecker should have caught this)")),
+                _ => {
+                    return Err(MetelError::internal(
+                        "index: expected u64 index (typechecker should have caught this)",
+                    ))
+                }
             };
             match arr {
                 Value::Array(rc) => {
                     let len = rc.borrow().len() as i64;
                     if i < 0 || i >= len {
-                        return Err(MetelError::panic(RuntimeErrorCode::R0004,
-                            format!("index {i} out of bounds (len {len})"), tspan));
+                        return Err(MetelError::panic(
+                            RuntimeErrorCode::R0004,
+                            format!("index {i} out of bounds (len {len})"),
+                            tspan,
+                        ));
                     }
                     Ok(rc.borrow()[i as usize].clone())
                 }
@@ -134,12 +186,17 @@ pub(super) fn apply_assign_op(
         AssignOp::MulAssign => BinOp::Mul,
         AssignOp::DivAssign => BinOp::Div,
         AssignOp::RemAssign => BinOp::Rem,
-        AssignOp::Assign    => unreachable!("plain Assign handled before apply_assign_op"),
+        AssignOp::Assign => unreachable!("plain Assign handled before apply_assign_op"),
     };
     eval_binop(&fake_binop, cur, rhs, span).map(Signal::into_value)
 }
 
-pub(super) fn eval_binop(op: &BinOp, lv: Value, rv: Value, span: &Span) -> Result<Signal, MetelError> {
+pub(super) fn eval_binop(
+    op: &BinOp,
+    lv: Value,
+    rv: Value,
+    span: &Span,
+) -> Result<Signal, MetelError> {
     let result = match (op, lv, rv) {
         // ── Int (i64) arithmetic — overflow panics ─────────────────────────────
         (BinOp::Add, Value::I64(a), Value::I64(b)) =>

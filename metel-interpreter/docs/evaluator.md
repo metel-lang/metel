@@ -14,7 +14,7 @@ TypedModuleGraph  ──►  evaluate_graph() ──►  side effects / RuntimeP
 
 Entry points:
 - `evaluator::evaluate(program: TypedProgram) -> Result<(), MetelError>` — single-module legacy path; used by the evaluator test harness only, not called from the main pipeline
-- `evaluator::evaluate_graph(graph: TypedModuleGraph) -> Result<(), MetelError>` — multi-module path (v0.6.0): processes each `TypedModule` in topological order in its own isolated `Environment`, seeding imported names from already-evaluated dependency environments
+- `evaluator::evaluate_graph(graph: TypedModuleGraph) -> Result<(), MetelError>` — multi-module path (v0.6.0): processes each `TypedModule` in topological order in its own isolated `Environment`, seeding imported names from already-evaluated dependency environments and sharing a process-wide `RuntimeRegistry` for builtins and impl dispatch
 
 The evaluator operates on the typed AST produced by the typechecker. It does not re-check types — if the evaluator panics on a type mismatch, that is a typechecker bug, not an evaluator limitation.
 
@@ -85,7 +85,7 @@ pub enum Signal {
 
 ---
 
-## Environment
+## Environment and Runtime Registry
 
 ```rust
 pub struct Environment {
@@ -101,6 +101,8 @@ Each binding is stored as an `Rc<RefCell<Value>>`. This has two consequences:
 
    This is an unintentional consequence of the PoC design. RFC-0006 (closure capture semantics) will establish the intended semantics. For now, any program that relies on closures sharing mutable state with their enclosing scope may produce surprising results, and any program that expects clone-at-definition isolation may also be surprised. The test suite avoids this ambiguity.
 
+Lexical `Environment` storage is intentionally separate from runtime metadata. Builtin free functions, builtin methods, and aspect impl methods live in a shared `RuntimeRegistry`, not as synthetic bindings inside the lexical scope stack. Closures capture only lexical environment state; they do not capture runtime dispatch tables.
+
 ---
 
 ## Evaluation Entry Point
@@ -108,16 +110,14 @@ Each binding is stored as an `Rc<RefCell<Value>>`. This has two consequences:
 `evaluate()` runs three passes over the top-level declarations:
 
 **Pass 1a — Define placeholders:**
-Every top-level `Fun` and `Impl` method is bound to `Value::Unit` in the root environment. This ensures the names exist before any closure is created, so closures formed in Pass 1b can capture them via shared `Rc`s.
-
-Impl methods are registered under a structured key produced by `ImplMethodKey::from_block(...).to_env_key()`:
-- Ordinary impl methods: `"TypeName::method_name"`
-- `impl From<S> for T` methods: `"T::From<S>::from"` (disambiguates multiple `From` impls on the same target)
+Every top-level `Fun` is bound to `Value::Unit` in the root environment. This ensures the names exist before any closure is created, so closures formed in Pass 1b can capture them via shared `Rc`s.
 
 **Pass 1b — Create closures:**
-Every top-level `Fun` and `Impl` method clones the full current environment and creates a `Value::Closure`. The clone captures the `Rc`s from Pass 1a, not copies of `Value::Unit`. `env.set()` then mutates those `Rc`s in place.
+Every top-level `Fun` clones the full current environment and creates a `Value::Closure`. The clone captures the `Rc`s from Pass 1a, not copies of `Value::Unit`. `env.set()` then mutates those `Rc`s in place.
 
-Because all closures from Pass 1b share the same set of `Rc`s, after Pass 1b completes every closure's captured environment already contains references to every other closure — including those defined after it. This "ties the knot" for mutual recursion without a fixpoint pass or separate reference-resolution step.
+Top-level `Impl` methods are registered into the shared `RuntimeRegistry` during this pass. They are available both as typed method dispatch entries and as qualified runtime globals such as `TypeName::method_name` for static-style calls like `Type::new(...)`.
+
+Because all function closures from Pass 1b share the same set of `Rc`s, after Pass 1b completes every closure's captured environment already contains references to every other function closure — including those defined after it. This "ties the knot" for mutual recursion without a fixpoint pass or separate reference-resolution step.
 
 **Pass 2 — Evaluate bindings:**
 Top-level `let`/`mut` bindings and statements are evaluated in order. `Fun` and `Impl` declarations are skipped (already handled in 1a/1b).
@@ -206,6 +206,8 @@ Index mutation works by calling `eval_typed_place_value` on the receiver to get 
 - `Value::Closure(rc)` — clones the captured environment, pushes a parameter scope, evaluates the body, and converts `Signal::Return` to `Signal::Value` at the boundary. `Signal::PropagateErr` is also converted: it wraps the error value in `Value::Enum { name: "Result", variant: "Err", fields: { "error": e } }` and returns `Signal::Value` — so the `?` error appears as a `Result::Err` value to the caller.
 - `Value::Closure(rc)` where `rc.body` is `ClosureBody::Untyped(block)` — a polymorphic generic function or let-bound closure. The evaluator re-runs the construction pass on the untyped block at the concrete argument types, producing a `TypedBlock` that is evaluated immediately. This is the monomorphization path.
 
+Method dispatch no longer looks up synthetic environment keys. `eval_expr` derives a typed runtime method key from the receiver and method name, then resolves it through `RuntimeRegistry`. `impl From<S> for T` coercions use the same runtime registry keyed by `(target, source)` rather than by environment strings.
+
 ---
 
 ## Known Limitations
@@ -215,12 +217,6 @@ Index mutation works by calling `eval_typed_place_value` on the receiver to get 
 ### Generic function dispatch — re-constructs on each call
 
 Generic functions and let-polymorphic closures re-run the construction pass at every call site. This is correct but not optimal: for hot generic functions, monomorphization at a higher level (pre-compiling all instantiation sites) would be faster. Acceptable for the tree-walk interpreter.
-
-### `call_function_mut_self` — non-standard calling convention for iterators
-
-`call_function_mut_self` returns `(Signal, updated_self)` instead of just `Signal`. This exists for the `for-in` loop path where `next(&mut self)` is called on a user-defined iterator: the `Iterable` aspect uses value-typed `self`, so mutations inside `next` are local to the call frame. Returning `updated_self` threads the mutated iterator state forward to the next loop iteration.
-
-> *Note:* RFC-0044 (explicit receiver semantics, v0.7.0) introduced general `&self` / `&mut self` dispatch via `call.rs`. `call_function_mut_self` remains only for the `for-in` iterator path because `Iterable::next` takes value `self` (not `&mut self`) by the aspect definition. If `Iterable` is revised to use `&mut self`, this function can be removed.
 
 ### Cross-module mutual recursion is not supported (#189)
 

@@ -59,10 +59,10 @@ metel-interpreter/
     │   ├── construction.rs— Pass 2: ConstructCtx, construct_* functions, exhaustiveness
     │   └── conversions.rs — type_expr_to_infer, infer_type_to_type, type_to_infer
     ├── typed_ast/         — typed AST node definitions
-    ├── evaluator/         — tree-walking evaluator, environment, runtime values
-    │   ├── mod.rs         — core: Value, Signal, Environment, evaluate(), eval_block/stmt/expr
-    │   ├── builtins.rs    — register_builtins: all built-in function bindings
-    │   ├── call.rs        — call_function, call_function_mut_self
+    ├── evaluator/         — tree-walking evaluator, lexical env, runtime registry, runtime values
+    │   ├── mod.rs         — core: Value, Signal, Environment, RuntimeRegistry, evaluate(), eval_block/stmt/expr
+    │   ├── builtins.rs    — register_builtins/runtime_registry: builtin globals and methods
+    │   ├── call.rs        — call_function and method-call dispatch
     │   ├── display.rs     — format_float, value_to_display_string, format_value
     │   ├── lvalue.rs      — eval_binop, apply_assign_op, lvalue path helpers
     │   └── pattern.rs     — match_pattern
