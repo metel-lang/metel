@@ -132,6 +132,15 @@ mod tests {
     fn cast() { check("types/08_cast.mtl"); }
 
     #[test]
+    fn cross_sized_from() { check("types/84_cross_sized_from.mtl"); }
+
+    #[test]
+    fn neg_min_literals() { check("types/85_neg_min_literals.mtl"); }
+
+    #[test]
+    fn try_cast_float_to_int() { check("types/86_try_cast_float_to_int.mtl"); }
+
+    #[test]
     fn tuple() { check("types/09_tuple.mtl"); }
 
     #[test]
