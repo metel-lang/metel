@@ -324,18 +324,6 @@ fun main() {
     #[test]
     fn stage6_neg_cast_float_to_int() { check("types/stage6_neg_11_cast_float_to_int.mtl"); }
 
-    #[test]
-    fn stage6_try_cast() { check("types/stage6_07_try_cast.mtl"); }
-
-    #[test]
-    fn stage6_neg_try_cast_invalid_source() { check("types/stage6_neg_12_try_cast_invalid_source.mtl"); }
-
-    #[test]
-    fn stage6_try_cast_return_type() { check("types/stage6_08_try_cast_return_type.mtl"); }
-
-    #[test]
-    fn stage6_neg_try_cast_bool() { check("types/stage6_neg_13_try_cast_bool.mtl"); }
-
     // ── Structs ───────────────────────────────────────────────────────────────
 
     #[test]

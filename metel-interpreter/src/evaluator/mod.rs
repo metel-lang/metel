@@ -1376,28 +1376,6 @@ pub fn eval_expr(
             Ok(Signal::Value(v))
         }
 
-        TypedExpr::TryCast {
-            expr: inner,
-            target_type,
-            ..
-        } => {
-            let v = eval_expr(inner, env, runtime)?.into_value();
-            let result = try_numeric_cast(&v, target_type);
-            let (variant, fields) = match result {
-                Some(cast_val) => {
-                    let mut f = HashMap::new();
-                    f.insert("value".to_string(), cast_val);
-                    ("Some".to_string(), f)
-                }
-                None => ("None".to_string(), HashMap::new()),
-            };
-            Ok(Signal::Value(Value::Enum {
-                name: "Perhaps".to_string(),
-                variant,
-                fields,
-            }))
-        }
-
         TypedExpr::TupleAccess {
             object,
             index,
@@ -1910,74 +1888,3 @@ pub fn eval_expr(
     }
 }
 
-// Returns Some(cast_value) if the value fits in the target type, None otherwise.
-fn try_numeric_cast(v: &Value, target: &crate::ast::TypeExpr) -> Option<Value> {
-    let target_name = match target {
-        crate::ast::TypeExpr::Named(name, _) => name.as_str(),
-        _ => return None,
-    };
-
-    // Extract a general integer/float from the source value.
-    // For float sources, produce an i64 only when the value is a whole number in i64 range.
-    let as_i64: Option<i64> = match v {
-        Value::I64(n) => Some(*n),
-        Value::I32(n) => Some(*n as i64),
-        Value::I16(n) => Some(*n as i64),
-        Value::I8(n) => Some(*n as i64),
-        Value::U64(n) => i64::try_from(*n).ok(),
-        Value::U32(n) => Some(*n as i64),
-        Value::U16(n) => Some(*n as i64),
-        Value::U8(n) => Some(*n as i64),
-        Value::F64(f) => {
-            let f = *f;
-            if f.fract() == 0.0 && f >= i64::MIN as f64 && f <= i64::MAX as f64 {
-                Some(f as i64)
-            } else {
-                None
-            }
-        }
-        Value::F32(f) => {
-            let f = *f as f64;
-            if f.fract() == 0.0 && f >= i64::MIN as f64 && f <= i64::MAX as f64 {
-                Some(f as i64)
-            } else {
-                None
-            }
-        }
-        _ => None,
-    };
-    let as_f64: Option<f64> = match v {
-        Value::F64(f) => Some(*f),
-        Value::F32(f) => Some(*f as f64),
-        _ => as_i64.map(|n| n as f64),
-    };
-
-    match target_name {
-        "i8" => as_i64
-            .filter(|&n| n >= i8::MIN as i64 && n <= i8::MAX as i64)
-            .map(|n| Value::I8(n as i8)),
-        "i16" => as_i64
-            .filter(|&n| n >= i16::MIN as i64 && n <= i16::MAX as i64)
-            .map(|n| Value::I16(n as i16)),
-        "i32" => as_i64
-            .filter(|&n| n >= i32::MIN as i64 && n <= i32::MAX as i64)
-            .map(|n| Value::I32(n as i32)),
-        "i64" | "Int" => as_i64.map(Value::I64),
-        "u8" => as_i64
-            .filter(|&n| n >= 0 && n <= u8::MAX as i64)
-            .map(|n| Value::U8(n as u8)),
-        "u16" => as_i64
-            .filter(|&n| n >= 0 && n <= u16::MAX as i64)
-            .map(|n| Value::U16(n as u16)),
-        "u32" => as_i64
-            .filter(|&n| n >= 0 && n <= u32::MAX as i64)
-            .map(|n| Value::U32(n as u32)),
-        "u64" => match v {
-            Value::U64(n) => Some(Value::U64(*n)),
-            _ => as_i64.filter(|&n| n >= 0).map(|n| Value::U64(n as u64)),
-        },
-        "f32" => as_f64.map(|f| Value::F32(f as f32)),
-        "f64" | "Float" => as_f64.map(Value::F64),
-        _ => None,
-    }
-}

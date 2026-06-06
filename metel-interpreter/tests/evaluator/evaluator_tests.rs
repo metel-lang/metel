@@ -144,9 +144,6 @@ mod tests {
     fn neg_min_literals() { check("types/85_neg_min_literals.mtl"); }
 
     #[test]
-    fn try_cast_float_to_int() { check("types/86_try_cast_float_to_int.mtl"); }
-
-    #[test]
     fn tuple() { check("types/09_tuple.mtl"); }
 
     #[test]
@@ -166,12 +163,6 @@ mod tests {
 
     #[test]
     fn from_cast() { check("types/60_from_cast.mtl"); }
-
-    #[test]
-    fn try_cast() { check("types/61_try_cast.mtl"); }
-
-    #[test]
-    fn try_cast_extended() { check("types/62_try_cast_extended.mtl"); }
 
     #[test]
     fn from_edge_cases() { check("types/63_from_edge_cases.mtl"); }

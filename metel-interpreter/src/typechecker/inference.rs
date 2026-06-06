@@ -961,32 +961,6 @@ fn infer_expr(
             }
             Ok(target_ty)
         }
-        Expr::TryCast { expr, target_type, span } => {
-            let source_ty = infer_expr(expr, ctx, fun_generalizations)?;
-            let target_ty = type_expr_to_infer(target_type);
-            let subst = ctx.default_literal_vars(&ctx.solve()?);
-            let source_resolved = subst.apply(&source_ty);
-            let target_resolved = subst.apply(&target_ty);
-            // Identity casts succeed trivially → Perhaps::Some(value).
-            if source_resolved != target_resolved {
-                // Require the same From impl that `as` requires.
-                let source_concrete = infer_to_type_for_from(&source_resolved);
-                let target_name = infer_type_name(&target_resolved);
-                let valid = match (source_concrete.as_ref(), target_name) {
-                    (Some(src_t), Some(tgt)) => ctx.has_from_impl(tgt, src_t),
-                    _ => false,
-                };
-                if !valid {
-                    return Err(MetelError::type_error(
-                        TypeErrorCode::T0007,
-                        format!("cannot cast `{source_resolved}` to `{target_resolved}` — no `impl From<{source_resolved}> for {target_resolved}` found"),
-                        span,
-                    ));
-                }
-            }
-            Ok(InferType::Named("Perhaps".to_string(), vec![target_ty]))
-        }
-
         Expr::TupleAccess { object, index, span } => {
             let obj_ty = infer_expr(object, ctx, fun_generalizations)?;
             let obj_ty = ctx.solve()?.apply(&obj_ty);

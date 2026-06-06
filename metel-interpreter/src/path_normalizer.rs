@@ -233,7 +233,6 @@ fn normalize_expr(
             Ok(())
         }
         Expr::PropagateError { expr, .. } => normalize_expr(expr, scope, module_names),
-        Expr::TryCast { expr, .. } => normalize_expr(expr, scope, module_names),
     }
 }
 

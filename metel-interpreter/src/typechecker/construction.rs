@@ -1115,17 +1115,6 @@ fn construct_expr(
             })
         }
 
-        Expr::TryCast { expr, target_type, span } => {
-            let typed_expr = construct_expr(expr, None, ctx)?;
-            let inner_ty = resolved_to_type(&ctx.type_expr_to_infer_ctx(target_type), ctx.subst, span)?;
-            let ty = Type::Named("Perhaps".to_string(), vec![inner_ty]);
-            Ok(TypedExpr::TryCast {
-                expr: Box::new(typed_expr),
-                target_type: target_type.clone(),
-                ty,
-                span: span.clone(),
-            })
-        }
         Expr::TupleAccess { object, index, span } => {
             let typed_obj = construct_expr(object, None, ctx)?;
             let ty = match typed_obj.ty() {
