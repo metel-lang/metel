@@ -176,10 +176,16 @@ fn write_path(root: &mut Value, path: &[PathSegment], new_val: Value, span: &Spa
 fn read_pointer_value(value: &Value) -> Option<Value> {
     match value {
         Value::Pointer(rc) | Value::MutPointer(rc) => Some(rc.borrow().clone()),
-        Value::MutFieldPointer { root, path } => {
-            read_path(&root.borrow(), path, &Span::new(0, 0, "")).ok()
-        }
         _ => None,
+    }
+}
+
+/// Like `read_pointer_value` but also handles `MutFieldPointer` with a proper span.
+fn deref_value(value: &Value, span: &Span) -> Result<Option<Value>, MetelError> {
+    match value {
+        Value::Pointer(rc) | Value::MutPointer(rc) => Ok(Some(rc.borrow().clone())),
+        Value::MutFieldPointer { root, path } => Ok(Some(read_path(&root.borrow(), path, span)?)),
+        _ => Ok(None),
     }
 }
 
@@ -1291,7 +1297,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
 
         TypedExpr::FieldAccess { object, field, span, .. } => {
             let mut val = eval_expr(object, env)?.into_value();
-            if let Some(deref) = read_pointer_value(&val) {
+            if let Some(deref) = deref_value(&val, span)? {
                 val = deref;
             }
             let fields = match &val {
@@ -1318,7 +1324,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
             }
 
             // User-defined struct/enum methods — looked up by "TypeName::method".
-            let recv_type_view = read_pointer_value(&recv_val).unwrap_or_else(|| recv_val.clone());
+            let recv_type_view = deref_value(&recv_val, span)?.unwrap_or_else(|| recv_val.clone());
             let type_name = match &recv_type_view {
                 Value::Struct { name, .. } | Value::Enum { name, .. } => name.clone(),
                 Value::I64(_)   => "i64".to_string(),

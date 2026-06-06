@@ -147,6 +147,9 @@ mod tests {
     fn sized_array_extended() { check("types/13_sized_array_extended.mtl"); }
 
     #[test]
+    fn mut_field_pointer() { check("types/14_mut_field_pointer.mtl"); }
+
+    #[test]
     fn from_cast() { check("types/60_from_cast.mtl"); }
 
     #[test]
