@@ -136,7 +136,8 @@ add_expr         = { mul_expr ~ (add_op ~ mul_expr)* }
 add_op           = { "+" | "-" }
 mul_expr         = { cast_expr ~ (mul_op ~ cast_expr)* }
 mul_op           = { "*" | "/" | "%" }
-cast_expr        = { asc_expr ~ ("as" ~ type_expr)* }
+cast_expr        = { asc_expr ~ (cast_op ~ type_expr)* }
+cast_op          = { "as?" | "as" }
 asc_expr         = { unary_expr ~ (":" ~ type_expr)? }
 unary_expr       = { ("!" | "-" | "*" | "&" ~ mut_kw?) ~ unary_expr | postfix_expr }
 

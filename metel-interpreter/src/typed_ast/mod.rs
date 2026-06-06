@@ -294,6 +294,12 @@ pub enum TypedExpr {
         ty: Type,
         span: Span,
     },
+    TryCast {
+        expr: Box<TypedExpr>,
+        target_type: TypeExpr,
+        ty: Type, // always Perhaps<target_type>
+        span: Span,
+    },
     Match(TypedMatchExpr),
     If {
         condition: Box<TypedExpr>,
@@ -355,6 +361,7 @@ impl TypedExpr {
             | TypedExpr::TupleAccess { ty, .. }
             | TypedExpr::Index { ty, .. }
             | TypedExpr::Cast { ty, .. }
+            | TypedExpr::TryCast { ty, .. }
             | TypedExpr::If { ty, .. }
             | TypedExpr::Loop { ty, .. }
             | TypedExpr::Closure { ty, .. }
@@ -382,6 +389,7 @@ impl TypedExpr {
             | TypedExpr::TupleAccess { span, .. }
             | TypedExpr::Index { span, .. }
             | TypedExpr::Cast { span, .. }
+            | TypedExpr::TryCast { span, .. }
             | TypedExpr::If { span, .. }
             | TypedExpr::Loop { span, .. }
             | TypedExpr::Closure { span, .. }

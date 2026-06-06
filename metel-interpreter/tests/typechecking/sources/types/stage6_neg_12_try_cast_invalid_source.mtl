@@ -1,0 +1,5 @@
+// as? requires the same From impl as as — String is not castable to i8.
+fun main() -> Perhaps<i8> {
+    let s = "hello";
+    s as? i8  // ERROR[T0007]
+}

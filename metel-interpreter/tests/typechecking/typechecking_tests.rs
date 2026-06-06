@@ -309,6 +309,12 @@ fun main() {
     #[test]
     fn stage6_neg_cast_float_to_int() { check("types/stage6_neg_11_cast_float_to_int.mtl"); }
 
+    #[test]
+    fn stage6_try_cast() { check("types/stage6_07_try_cast.mtl"); }
+
+    #[test]
+    fn stage6_neg_try_cast_invalid_source() { check("types/stage6_neg_12_try_cast_invalid_source.mtl"); }
+
     // ── Structs ───────────────────────────────────────────────────────────────
 
     #[test]

@@ -981,7 +981,8 @@ fn shift_expr_span(expr: &mut Expr, base_start: usize, base_line: u32, base_col:
             shift_expr_span(index, base_start, base_line, base_col);
             shift_span(span, base_start, base_line, base_col);
         }
-        Expr::Cast { expr, span, .. } | Expr::Ascribe { expr, span, .. } => {
+        Expr::Cast { expr, span, .. } | Expr::TryCast { expr, span, .. }
+        | Expr::Ascribe { expr, span, .. } => {
             shift_expr_span(expr, base_start, base_line, base_col);
             shift_span(span, base_start, base_line, base_col);
         }
@@ -1455,10 +1456,19 @@ fn parse_cast_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<
     let first = inner.next()
         .ok_or_else(|| MetelError::internal("cast_expr: expected operand"))?;
     let mut expr = parse_expr(first, filename)?;
+    let mut is_try = false;
     for p in inner {
-        if p.as_rule() == Rule::type_expr {
-            let target_type = parse_type_expr(p, filename)?;
-            expr = Expr::Cast { expr: Box::new(expr), target_type, span: span.clone() };
+        match p.as_rule() {
+            Rule::cast_op => { is_try = p.as_str() == "as?"; }
+            Rule::type_expr => {
+                let target_type = parse_type_expr(p, filename)?;
+                if is_try {
+                    expr = Expr::TryCast { expr: Box::new(expr), target_type, span: span.clone() };
+                } else {
+                    expr = Expr::Cast { expr: Box::new(expr), target_type, span: span.clone() };
+                }
+            }
+            _ => {}
         }
     }
     Ok(expr)
