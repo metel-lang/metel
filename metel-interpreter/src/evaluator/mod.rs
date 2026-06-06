@@ -616,14 +616,8 @@ fn runtime_method_from_decl(
     }
 }
 
-fn seed_std_core_into_env(env: &mut Environment, runtime: &RuntimeRegistry) {
-    if let Some(values) = runtime.std_core_values() {
-        for (name, value) in values {
-            if env.get(name).is_none() {
-                env.define(name, value.clone());
-            }
-        }
-    }
+fn std_core_lookup(name: &str, runtime: &RuntimeRegistry) -> Option<Value> {
+    runtime.get_module_value(&["std".to_string(), "core".to_string()], name)
 }
 
 // For a FieldAccess receiver like `a.b.c`, returns:
@@ -880,7 +874,6 @@ pub fn evaluate_graph(graph: TypedModuleGraph) -> Result<(), MetelError> {
 
     for module in graph.modules {
         let mut env = Environment::new();
-        seed_std_core_into_env(&mut env, &runtime);
 
         // Seed names imported from already-initialised dependency modules.
         for (local_name, (source_module, canonical_name)) in &module.imported_names {
@@ -930,7 +923,6 @@ pub fn evaluate(program: TypedProgram) -> Result<(), MetelError> {
     CALL_STACK.with(|s| s.borrow_mut().clear());
     let mut runtime = builtins::runtime_registry();
     let mut env = Environment::new();
-    seed_std_core_into_env(&mut env, &runtime);
     run_passes(
         &program,
         &std::collections::HashMap::new(),
@@ -946,7 +938,6 @@ pub fn evaluate_with_ctx(program: TypedProgram, ctx: TypeCtx) -> Result<(), Mete
     CALL_STACK.with(|s| s.borrow_mut().clear());
     let mut runtime = builtins::runtime_registry();
     let mut env = Environment::new();
-    seed_std_core_into_env(&mut env, &runtime);
     let type_ctx_rc = std::rc::Rc::new(ctx);
     run_passes(
         &program,
@@ -1063,7 +1054,9 @@ fn run_passes(
 
     // Alias registration
     for (alias, canonical) in aliases {
-        if let Some(val) = env.get(canonical) {
+        if let Some(val) = env.get(canonical)
+            .or_else(|| std_core_lookup(canonical, runtime))
+        {
             if env.get(alias).is_none() {
                 env.define(alias, val);
             }
@@ -1494,7 +1487,9 @@ pub fn eval_expr(
             Ok(Signal::Value(val))
         }
 
-        TypedExpr::Ident(name, _, span) => match env.get(name) {
+        TypedExpr::Ident(name, _, span) => match env.get(name)
+            .or_else(|| std_core_lookup(name, runtime))
+        {
             Some(val) => Ok(Signal::Value(val)),
             None => Err(MetelError::panic(
                 RuntimeErrorCode::R0003,
@@ -1509,7 +1504,7 @@ pub fn eval_expr(
             if segments.len() == 1 {
                 let name = &segments[0];
                 let span = expr.span();
-                match env.get(name) {
+                match env.get(name).or_else(|| std_core_lookup(name, runtime)) {
                     Some(val) => Ok(Signal::Value(val)),
                     None => Err(MetelError::panic(
                         RuntimeErrorCode::R0003,

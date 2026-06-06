@@ -401,7 +401,7 @@ fn register_default_aspect_method(
 
 /// Seed `ctx` with all built-in free-function bindings from `StdPrelude`,
 /// plus built-in method registrations and aspect declarations.
-pub(super) fn register_builtins(ctx: &mut InferContext, prelude: &super::StdPrelude) {
+pub(super) fn register_primitive_type_bindings(ctx: &mut InferContext, prelude: &super::StdPrelude) {
     let str_ty   = InferType::str();
     let int_ty   = InferType::int();
     let float_ty = InferType::float();

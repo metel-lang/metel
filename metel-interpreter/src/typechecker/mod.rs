@@ -509,7 +509,7 @@ fn check_impl(
     ctx.seed_glob_conflicts(deferred_conflicts);
 
     // Pre-pass: register built-in value bindings and hoist function names.
-    registry::register_builtins(&mut ctx, std_prelude);
+    registry::register_primitive_type_bindings(&mut ctx, std_prelude);
     inference::hoist_fun_decls(&program.decls, &mut ctx);
 
     // Pass 1: walk AST, emit constraints, collect function generalizations.
