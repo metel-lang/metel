@@ -40,6 +40,14 @@ use crate::typed_ast::{FunBody, TypedBlock, TypedDecl, TypedExpr, TypedForInit, 
 
 // ── Runtime values ────────────────────────────────────────────────────────────
 
+/// One step in a `MutFieldPointer` path.
+#[derive(Debug, Clone)]
+pub enum PathSegment {
+    Field(String),
+    TupleIndex(usize),
+    ArrayIndex(usize),
+}
+
 #[derive(Debug, Clone)]
 pub enum Value {
     // ── Primitive types ───────────────────────────────────────────────────────
@@ -63,10 +71,13 @@ pub enum Value {
     Enum { name: String, variant: String, fields: HashMap<String, Value> },
     Closure(Rc<ClosureValue>),
     Builtin(String, fn(Vec<Value>, &Span) -> Result<Value, MetelError>),
-    /// Read-only pointer placeholder — never constructed in v0.2; reserved for RFC-0001.
+    /// Read-only pointer to a named binding cell.
     Pointer(Rc<RefCell<Value>>),
-    /// Writable pointer placeholder — never constructed in v0.2; reserved for RFC-0001.
+    /// Writable pointer to a named binding cell.
     MutPointer(Rc<RefCell<Value>>),
+    /// Fat mutable pointer for sub-element lvalue paths (RFC-0045).
+    /// `root` is the binding cell; `path` navigates to the leaf.
+    MutFieldPointer { root: Rc<RefCell<Value>>, path: Vec<PathSegment> },
 }
 
 /// The body of a closure — either a fully type-checked block (monomorphic) or the
@@ -115,9 +126,59 @@ fn deep_clone_value(v: Value) -> Value {
     }
 }
 
+/// Walk a `PathSegment` path into `root`, returning a clone of the leaf value.
+fn read_path(root: &Value, path: &[PathSegment], span: &Span) -> Result<Value, MetelError> {
+    let mut cur = root.clone();
+    for seg in path {
+        cur = match (seg, cur) {
+            (PathSegment::Field(f), Value::Struct { fields, .. } | Value::Enum { fields, .. }) =>
+                fields.get(f.as_str()).cloned().ok_or_else(|| MetelError::panic(
+                    RuntimeErrorCode::R0008, format!("fat pointer: no field `{f}`"), span))?,
+            (PathSegment::TupleIndex(i), Value::Tuple(elems)) =>
+                elems.get(*i).cloned().ok_or_else(|| MetelError::panic(
+                    RuntimeErrorCode::R0008, format!("fat pointer: tuple index {i} out of bounds"), span))?,
+            (PathSegment::ArrayIndex(i), Value::Array(rc)) =>
+                rc.borrow().get(*i).cloned().ok_or_else(|| MetelError::panic(
+                    RuntimeErrorCode::R0004, format!("fat pointer: array index {i} out of bounds"), span))?,
+            _ => return Err(MetelError::internal("fat pointer path: segment type mismatch")),
+        };
+    }
+    Ok(cur)
+}
+
+/// Walk a `PathSegment` path into `root` and write `new_val` at the leaf.
+fn write_path(root: &mut Value, path: &[PathSegment], new_val: Value, span: &Span) -> Result<(), MetelError> {
+    if path.is_empty() {
+        *root = new_val;
+        return Ok(());
+    }
+    match (&path[0], root) {
+        (PathSegment::Field(f), Value::Struct { fields, .. } | Value::Enum { fields, .. }) => {
+            let child = fields.get_mut(f.as_str()).ok_or_else(|| MetelError::panic(
+                RuntimeErrorCode::R0008, format!("fat pointer: no field `{f}`"), span))?;
+            write_path(child, &path[1..], new_val, span)
+        }
+        (PathSegment::TupleIndex(i), Value::Tuple(elems)) => {
+            let child = elems.get_mut(*i).ok_or_else(|| MetelError::panic(
+                RuntimeErrorCode::R0008, format!("fat pointer: tuple index {i} out of bounds"), span))?;
+            write_path(child, &path[1..], new_val, span)
+        }
+        (PathSegment::ArrayIndex(i), Value::Array(rc)) => {
+            let mut borrow = rc.borrow_mut();
+            let child = borrow.get_mut(*i).ok_or_else(|| MetelError::panic(
+                RuntimeErrorCode::R0004, format!("fat pointer: array index {i} out of bounds"), span))?;
+            write_path(child, &path[1..], new_val, span)
+        }
+        _ => Err(MetelError::internal("fat pointer path: segment type mismatch during write")),
+    }
+}
+
 fn read_pointer_value(value: &Value) -> Option<Value> {
     match value {
         Value::Pointer(rc) | Value::MutPointer(rc) => Some(rc.borrow().clone()),
+        Value::MutFieldPointer { root, path } => {
+            read_path(&root.borrow(), path, &Span::new(0, 0, "")).ok()
+        }
         _ => None,
     }
 }
@@ -186,6 +247,41 @@ fn is_lvalue_path_typed(expr: &crate::typed_ast::TypedExpr) -> bool {
         | TypedExpr::TupleAccess { object, .. }
         | TypedExpr::Index { object, .. } => is_lvalue_path_typed(object),
         _ => false,
+    }
+}
+
+/// Recursively walk a typed lvalue path, collecting `PathSegment`s.
+/// Returns the root binding name and the full segment list (root-to-leaf order).
+fn build_mut_path(
+    expr: &TypedExpr,
+    env: &mut Environment,
+    span: &Span,
+) -> Result<(String, Vec<PathSegment>), MetelError> {
+    match expr {
+        TypedExpr::Ident(name, _, _) => Ok((name.clone(), vec![])),
+        TypedExpr::FieldAccess { object, field, .. } => {
+            let (root, mut path) = build_mut_path(object, env, span)?;
+            path.push(PathSegment::Field(field.clone()));
+            Ok((root, path))
+        }
+        TypedExpr::TupleAccess { object, index, .. } => {
+            let (root, mut path) = build_mut_path(object, env, span)?;
+            path.push(PathSegment::TupleIndex(*index));
+            Ok((root, path))
+        }
+        TypedExpr::Index { object, index, .. } => {
+            let (root, mut path) = build_mut_path(object, env, span)?;
+            let idx_val = eval_expr(index, env)?.into_value();
+            let i = match idx_val {
+                Value::I64(n) if n >= 0 => n as usize,
+                Value::U64(n) => n as usize,
+                _ => return Err(MetelError::panic(
+                    RuntimeErrorCode::R0004, "&mut: array index must be a non-negative integer", span)),
+            };
+            path.push(PathSegment::ArrayIndex(i));
+            Ok((root, path))
+        }
+        _ => Err(MetelError::internal("build_mut_path: not a lvalue path")),
     }
 }
 
@@ -900,7 +996,13 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                     TypedExpr::Ident(name, _, _) => env.get_rc(name)
                         .map(|rc| Signal::Value(Value::MutPointer(rc)))
                         .ok_or_else(|| MetelError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span)),
-                    _ => Err(MetelError::internal("mutable address-of currently requires an identifier operand")),
+                    other if is_lvalue_path_typed(other) => {
+                        let (root_name, path) = build_mut_path(other, env, span)?;
+                        let root = env.get_rc(&root_name).ok_or_else(|| MetelError::panic(
+                            RuntimeErrorCode::R0003, format!("undefined variable `{root_name}`"), span))?;
+                        Ok(Signal::Value(Value::MutFieldPointer { root, path }))
+                    }
+                    _ => Err(MetelError::internal("mutable address-of requires an addressable lvalue")),
                 },
                 _ => {}
             }
@@ -914,6 +1016,8 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
                 (UnaryOp::Neg, Value::F32(f))   => Value::F32(-f),
                 (UnaryOp::Not, Value::Bool(b))  => Value::Bool(!b),
                 (UnaryOp::Deref, Value::Pointer(rc)) | (UnaryOp::Deref, Value::MutPointer(rc)) => rc.borrow().clone(),
+                (UnaryOp::Deref, Value::MutFieldPointer { root, path }) =>
+                    read_path(&root.borrow(), &path, span)?,
                 (UnaryOp::Neg, _) => return Err(MetelError::internal("unary `-`: expected numeric type (typechecker should have caught this)")),
                 (UnaryOp::Not, _) => return Err(MetelError::internal("unary `!`: expected Bool (typechecker should have caught this)")),
                 (UnaryOp::Deref, _) => return Err(MetelError::internal("unary `*`: expected pointer (typechecker should have caught this)")),
@@ -1071,17 +1175,27 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Mete
 
                 TypedPlace::Deref { object, span: tspan } => {
                     let ptr = eval_expr(object, env)?.into_value();
-                    let rc = match ptr {
-                        Value::Pointer(rc) | Value::MutPointer(rc) => rc,
+                    match ptr {
+                        Value::Pointer(rc) | Value::MutPointer(rc) => {
+                            let new_val = if matches!(op, AssignOp::Assign) {
+                                rhs
+                            } else {
+                                let cur = rc.borrow().clone();
+                                lvalue::apply_assign_op(op, cur, rhs, span)?
+                            };
+                            *rc.borrow_mut() = new_val;
+                        }
+                        Value::MutFieldPointer { root, path } => {
+                            let new_val = if matches!(op, AssignOp::Assign) {
+                                rhs
+                            } else {
+                                let cur = read_path(&root.borrow(), &path, tspan)?;
+                                lvalue::apply_assign_op(op, cur, rhs, span)?
+                            };
+                            write_path(&mut root.borrow_mut(), &path, new_val, tspan)?;
+                        }
                         _ => return Err(MetelError::panic(RuntimeErrorCode::R0003, "assign: dereference target is not a pointer", tspan)),
-                    };
-                    let new_val = if matches!(op, AssignOp::Assign) {
-                        rhs
-                    } else {
-                        let cur = rc.borrow().clone();
-                        lvalue::apply_assign_op(op, cur, rhs, span)?
-                    };
-                    *rc.borrow_mut() = new_val;
+                    }
                     Ok(Signal::Value(Value::Unit))
                 }
 

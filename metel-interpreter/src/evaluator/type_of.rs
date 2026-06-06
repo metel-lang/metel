@@ -49,5 +49,19 @@ pub(super) fn value_to_type(value: &Value) -> Type {
         }
         Value::Pointer(rc)    => Type::Pointer(Box::new(value_to_type(&rc.borrow()))),
         Value::MutPointer(rc) => Type::MutPointer(Box::new(value_to_type(&rc.borrow()))),
+        Value::MutFieldPointer { root, path } => {
+            // Approximate: read the leaf type from the current root value.
+            let root_val = root.borrow();
+            let mut cur_type = value_to_type(&*root_val);
+            for seg in path {
+                cur_type = match (seg, cur_type) {
+                    (super::PathSegment::Field(f), Type::Named(name, _)) =>
+                        Type::Named(format!("{name}.{f}"), vec![]),
+                    (super::PathSegment::TupleIndex(_), t) | (super::PathSegment::ArrayIndex(_), t) => t,
+                    _ => Type::Unit,
+                };
+            }
+            Type::MutPointer(Box::new(cur_type))
+        }
     }
 }

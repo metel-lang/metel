@@ -86,5 +86,6 @@ pub(super) fn format_value(val: &Value) -> String {
         Value::Builtin(name, _) => format!("<builtin:{}>", name),
         Value::Pointer(rc) => format!("*{}", format_value(&rc.borrow())),
         Value::MutPointer(rc) => format!("*mut {}", format_value(&rc.borrow())),
+        Value::MutFieldPointer { .. } => "<*mut field-path>".to_string(),
     }
 }
