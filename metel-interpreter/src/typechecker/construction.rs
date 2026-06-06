@@ -785,7 +785,12 @@ fn construct_expr(
             })
         }
         Expr::Assign { target, op, value, span } => {
-            let typed_value = construct_expr(value, None, ctx)?;
+            let value_hint: Option<Type> = if let AssignTarget::Ident(name, _) = target {
+                ctx.lookup(name).cloned()
+            } else {
+                None
+            };
+            let typed_value = construct_expr(value, value_hint.as_ref(), ctx)?;
             let typed_place = assign_target_to_typed_place(target, ctx)?;
             Ok(TypedExpr::Assign {
                 target: typed_place,
