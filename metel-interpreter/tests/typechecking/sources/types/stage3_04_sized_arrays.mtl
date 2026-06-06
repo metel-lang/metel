@@ -8,20 +8,20 @@
 // Pattern [a, b, c] matches [T; 3] exactly.
 // Pattern [head, ..rest] matches any array.
 
-fun sum3(xs: [Int; 3]) -> Int {
+fun sum3(xs: [i64; 3]) -> i64 {
     xs[0] + xs[1] + xs[2]
 }
 
-let zeros: [Int; 3] = [0; 3];
-let ones:  [Int; 3] = [1, 2, 3];
-let result: Int = sum3(ones);
+let zeros: [i64; 3] = [0; 3];
+let ones:  [i64; 3] = [1, 2, 3];
+let result: i64 = sum3(ones);
 
 // Coercion: [T; N] coerces to T[] when passed as T[] argument.
-fun first(xs: Int[]) -> Int { xs[0] }
-let coerced: Int = first(zeros);
+fun first(xs: i64[]) -> i64 { xs[0] }
+let coerced: i64 = first(zeros);
 
 // For-in over sized array.
-fun total(xs: [Int; 3]) -> Int {
+fun total(xs: [i64; 3]) -> i64 {
     let mut acc = 0;
     for (let x in xs) {
         acc += x;
