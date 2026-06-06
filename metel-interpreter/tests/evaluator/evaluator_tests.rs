@@ -141,6 +141,9 @@ mod tests {
     fn index_assign() { check("types/11_index_assign.mtl"); }
 
     #[test]
+    fn sized_array() { check("types/12_sized_array.mtl"); }
+
+    #[test]
     fn from_cast() { check("types/60_from_cast.mtl"); }
 
     #[test]

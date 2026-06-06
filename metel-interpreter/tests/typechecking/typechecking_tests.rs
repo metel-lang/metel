@@ -256,6 +256,9 @@ fun main() {
     fn stage3_arrays() { check("types/stage3_02_arrays.mtl"); }
 
     #[test]
+    fn stage3_sized_arrays() { check("types/stage3_04_sized_arrays.mtl"); }
+
+    #[test]
     fn stage4_if_as_block_tail() { check("types/stage3_03_if_as_block_tail.mtl"); }
 
     #[test]
