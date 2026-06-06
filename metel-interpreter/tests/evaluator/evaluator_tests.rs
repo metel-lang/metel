@@ -144,6 +144,9 @@ mod tests {
     fn sized_array() { check("types/12_sized_array.mtl"); }
 
     #[test]
+    fn sized_array_extended() { check("types/13_sized_array_extended.mtl"); }
+
+    #[test]
     fn from_cast() { check("types/60_from_cast.mtl"); }
 
     #[test]

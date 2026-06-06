@@ -280,6 +280,15 @@ fun main() {
     fn stage3_neg_non_int_index() { check("types/stage3_neg_06_non_int_index.mtl"); }
 
     #[test]
+    fn stage3_neg_sized_array_n_mismatch() { check("types/stage3_neg_07_sized_array_n_mismatch.mtl"); }
+
+    #[test]
+    fn stage3_neg_sized_array_elem_mismatch() { check("types/stage3_neg_08_sized_array_elem_mismatch.mtl"); }
+
+    #[test]
+    fn stage3_neg_sized_array_pattern_undercount() { check("types/stage3_neg_09_sized_array_pattern_undercount.mtl"); }
+
+    #[test]
     fn stage4_neg_if_no_else_non_unit() { check("types/stage3_neg_07_if_no_else_non_unit.mtl"); }
 
     #[test]
