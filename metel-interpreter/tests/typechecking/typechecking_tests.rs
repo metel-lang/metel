@@ -540,6 +540,11 @@ fun main() {
     #[test]
     fn stage14_impl_method_with_bounded_type_param() { check("generics/stage14_10_impl_method_with_bounded_type_param.mtl"); }
 
+    // ── Stage 15: constraint-bleed regression (METEL-137) ────────────────────
+
+    #[test]
+    fn stage15_constraint_no_bleed_multi_type_param() { check("generics/stage15_01_constraint_no_bleed_multi_type_param.mtl"); }
+
     #[test]
     fn stage12_fun_bound_satisfied() { check("generics/stage12_01_fun_bound_satisfied.mtl"); }
 

@@ -201,6 +201,7 @@ fn two_explicit_imports_same_local_name_is_t0011() {
 
 #[test]
 fn two_glob_imports_same_name_is_t0011() {
+    // T0011 fires only when the conflicting name is actually used. (METEL-98)
     let dir = fixture_dir("t0011_glob");
     let main = dir.join("main.mtl");
     write(&main, "import a::*;\nimport b::*;\nfun main() -> i64 { return foo(); }\n");
@@ -210,6 +211,20 @@ fn two_glob_imports_same_name_is_t0011() {
     let err = run_graph(&main).expect_err("expected T0011 on glob/glob conflict");
     let msg = format!("{err}");
     assert!(msg.contains("T0011"), "expected T0011, got: {msg}");
+}
+
+#[test]
+fn two_glob_imports_same_name_unused_no_t0011() {
+    // Regression: METEL-98 — same-tier glob conflicts must be deferred until the
+    // ambiguous name is actually used.  Importing two globs that both export `foo`
+    // must NOT produce T0011 if `foo` is never referenced.
+    let dir = fixture_dir("t0011_glob_unused");
+    let main = dir.join("main.mtl");
+    write(&main, "import a::*;\nimport b::*;\nfun main() -> i64 { return 42; }\n");
+    write(&dir.join("a.mtl"), "pub fun foo() -> i64 { return 1; }\n");
+    write(&dir.join("b.mtl"), "pub fun foo() -> i64 { return 2; }\n");
+
+    run_graph(&main).unwrap_or_else(|e| panic!("expected Ok but got: {e}"));
 }
 
 #[test]

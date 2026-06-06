@@ -190,11 +190,13 @@ pub fn check_graph(
 
     for loaded in graph.modules() {
         check_pub_annotations(loaded, names)?;
-        let imported_schemes = build_import_schemes(loaded, names, &global_exports, &graph)?;
+        let (imported_schemes, deferred_conflicts) =
+            build_import_schemes(loaded, names, &global_exports, &graph)?;
         let (typed_decls, scheme_env, next_registry) =
             check_impl(
                 &loaded.program,
                 &imported_schemes,
+                deferred_conflicts,
                 &type_registry,
                 &std_prelude,
                 &loaded.module_path,
@@ -264,14 +266,17 @@ pub fn check_graph(
 /// For explicit imports: if the name is absent from GlobalExports, checks
 /// `names.declared_names` to distinguish T0009 (private item — declared but
 /// not pub) from T0003 (name does not exist). See #191.
+/// Returns the resolved import schemes plus a map of deferred same-tier glob conflicts.
+/// Conflicts are not rejected here; T0011 fires at the use site. (METEL-98)
 fn build_import_schemes(
     loaded: &LoadedModule,
     names: &ResolvedNames,
     global_exports: &GlobalExports,
     graph: &NormalizedModuleGraph,
-) -> Result<SchemeEnv, MetelError> {
+) -> Result<(SchemeEnv, HashMap<String, Vec<Vec<String>>>), MetelError> {
     let mut env: SchemeEnv = HashMap::new();
-    let Some(scope) = names.scopes.get(&loaded.module_path) else { return Ok(env) };
+    let mut deferred_conflicts: HashMap<String, Vec<Vec<String>>> = HashMap::new();
+    let Some(scope) = names.scopes.get(&loaded.module_path) else { return Ok((env, deferred_conflicts)) };
 
     // Glob imports (lower priority — added first so explicit can override).
     // Process Std globs before User globs so User silently wins cross-tier conflicts.
@@ -286,19 +291,14 @@ fn build_import_schemes(
             let conflict = glob_source.get(name.as_str()).map(|(s, t)| (s.clone(), t.clone()));
             match conflict {
                 Some((prior_source, ref prior_tier)) if prior_tier == tier => {
-                    // Same-tier conflict → T0011.
-                    return Err(MetelError::type_error(
-                        TypeErrorCode::T0011,
-                        format!(
-                            "import conflict: `{name}` is exported by both `{}` and `{}`; \
-                             use an explicit import to disambiguate: `import {}::{}` or `import {}::{}`",
-                            prior_source.join("::"),
-                            glob_module.join("::"),
-                            prior_source.join("::"), name,
-                            glob_module.join("::"), name,
-                        ),
-                        &crate::ast::Span::new(0, 0, loaded.file_path.display().to_string()),
-                    ));
+                    // Same-tier conflict — defer T0011 to the use site. (METEL-98)
+                    // Remove the name from env so a use site that sees None gets our error,
+                    // not a spurious T0003.
+                    env.remove(name.as_str());
+                    let entry = deferred_conflicts.entry(name.clone()).or_default();
+                    if !entry.contains(&prior_source) { entry.push(prior_source.clone()); }
+                    if !entry.contains(&glob_module.to_vec()) { entry.push(glob_module.clone()); }
+                    continue;
                 }
                 Some((_, GlobTier::User)) => {
                     // Prior User glob claimed this name; current Std glob cannot override.
@@ -360,7 +360,7 @@ fn build_import_schemes(
         }
     }
 
-    Ok(env)
+    Ok((env, deferred_conflicts))
 }
 
 /// Find the span of the import declaration in `loaded` that references `source_name`
@@ -435,6 +435,7 @@ pub fn check(program: Program) -> Result<TypedProgram, MetelError> {
     let (decls, _, _) = check_impl(
         &program,
         &HashMap::new(),
+        HashMap::new(),
         &TypeDefinitionRegistry::new(),
         &StdPrelude::default(),
         &[],
@@ -452,6 +453,7 @@ pub fn check_with_ctx(
     let (decls, scheme_env, registry) = check_impl(
         &program,
         &HashMap::new(),
+        HashMap::new(),
         &TypeDefinitionRegistry::new(),
         &std_prelude,
         &[],
@@ -490,6 +492,7 @@ pub(crate) fn construct_generic_body(
 fn check_impl(
     program: &Program,
     imported_schemes: &SchemeEnv,
+    deferred_conflicts: HashMap<String, Vec<Vec<String>>>,
     base_registry: &TypeDefinitionRegistry,
     std_prelude: &StdPrelude,
     current_module_path: &[String],
@@ -503,6 +506,7 @@ fn check_impl(
     // Merge dependency type definitions so cross-module struct/enum refs resolve.
     reg.merge_from(base_registry);
     let mut ctx = InferContext::new(reg, gen, imported_schemes, current_module_path.to_vec());
+    ctx.seed_glob_conflicts(deferred_conflicts);
 
     // Pre-pass: register built-in value bindings and hoist function names.
     registry::register_builtins(&mut ctx, std_prelude);
@@ -517,8 +521,10 @@ fn check_impl(
     let gen = ctx.split_gen();
     let mut scheme_env: SchemeEnv = HashMap::new();
     for fg in fun_generalizations {
-        let resolved = subst.apply(&fg.fun_ty);
-        let scheme = generalize_with_names(resolved, &fg.env_fvs, &fg.name_map);
+        // fg.fun_ty is already post-inline-solve (resolved_ty from infer_fun_decl).
+        // Applying the final module-level subst would collapse generic TypeVars that
+        // happened to appear in other functions' constraints. (METEL-137)
+        let scheme = generalize_with_names(fg.fun_ty, &fg.env_fvs, &fg.name_map);
         scheme_env.insert(fg.name, scheme);
     }
     // Imported schemes must be visible in the construction pass so calls to imported

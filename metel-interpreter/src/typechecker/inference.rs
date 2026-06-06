@@ -228,7 +228,7 @@ fn infer_fun_decl(
     // when the same polymorphic function is called at different types.
     let partial_subst = ctx.solve()?;
     let resolved_ty = partial_subst.apply(&fun_ty);
-    let scheme = generalize(resolved_ty, &env_fvs);
+    let scheme = generalize(resolved_ty.clone(), &env_fvs);
     ctx.bind_poly(&fun.name, scheme);
 
     // After solving, the original TypeVars may have been unified with others.
@@ -242,7 +242,9 @@ fn infer_fun_decl(
             }
         })
         .collect();
-    fun_generalizations.push(FunGeneralization { name: fun.name.clone(), fun_ty, env_fvs, name_map });
+    // Store resolved_ty (post-solve) so the re-generalization in check_impl uses the
+    // already-solved type and is not perturbed by a now-empty final substitution.
+    fun_generalizations.push(FunGeneralization { name: fun.name.clone(), fun_ty: resolved_ty, env_fvs, name_map });
     Ok(())
 }
 
@@ -576,6 +578,7 @@ fn infer_expr(
     match expr {
         Expr::Literal(lit, _)          => Ok(infer_literal(lit, ctx)),
         Expr::Ident(name, span)        => {
+            if let Some(err) = ctx.check_glob_conflict(name, span) { return Err(err); }
             ctx.lookup(name).ok_or_else(|| MetelError::type_error(
                 TypeErrorCode::T0003,
                 format!("undefined name `{name}`"),
@@ -583,6 +586,7 @@ fn infer_expr(
             ))
         }
         Expr::ResolvedPath { resolved, original, span } => {
+            if let Some(err) = ctx.check_glob_conflict(resolved, span) { return Err(err); }
             ctx.lookup(resolved).ok_or_else(|| MetelError::type_error(
                 TypeErrorCode::T0003,
                 format!("undefined name `{}`", original.join("::")),

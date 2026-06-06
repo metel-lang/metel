@@ -823,6 +823,9 @@ pub struct InferContext {
     /// Parallel to current_type_params; swapped in/out alongside it.
     current_type_param_bounds: HashMap<TypeVar, Vec<String>>,
     current_module_path: Vec<String>,
+    /// Names that have same-tier glob conflicts deferred until use. (METEL-98)
+    /// Maps name → list of source module paths that both export it.
+    deferred_glob_conflicts: HashMap<String, Vec<Vec<String>>>,
 }
 
 impl InferContext {
@@ -847,11 +850,35 @@ impl InferContext {
             current_type_params: HashMap::new(),
             current_type_param_bounds: HashMap::new(),
             current_module_path,
+            deferred_glob_conflicts: HashMap::new(),
         };
         for (name, scheme) in imported_schemes {
             ctx.bind_poly(name, scheme.clone());
         }
         ctx
+    }
+
+    /// Register deferred same-tier glob conflicts. T0011 fires at the use site.
+    pub fn seed_glob_conflicts(&mut self, conflicts: HashMap<String, Vec<Vec<String>>>) {
+        self.deferred_glob_conflicts = conflicts;
+    }
+
+    /// If `name` has a deferred same-tier glob conflict, return T0011.
+    /// Call this at every name use site before `lookup`.
+    pub fn check_glob_conflict(&self, name: &str, span: &Span) -> Option<crate::error::MetelError> {
+        self.deferred_glob_conflicts.get(name).map(|sources| {
+            let m0 = sources.first().map(|m| m.join("::")).unwrap_or_default();
+            let m1 = sources.get(1).map(|m| m.join("::")).unwrap_or_default();
+            crate::error::MetelError::type_error(
+                crate::error::TypeErrorCode::T0011,
+                format!(
+                    "import conflict: `{name}` is exported by both `{m0}` and `{m1}`; \
+                     use an explicit import to disambiguate: \
+                     `import {m0}::{name}` or `import {m1}::{name}`"
+                ),
+                span,
+            )
+        })
     }
 
     pub fn register_struct_fields(&mut self, name: String, fields: Vec<crate::typeinference::FieldEntry>) {
