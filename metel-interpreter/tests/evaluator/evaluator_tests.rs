@@ -100,6 +100,9 @@ mod tests {
     #[test]
     fn literals() { check("literals/01_literals.mtl"); }
 
+    #[test]
+    fn polymorphic_literals() { check("literals/04_polymorphic_literals.mtl"); }
+
     // ── Arithmetic ────────────────────────────────────────────────────────────
 
     #[test]

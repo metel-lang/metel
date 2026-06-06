@@ -82,6 +82,21 @@ mod tests {
     #[test]
     fn stage1_literals() { check("literals/01_literals.mtl"); }
 
+    #[test]
+    fn polymorphic_literals() { check("literals/02_polymorphic_literals.mtl"); }
+
+    #[test]
+    fn neg_int_literal_with_string_add() { check("literals/neg_01_int_literal_with_string_add.mtl"); }
+
+    #[test]
+    fn neg_float_literal_with_string_add() { check("literals/neg_02_float_literal_with_string_add.mtl"); }
+
+    #[test]
+    fn neg_int_literal_unified_with_bool() { check("literals/neg_03_int_literal_unified_with_bool.mtl"); }
+
+    #[test]
+    fn neg_int_literal_unified_with_string() { check("literals/neg_04_int_literal_unified_with_string.mtl"); }
+
     // ── Arithmetic ────────────────────────────────────────────────────────────
 
     #[test]

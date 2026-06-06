@@ -671,7 +671,20 @@ fn construct_expr(
             Ok(TypedExpr::Ident(resolved.clone(), ty, span.clone()))
         }
         Expr::BinOp(lhs, op, rhs, span) => construct_binop(lhs, op, rhs, span, ctx),
-        Expr::UnaryOp(op, operand, span) => construct_unaryop(op, operand, span, ctx),
+        Expr::UnaryOp(op, operand, span) => {
+            // For negation, propagate expected_ty to the operand so `-100` in
+            // `let x: i8 = -100` resolves to i8. Unsigned targets are excluded:
+            // negation of an unsigned value is a type error that must stay detectable.
+            let inner_hint = if matches!(op, UnaryOp::Neg) {
+                match expected_ty {
+                    Some(Type::U8) | Some(Type::U16) | Some(Type::U32) | Some(Type::U64) => None,
+                    other => other,
+                }
+            } else {
+                None
+            };
+            construct_unaryop(op, operand, span, inner_hint, ctx)
+        }
         Expr::Tuple(elems, span) => {
             let typed: Vec<TypedExpr> = elems.iter()
                 .map(|e| construct_expr(e, None, ctx))
@@ -701,6 +714,14 @@ fn construct_expr(
                     .map(|e| construct_expr(e, Some(expected_elem.as_ref()), ctx))
                     .collect::<Result<_, _>>()?;
                 let ty = Type::SizedArray(expected_elem.clone(), *n);
+                return Ok(TypedExpr::Array(typed, ty, span.clone()));
+            }
+            // When expected type is Array(T), propagate element type hint.
+            if let Some(Type::Array(expected_elem)) = expected_ty {
+                let typed: Vec<TypedExpr> = elems.iter()
+                    .map(|e| construct_expr(e, Some(expected_elem.as_ref()), ctx))
+                    .collect::<Result<_, _>>()?;
+                let ty = Type::Array(expected_elem.clone());
                 return Ok(TypedExpr::Array(typed, ty, span.clone()));
             }
             let typed: Vec<TypedExpr> = elems.iter()
@@ -930,8 +951,18 @@ fn construct_expr(
             })
         }
         Expr::StructLiteral { path, fields, span } => {
+            // Look up field type hints from the struct definition for non-generic structs.
+            // Clone to release the borrow on ctx before calling construct_expr below.
+            let type_name = path.last().map(|s| s.as_str()).unwrap_or("");
+            let field_hints: HashMap<String, Type> =
+                ctx.get_struct_fields(type_name).map(|fs| {
+                    fs.iter().map(|(n, t, _)| (n.clone(), t.clone())).collect()
+                }).unwrap_or_default();
             let typed_fields: Vec<(String, TypedExpr)> = fields.iter()
-                .map(|(name, expr)| Ok((name.clone(), construct_expr(expr, None, ctx)?)))
+                .map(|(name, expr)| {
+                    let hint = field_hints.get(name.as_str());
+                    Ok((name.clone(), construct_expr(expr, hint, ctx)?))
+                })
                 .collect::<Result<_, _>>()?;
 
             let ty = if path.len() == 2 {
@@ -1779,20 +1810,32 @@ fn construct_literal_type(
     use crate::ast::{IntKind, FloatKind};
     match lit {
         Literal::Int(n) => {
-            if matches!(expected_ty, Some(Type::U64)) {
-                if *n < 0 {
-                    return Err(MetelError::type_error(
-                        TypeErrorCode::T0005,
-                        format!("integer literal `{n}` is negative and cannot be used as a u64 index"),
-                        span,
-                    ));
+            match expected_ty {
+                Some(Type::I8)  => Ok(Type::I8),
+                Some(Type::I16) => Ok(Type::I16),
+                Some(Type::I32) => Ok(Type::I32),
+                Some(Type::U8)  => Ok(Type::U8),
+                Some(Type::U16) => Ok(Type::U16),
+                Some(Type::U32) => Ok(Type::U32),
+                Some(Type::U64) => {
+                    if *n < 0 {
+                        return Err(MetelError::type_error(
+                            TypeErrorCode::T0005,
+                            format!("integer literal `{n}` is negative and cannot be used as a u64 index"),
+                            span,
+                        ));
+                    }
+                    Ok(Type::U64)
                 }
-                Ok(Type::U64)
-            } else {
-                Ok(Type::I64)
+                Some(Type::F32) => Ok(Type::F32),
+                Some(Type::F64) => Ok(Type::F64),
+                _ => Ok(Type::I64),
             }
         }
-        Literal::Float(_) => Ok(Type::F64),
+        Literal::Float(_) => match expected_ty {
+            Some(Type::F32) => Ok(Type::F32),
+            _ => Ok(Type::F64),
+        },
         Literal::SizedInt { kind, .. } => Ok(match kind {
             IntKind::I8  => Type::I8,
             IntKind::I16 => Type::I16,
@@ -1830,8 +1873,19 @@ fn construct_binop(
     span: &Span,
     ctx: &mut ConstructCtx,
 ) -> Result<TypedExpr, MetelError> {
-    let lhs = construct_expr(lhs, None, ctx)?;
-    let rhs = construct_expr(rhs, None, ctx)?;
+    let lhs_built = construct_expr(lhs, None, ctx)?;
+    let rhs_built = construct_expr(rhs, None, ctx)?;
+    // If one operand is a polymorphic literal that defaulted to i64/f64, and the other
+    // has a more specific numeric type, re-build the literal with the concrete type.
+    let lt = lhs_built.ty().clone();
+    let rt = rhs_built.ty().clone();
+    let (lhs, rhs) = if (lt == Type::I64 || lt == Type::F64) && rt.is_numeric() && rt != lt {
+        (construct_expr(lhs, Some(&rt), ctx)?, rhs_built)
+    } else if (rt == Type::I64 || rt == Type::F64) && lt.is_numeric() && lt != rt {
+        (lhs_built, construct_expr(rhs, Some(&lt), ctx)?)
+    } else {
+        (lhs_built, rhs_built)
+    };
     let ty = match op {
         BinOp::Add => {
             let t = lhs.ty();
@@ -2008,12 +2062,13 @@ fn construct_propagate_error(
 }
 
 fn construct_unaryop(
-    op:      &UnaryOp,
-    operand: &Expr,
-    span:    &Span,
-    ctx:     &mut ConstructCtx,
+    op:          &UnaryOp,
+    operand:     &Expr,
+    span:        &Span,
+    expected_ty: Option<&Type>,
+    ctx:         &mut ConstructCtx,
 ) -> Result<TypedExpr, MetelError> {
-    let operand = construct_expr(operand, None, ctx)?;
+    let operand = construct_expr(operand, expected_ty, ctx)?;
     let ty = match op {
         UnaryOp::Neg => {
             let t = operand.ty();
