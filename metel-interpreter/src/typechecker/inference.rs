@@ -759,8 +759,8 @@ fn infer_expr(
             let recv_ty = infer_expr(receiver, ctx, fun_generalizations)?;
             let recv_ty = ctx.solve()?.apply(&recv_ty);
 
-            // T[]::len — built-in method on array types.
-            if let InferType::Array(_) = &recv_ty {
+            // T[]::len and [T; N]::len — built-in method on array types.
+            if matches!(&recv_ty, InferType::Array(_) | InferType::SizedArray(_, _)) {
                 let arg_tys: Vec<InferType> = args.iter()
                     .map(|a| infer_expr(a, ctx, fun_generalizations))
                     .collect::<Result<_, _>>()?;
@@ -769,7 +769,7 @@ fn infer_expr(
                 }
                 return Err(MetelError::type_error(
                     TypeErrorCode::T0003,
-                    format!("no method `{method}` on array type `T[]`; use `List<T>` for mutable collections"),
+                    format!("no method `{method}` on array type; use `List<T>` for mutable collections"),
                     span,
                 ));
             }

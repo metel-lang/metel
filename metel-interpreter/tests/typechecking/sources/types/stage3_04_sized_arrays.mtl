@@ -28,3 +28,7 @@ fun total(xs: [i64; 3]) -> i64 {
     }
     acc
 }
+
+// len() is available on sized arrays.
+fun sized_len(xs: [i64; 3]) -> i64 { xs.len() }
+let _n: i64 = sized_len(ones);

@@ -836,7 +836,7 @@ fn construct_expr(
                 Type::F64 => ("f64".to_string(), vec![]),
                 Type::Bool  => ("Bool".to_string(),   vec![]),
                 Type::Char  => ("Char".to_string(),   vec![]),
-                Type::Array(_) => {
+                Type::Array(_) | Type::SizedArray(_, _) => {
                     if method == "len" && args.is_empty() {
                         let typed_args: Vec<TypedExpr> = vec![];
                         return Ok(TypedExpr::MethodCall {
@@ -849,7 +849,7 @@ fn construct_expr(
                     }
                     return Err(MetelError::type_error(
                         TypeErrorCode::T0003,
-                        format!("no method `{method}` on array type `T[]`; use `List<T>` for mutable collections"),
+                        format!("no method `{method}` on array type; use `List<T>` for mutable collections"),
                         span,
                     ));
                 }

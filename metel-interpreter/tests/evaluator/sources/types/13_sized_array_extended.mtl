@@ -1,9 +1,7 @@
 fun main() {
-    // Empty sized array [T; 0] — for-in produces zero iterations.
+    // Empty sized array [T; 0] — len() returns 0.
     let empty: [i64; 0] = [0; 0];
-    let mut empty_count = 0;
-    for (let _ in empty) { empty_count += 1; }
-    assert(empty_count == 0);
+    assert(empty.len() == 0);
 
     // Single-element sized array.
     let single: [i64; 1] = [42];
