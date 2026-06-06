@@ -653,11 +653,13 @@ fn parse_literal_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resu
                 line: span.line, col: span.col, source_line: None,
             })?;
             let in_range = match kind {
-                IntKind::I8  => value <= i8::MAX as i128,
-                IntKind::I16 => value <= i16::MAX as i128,
-                IntKind::I32 => value <= i32::MAX as i128,
-                IntKind::I64 => value <= i64::MAX as i128,
-                IntKind::U8  => value <= u8::MAX as i128,
+                // Allow abs(MIN) so that e.g. `-128i8` and `-32768i16` parse correctly;
+                // the extra value wraps to MIN via the two's-complement cast in the evaluator.
+                IntKind::I8  => value <= i8::MAX  as i128 + 1,
+                IntKind::I16 => value <= i16::MAX as i128 + 1,
+                IntKind::I32 => value <= i32::MAX as i128 + 1,
+                IntKind::I64 => value <= i64::MAX as i128 + 1,
+                IntKind::U8  => value <= u8::MAX  as i128,
                 IntKind::U16 => value <= u16::MAX as i128,
                 IntKind::U32 => value <= u32::MAX as i128,
                 IntKind::U64 => value <= u64::MAX as i128,

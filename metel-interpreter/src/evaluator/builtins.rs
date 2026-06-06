@@ -3,6 +3,38 @@ use crate::error::{MetelError, RuntimeErrorCode};
 use super::{Environment, Value};
 use super::display::{format_float, format_value, value_to_display_string};
 
+fn numeric_as_i128(v: &Value) -> Option<i128> {
+    match v {
+        Value::I8(n)  => Some(*n as i128),
+        Value::I16(n) => Some(*n as i128),
+        Value::I32(n) => Some(*n as i128),
+        Value::I64(n) => Some(*n as i128),
+        Value::U8(n)  => Some(*n as i128),
+        Value::U16(n) => Some(*n as i128),
+        Value::U32(n) => Some(*n as i128),
+        Value::U64(n) => Some(*n as i128),
+        Value::F32(f) => Some(*f as i128),
+        Value::F64(f) => Some(*f as i128),
+        _ => None,
+    }
+}
+
+fn numeric_as_f64_val(v: &Value) -> Option<f64> {
+    match v {
+        Value::I8(n)  => Some(*n as f64),
+        Value::I16(n) => Some(*n as f64),
+        Value::I32(n) => Some(*n as f64),
+        Value::I64(n) => Some(*n as f64),
+        Value::U8(n)  => Some(*n as f64),
+        Value::U16(n) => Some(*n as f64),
+        Value::U32(n) => Some(*n as f64),
+        Value::U64(n) => Some(*n as f64),
+        Value::F32(f) => Some(*f as f64),
+        Value::F64(f) => Some(*f),
+        _ => None,
+    }
+}
+
 /// The free-function builtin names registered by this module.
 /// Must stay in sync with `StdPrelude::schemes()`. See METEL-5 / ADR-0027.
 #[allow(dead_code)] // called by the parity test in typechecker::tests
@@ -69,90 +101,143 @@ pub(super) fn register_builtins(env: &mut Environment) {
         }
     }));
 
-    // From impls for numeric conversions.
+    // Numeric From impls: full cross-product of all numeric types.
+    // Fallback generic builtins (for any remaining dispatch paths).
     env.define("i64::from", Value::Builtin("i64::from".to_string(), |args, _span| {
-        match args.first() {
-            Some(Value::F64(f)) => Ok(Value::I64(*f as i64)),
-            Some(Value::I64(n))   => Ok(Value::I64(*n)),
-            _ => Err(MetelError::internal("i64::from: expected f64")),
+        match args.first().and_then(|v| numeric_as_i128(v)) {
+            Some(n) => Ok(Value::I64(n as i64)),
+            None => Err(MetelError::internal("i64::from: expected numeric")),
         }
     }));
     env.define("f64::from", Value::Builtin("f64::from".to_string(), |args, _span| {
-        match args.first() {
-            Some(Value::I64(n))   => Ok(Value::F64(*n as f64)),
-            Some(Value::F64(f)) => Ok(Value::F64(*f)),
-            _ => Err(MetelError::internal("f64::from: expected i64")),
+        match args.first().and_then(|v| numeric_as_f64_val(v)) {
+            Some(f) => Ok(Value::F64(f)),
+            None => Err(MetelError::internal("f64::from: expected numeric")),
         }
     }));
 
-    // Sized integer / float → Int
-    macro_rules! int_from {
-        ($key:expr, $pat:pat => $val:expr) => {
+    // Specific-key From impls (evaluated before generic fallbacks).
+    macro_rules! from_int {
+        ($key:literal, $out:expr) => {
             env.define($key, Value::Builtin($key.to_string(), |args, _span| {
-                match args.first() {
-                    Some($pat) => Ok(Value::I64($val)),
-                    _ => Err(MetelError::internal(concat!($key, ": unexpected argument"))),
+                match args.first().and_then(|v| numeric_as_i128(v)) {
+                    Some(n) => Ok($out(n)),
+                    None => Err(MetelError::internal(concat!($key, ": unexpected argument"))),
                 }
             }));
         };
     }
-    int_from!("i64::From<i8>::from",  Value::I8(n)  => *n as i64);
-    int_from!("i64::From<i16>::from", Value::I16(n) => *n as i64);
-    int_from!("i64::From<i32>::from", Value::I32(n) => *n as i64);
-    int_from!("i64::From<u8>::from",  Value::U8(n)  => *n as i64);
-    int_from!("i64::From<u16>::from", Value::U16(n) => *n as i64);
-    int_from!("i64::From<u32>::from", Value::U32(n) => *n as i64);
-    int_from!("i64::From<u64>::from", Value::U64(n) => *n as i64);
-    int_from!("i64::From<f32>::from", Value::F32(f) => *f as i64);
+    macro_rules! from_float {
+        ($key:literal, $out:expr) => {
+            env.define($key, Value::Builtin($key.to_string(), |args, _span| {
+                match args.first().and_then(|v| numeric_as_f64_val(v)) {
+                    Some(f) => Ok($out(f)),
+                    None => Err(MetelError::internal(concat!($key, ": unexpected argument"))),
+                }
+            }));
+        };
+    }
 
-    // Sized integer / float → Float
-    macro_rules! float_from {
-        ($key:expr, $pat:pat => $val:expr) => {
-            env.define($key, Value::Builtin($key.to_string(), |args, _span| {
-                match args.first() {
-                    Some($pat) => Ok(Value::F64($val)),
-                    _ => Err(MetelError::internal(concat!($key, ": unexpected argument"))),
-                }
-            }));
-        };
-    }
-    float_from!("f64::From<i8>::from",  Value::I8(n)  => *n as f64);
-    float_from!("f64::From<i16>::from", Value::I16(n) => *n as f64);
-    float_from!("f64::From<i32>::from", Value::I32(n) => *n as f64);
-    float_from!("f64::From<u8>::from",  Value::U8(n)  => *n as f64);
-    float_from!("f64::From<u16>::from", Value::U16(n) => *n as f64);
-    float_from!("f64::From<u32>::from", Value::U32(n) => *n as f64);
-    float_from!("f64::From<u64>::from", Value::U64(n) => *n as f64);
-    float_from!("f64::From<f32>::from", Value::F32(f) => *f as f64);
-
-    // Int / Float → sized integer types (truncating / wrapping)
-    macro_rules! sized_from {
-        ($key:expr, Int => $cast:expr) => {
-            env.define($key, Value::Builtin($key.to_string(), |args, _span| {
-                match args.first() {
-                    Some(Value::I64(n))   => Ok($cast(*n as i128)),
-                    Some(Value::F64(f)) => Ok($cast(*f as i128)),
-                    _ => Err(MetelError::internal(concat!($key, ": unexpected argument"))),
-                }
-            }));
-        };
-    }
-    sized_from!("u64::From<i64>::from",   Int => |n: i128| Value::U64(n as u64));
-    sized_from!("u64::From<f64>::from",   Int => |n: i128| Value::U64(n as u64));
-    sized_from!("i8::From<i64>::from",    Int => |n: i128| Value::I8(n as i8));
-    sized_from!("i8::From<f64>::from",    Int => |n: i128| Value::I8(n as i8));
-    sized_from!("i16::From<i64>::from",   Int => |n: i128| Value::I16(n as i16));
-    sized_from!("i16::From<f64>::from",   Int => |n: i128| Value::I16(n as i16));
-    sized_from!("i32::From<i64>::from",   Int => |n: i128| Value::I32(n as i32));
-    sized_from!("i32::From<f64>::from",   Int => |n: i128| Value::I32(n as i32));
-    sized_from!("u8::From<i64>::from",    Int => |n: i128| Value::U8(n as u8));
-    sized_from!("u8::From<f64>::from",    Int => |n: i128| Value::U8(n as u8));
-    sized_from!("u16::From<i64>::from",   Int => |n: i128| Value::U16(n as u16));
-    sized_from!("u16::From<f64>::from",   Int => |n: i128| Value::U16(n as u16));
-    sized_from!("u32::From<i64>::from",   Int => |n: i128| Value::U32(n as u32));
-    sized_from!("u32::From<f64>::from",   Int => |n: i128| Value::U32(n as u32));
-    sized_from!("f32::From<i64>::from",   Int => |n: i128| Value::F32(n as f32));
-    sized_from!("f32::From<f64>::from",   Int => |n: i128| Value::F32(n as f32));
+    // i8
+    from_int!("i8::From<i16>::from",  |n: i128| Value::I8(n as i8));
+    from_int!("i8::From<i32>::from",  |n: i128| Value::I8(n as i8));
+    from_int!("i8::From<i64>::from",  |n: i128| Value::I8(n as i8));
+    from_int!("i8::From<u8>::from",   |n: i128| Value::I8(n as i8));
+    from_int!("i8::From<u16>::from",  |n: i128| Value::I8(n as i8));
+    from_int!("i8::From<u32>::from",  |n: i128| Value::I8(n as i8));
+    from_int!("i8::From<u64>::from",  |n: i128| Value::I8(n as i8));
+    from_int!("i8::From<f32>::from",  |n: i128| Value::I8(n as i8));
+    from_int!("i8::From<f64>::from",  |n: i128| Value::I8(n as i8));
+    // i16
+    from_int!("i16::From<i8>::from",  |n: i128| Value::I16(n as i16));
+    from_int!("i16::From<i32>::from", |n: i128| Value::I16(n as i16));
+    from_int!("i16::From<i64>::from", |n: i128| Value::I16(n as i16));
+    from_int!("i16::From<u8>::from",  |n: i128| Value::I16(n as i16));
+    from_int!("i16::From<u16>::from", |n: i128| Value::I16(n as i16));
+    from_int!("i16::From<u32>::from", |n: i128| Value::I16(n as i16));
+    from_int!("i16::From<u64>::from", |n: i128| Value::I16(n as i16));
+    from_int!("i16::From<f32>::from", |n: i128| Value::I16(n as i16));
+    from_int!("i16::From<f64>::from", |n: i128| Value::I16(n as i16));
+    // i32
+    from_int!("i32::From<i8>::from",  |n: i128| Value::I32(n as i32));
+    from_int!("i32::From<i16>::from", |n: i128| Value::I32(n as i32));
+    from_int!("i32::From<i64>::from", |n: i128| Value::I32(n as i32));
+    from_int!("i32::From<u8>::from",  |n: i128| Value::I32(n as i32));
+    from_int!("i32::From<u16>::from", |n: i128| Value::I32(n as i32));
+    from_int!("i32::From<u32>::from", |n: i128| Value::I32(n as i32));
+    from_int!("i32::From<u64>::from", |n: i128| Value::I32(n as i32));
+    from_int!("i32::From<f32>::from", |n: i128| Value::I32(n as i32));
+    from_int!("i32::From<f64>::from", |n: i128| Value::I32(n as i32));
+    // i64
+    from_int!("i64::From<i8>::from",  |n: i128| Value::I64(n as i64));
+    from_int!("i64::From<i16>::from", |n: i128| Value::I64(n as i64));
+    from_int!("i64::From<i32>::from", |n: i128| Value::I64(n as i64));
+    from_int!("i64::From<u8>::from",  |n: i128| Value::I64(n as i64));
+    from_int!("i64::From<u16>::from", |n: i128| Value::I64(n as i64));
+    from_int!("i64::From<u32>::from", |n: i128| Value::I64(n as i64));
+    from_int!("i64::From<u64>::from", |n: i128| Value::I64(n as i64));
+    from_int!("i64::From<f32>::from", |n: i128| Value::I64(n as i64));
+    from_int!("i64::From<f64>::from", |n: i128| Value::I64(n as i64));
+    // u8
+    from_int!("u8::From<i8>::from",   |n: i128| Value::U8(n as u8));
+    from_int!("u8::From<i16>::from",  |n: i128| Value::U8(n as u8));
+    from_int!("u8::From<i32>::from",  |n: i128| Value::U8(n as u8));
+    from_int!("u8::From<i64>::from",  |n: i128| Value::U8(n as u8));
+    from_int!("u8::From<u16>::from",  |n: i128| Value::U8(n as u8));
+    from_int!("u8::From<u32>::from",  |n: i128| Value::U8(n as u8));
+    from_int!("u8::From<u64>::from",  |n: i128| Value::U8(n as u8));
+    from_int!("u8::From<f32>::from",  |n: i128| Value::U8(n as u8));
+    from_int!("u8::From<f64>::from",  |n: i128| Value::U8(n as u8));
+    // u16
+    from_int!("u16::From<i8>::from",  |n: i128| Value::U16(n as u16));
+    from_int!("u16::From<i16>::from", |n: i128| Value::U16(n as u16));
+    from_int!("u16::From<i32>::from", |n: i128| Value::U16(n as u16));
+    from_int!("u16::From<i64>::from", |n: i128| Value::U16(n as u16));
+    from_int!("u16::From<u8>::from",  |n: i128| Value::U16(n as u16));
+    from_int!("u16::From<u32>::from", |n: i128| Value::U16(n as u16));
+    from_int!("u16::From<u64>::from", |n: i128| Value::U16(n as u16));
+    from_int!("u16::From<f32>::from", |n: i128| Value::U16(n as u16));
+    from_int!("u16::From<f64>::from", |n: i128| Value::U16(n as u16));
+    // u32
+    from_int!("u32::From<i8>::from",  |n: i128| Value::U32(n as u32));
+    from_int!("u32::From<i16>::from", |n: i128| Value::U32(n as u32));
+    from_int!("u32::From<i32>::from", |n: i128| Value::U32(n as u32));
+    from_int!("u32::From<i64>::from", |n: i128| Value::U32(n as u32));
+    from_int!("u32::From<u8>::from",  |n: i128| Value::U32(n as u32));
+    from_int!("u32::From<u16>::from", |n: i128| Value::U32(n as u32));
+    from_int!("u32::From<u64>::from", |n: i128| Value::U32(n as u32));
+    from_int!("u32::From<f32>::from", |n: i128| Value::U32(n as u32));
+    from_int!("u32::From<f64>::from", |n: i128| Value::U32(n as u32));
+    // u64
+    from_int!("u64::From<i8>::from",  |n: i128| Value::U64(n as u64));
+    from_int!("u64::From<i16>::from", |n: i128| Value::U64(n as u64));
+    from_int!("u64::From<i32>::from", |n: i128| Value::U64(n as u64));
+    from_int!("u64::From<i64>::from", |n: i128| Value::U64(n as u64));
+    from_int!("u64::From<u8>::from",  |n: i128| Value::U64(n as u64));
+    from_int!("u64::From<u16>::from", |n: i128| Value::U64(n as u64));
+    from_int!("u64::From<u32>::from", |n: i128| Value::U64(n as u64));
+    from_int!("u64::From<f32>::from", |n: i128| Value::U64(n as u64));
+    from_int!("u64::From<f64>::from", |n: i128| Value::U64(n as u64));
+    // f32
+    from_float!("f32::From<i8>::from",  |f: f64| Value::F32(f as f32));
+    from_float!("f32::From<i16>::from", |f: f64| Value::F32(f as f32));
+    from_float!("f32::From<i32>::from", |f: f64| Value::F32(f as f32));
+    from_float!("f32::From<i64>::from", |f: f64| Value::F32(f as f32));
+    from_float!("f32::From<u8>::from",  |f: f64| Value::F32(f as f32));
+    from_float!("f32::From<u16>::from", |f: f64| Value::F32(f as f32));
+    from_float!("f32::From<u32>::from", |f: f64| Value::F32(f as f32));
+    from_float!("f32::From<u64>::from", |f: f64| Value::F32(f as f32));
+    from_float!("f32::From<f64>::from", |f: f64| Value::F32(f as f32));
+    // f64
+    from_float!("f64::From<i8>::from",  |f: f64| Value::F64(f));
+    from_float!("f64::From<i16>::from", |f: f64| Value::F64(f));
+    from_float!("f64::From<i32>::from", |f: f64| Value::F64(f));
+    from_float!("f64::From<i64>::from", |f: f64| Value::F64(f));
+    from_float!("f64::From<u8>::from",  |f: f64| Value::F64(f));
+    from_float!("f64::From<u16>::from", |f: f64| Value::F64(f));
+    from_float!("f64::From<u32>::from", |f: f64| Value::F64(f));
+    from_float!("f64::From<u64>::from", |f: f64| Value::F64(f));
+    from_float!("f64::From<f32>::from", |f: f64| Value::F64(f));
 
     env.define("u32::From<Char>::from", Value::Builtin("u32::From<Char>::from".to_string(), |args, _span| {
         match args.first() {

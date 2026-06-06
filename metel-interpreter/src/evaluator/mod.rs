@@ -1484,6 +1484,7 @@ fn try_numeric_cast(v: &Value, target: &crate::ast::TypeExpr) -> Option<Value> {
     };
 
     // Extract a general integer/float from the source value.
+    // For float sources, produce an i64 only when the value is a whole number in i64 range.
     let as_i64: Option<i64> = match v {
         Value::I64(n)  => Some(*n),
         Value::I32(n)  => Some(*n as i64),
@@ -1493,6 +1494,14 @@ fn try_numeric_cast(v: &Value, target: &crate::ast::TypeExpr) -> Option<Value> {
         Value::U32(n)  => Some(*n as i64),
         Value::U16(n)  => Some(*n as i64),
         Value::U8(n)   => Some(*n as i64),
+        Value::F64(f) => {
+            let f = *f;
+            if f.fract() == 0.0 && f >= i64::MIN as f64 && f <= i64::MAX as f64 { Some(f as i64) } else { None }
+        }
+        Value::F32(f) => {
+            let f = *f as f64;
+            if f.fract() == 0.0 && f >= i64::MIN as f64 && f <= i64::MAX as f64 { Some(f as i64) } else { None }
+        }
         _ => None,
     };
     let as_f64: Option<f64> = match v {

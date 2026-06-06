@@ -84,16 +84,18 @@ fn register_builtin_aspect_impls(registry: &mut TypeDefinitionRegistry) {
     // Iterable impls for built-in sequence types
     registry.register_aspect_impl("Range".into(),          "Iterable".into(), vec![Type::I64]);
     registry.register_aspect_impl("RangeInclusive".into(), "Iterable".into(), vec![Type::I64]);
-    // From impls for numeric conversions
-    registry.register_aspect_impl("i64".into(), "From".into(), vec![Type::F64]);
-    registry.register_aspect_impl("f64".into(), "From".into(), vec![Type::I64]);
-    // Sized integer ↔ i64 / f64 conversions
-    for sized in [Type::I8, Type::I16, Type::I32, Type::U8, Type::U16, Type::U32, Type::U64, Type::F32] {
-        let name = sized.to_string();
-        registry.register_aspect_impl("i64".into(), "From".into(), vec![sized.clone()]);
-        registry.register_aspect_impl("f64".into(), "From".into(), vec![sized.clone()]);
-        registry.register_aspect_impl(name.clone(), "From".into(), vec![Type::I64]);   // i64
-        registry.register_aspect_impl(name.clone(), "From".into(), vec![Type::F64]); // f64
+    // Full cross-product numeric From impls: every numeric type has From<T> for every other.
+    let all_numeric = [
+        (Type::I8, "i8"), (Type::I16, "i16"), (Type::I32, "i32"), (Type::I64, "i64"),
+        (Type::U8, "u8"), (Type::U16, "u16"), (Type::U32, "u32"), (Type::U64, "u64"),
+        (Type::F32, "f32"), (Type::F64, "f64"),
+    ];
+    for (target_ty, target_name) in &all_numeric {
+        for (source_ty, _) in &all_numeric {
+            if target_ty != source_ty {
+                registry.register_aspect_impl((*target_name).to_string(), "From".into(), vec![source_ty.clone()]);
+            }
+        }
     }
     // Display impls for built-in types (used by to_string method dispatch)
     registry.register_aspect_impl("i64".into(),    "Display".into(), vec![]);
