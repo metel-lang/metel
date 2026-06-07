@@ -1792,7 +1792,7 @@ pub fn eval_expr(
             use crate::typed_ast::TypedPlace;
             let rhs = eval_expr(value, env, runtime)?.into_value();
             match target {
-                TypedPlace::Ident(name) => {
+                TypedPlace::Ident(name, ident_span) => {
                     let new_val = if matches!(op, AssignOp::Assign) {
                         rhs
                     } else {
@@ -1800,7 +1800,7 @@ pub fn eval_expr(
                             MetelError::panic(
                                 RuntimeErrorCode::R0003,
                                 format!("assign: undefined `{name}`"),
-                                span,
+                                ident_span,
                             )
                         })?;
                         lvalue::apply_assign_op(op, cur, rhs, span)?
@@ -1809,7 +1809,7 @@ pub fn eval_expr(
                         return Err(MetelError::panic(
                             RuntimeErrorCode::R0003,
                             format!("assign: undefined `{name}`"),
-                            span,
+                            ident_span,
                         ));
                     }
                     Ok(Signal::Value(Value::Unit))

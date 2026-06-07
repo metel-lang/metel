@@ -28,12 +28,12 @@ pub(super) fn resolve_field_assign_root<'a>(
         span: &Span,
     ) -> Result<std::rc::Rc<std::cell::RefCell<Value>>, MetelError> {
         match place {
-            TypedPlace::Ident(name) => {
+            TypedPlace::Ident(name, ident_span) => {
                 let rc = env.get_rc(name).ok_or_else(|| {
                     MetelError::panic(
                         RuntimeErrorCode::R0003,
                         format!("assign: `{name}` not found"),
-                        span,
+                        ident_span,
                     )
                 })?;
                 // Auto-deref: if the binding holds a *mut pointer, follow it.
@@ -89,11 +89,11 @@ pub(super) fn eval_typed_place_value(
     span: &Span,
 ) -> Result<Value, MetelError> {
     match place {
-        TypedPlace::Ident(name) => env.get(name).ok_or_else(|| {
+        TypedPlace::Ident(name, ident_span) => env.get(name).ok_or_else(|| {
             MetelError::panic(
                 RuntimeErrorCode::R0003,
                 format!("assign: `{name}` not found"),
-                span,
+                ident_span,
             )
         }),
         TypedPlace::Deref {

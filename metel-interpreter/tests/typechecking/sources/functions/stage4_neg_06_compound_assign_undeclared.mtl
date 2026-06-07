@@ -1,0 +1,2 @@
+// Compound assignment to an undeclared name is T0003, same as plain assign.
+w += 1; // ERROR[T0003]

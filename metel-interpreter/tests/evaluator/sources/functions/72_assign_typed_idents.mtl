@@ -1,0 +1,36 @@
+// Compound assignment through TypedPlace::Ident for non-default numeric types.
+fun main() {
+    let mut a: i32 = 10;
+    a += 5;
+    assert(a == 15);
+    a -= 3;
+    assert(a == 12);
+    a *= 2;
+    assert(a == 24);
+    a /= 4;
+    assert(a == 6);
+    a %= 4;
+    assert(a == 2);
+
+    let mut b: u64 = 100;
+    b += 50;
+    assert(b == 150);
+    b -= 25;
+    assert(b == 125);
+    b *= 2;
+    assert(b == 250);
+    b /= 5;
+    assert(b == 50);
+    b %= 7;
+    assert(b == 1);
+
+    let mut c: f32 = 4.0;
+    c += 2.0;
+    assert(c == 6.0);
+    c *= 3.0;
+    assert(c == 18.0);
+    c /= 6.0;
+    assert(c == 3.0);
+    c -= 1.0;
+    assert(c == 2.0);
+}
