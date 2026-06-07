@@ -112,4 +112,5 @@ Type error codes: E0001–E0008. Runtime panics (`.yolo()` on `nope`, out-of-bou
 | Parser | `src/parser/`, `src/grammar.pest` |
 | Type Checker | [typechecker.md](typechecker.md) |
 | Evaluator | [evaluator.md](evaluator.md) |
+| Testing | [testing.md](testing.md) |
 | Design decisions | [decisions/](decisions/) |
