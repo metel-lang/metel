@@ -1,0 +1,2 @@
+fun answer() -> i64 { return 99; }
+fun main() -> i64 { return self::answer(); }

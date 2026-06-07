@@ -1,0 +1,1 @@
+pub fun right_val() -> i64 { return 10; }

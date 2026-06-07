@@ -1,0 +1,3 @@
+import a::foo;
+import b::foo;
+fun main() -> i64 { return foo(); }

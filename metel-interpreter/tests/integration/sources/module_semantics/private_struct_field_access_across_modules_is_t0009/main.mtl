@@ -1,0 +1,2 @@
+import token::make;
+fun main() -> i64 { return make().offset; }

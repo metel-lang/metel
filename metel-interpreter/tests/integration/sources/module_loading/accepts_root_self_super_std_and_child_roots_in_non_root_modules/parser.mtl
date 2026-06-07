@@ -1,0 +1,8 @@
+
+import self::child::Thing;
+import root::child::Thing;
+import super::child::Thing;
+import std::core::i64;
+import child::Thing;
+
+struct Token { value: i64 }

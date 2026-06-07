@@ -1,0 +1,63 @@
+
+import types::*;
+import utils::*;
+
+pub fun validate_task(title: String, priority: Priority, status: Status, effort: i64) -> Result<Task, ValidationError> {
+    if (string_len(title) == 0) {
+        return Result::Err { error: ValidationError { message: "title cannot be empty" } };
+    }
+    if (effort < 0) {
+        return Result::Err { error: ValidationError { message: "effort cannot be negative" } };
+    }
+    Result::Ok { value: Task { title: title, priority: priority, status: status, effort: effort } }
+}
+
+pub fun total_effort(tasks: Task[]) -> i64 {
+    fold_left(tasks, 0, (acc: i64, t: Task) -> i64 { acc + t.effort })
+}
+
+pub fun open_task_count(tasks: Task[]) -> i64 {
+    let mut count = 0;
+    for (let t in tasks) {
+        match t.status {
+            Status::Open       => { count += 1; },
+            Status::InProgress => { count += 1; },
+            Status::Done       => (),
+        };
+    }
+    count
+}
+
+pub fun is_high_priority(t: Task) -> boolean {
+    match t.priority {
+        Priority::High   => true,
+        Priority::Medium => false,
+        Priority::Low    => false,
+    }
+}
+
+pub fun is_done(t: Task) -> boolean {
+    match t.status {
+        Status::Done       => true,
+        Status::Open       => false,
+        Status::InProgress => false,
+    }
+}
+
+pub fun task_titles(tasks: Task[]) -> String[] {
+    map_array(tasks, (t: Task) -> String { t.title })
+}
+
+pub fun find_by_title(tasks: Task[], title: String) -> Perhaps<Task> {
+    find_first(tasks, (t: Task) -> boolean { t.title == title })
+}
+
+pub fun compute_completion_pct(tasks: Task[]) -> i64 {
+    let n = tasks.len();
+    if (n == 0) { return 0; }
+    let mut done = 0;
+    for (let t in tasks) {
+        if (is_done(t)) { done += 1; }
+    }
+    (done * 100) / n
+}

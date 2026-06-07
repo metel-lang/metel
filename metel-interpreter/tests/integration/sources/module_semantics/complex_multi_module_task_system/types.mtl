@@ -1,0 +1,5 @@
+
+pub enum Priority { High, Medium, Low }
+pub enum Status { Open, InProgress, Done }
+pub struct Task { pub title: String, pub priority: Priority, pub status: Status, pub effort: i64 }
+pub struct ValidationError { pub message: String }

@@ -1,0 +1,2 @@
+import parser::*;
+fun main() -> i64 { return parse(); }

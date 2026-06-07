@@ -1,0 +1,4 @@
+runner = "load_graph"
+[expect]
+status = "load_error"
+contains = "cannot find module"

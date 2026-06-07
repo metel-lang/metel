@@ -1,0 +1,6 @@
+runner = "load_graph"
+[expect]
+status = "success"
+[graph]
+module_count = 2
+has_module_paths = ["parser"]

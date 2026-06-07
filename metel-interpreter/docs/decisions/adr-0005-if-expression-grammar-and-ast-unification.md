@@ -195,7 +195,7 @@ Files changed (task 0008):
 - `src/ast/mod.rs` — removed `Stmt::Match`, `Stmt::Loop`, `LoopStmt`
 - `src/typed_ast/mod.rs` — removed `TypedStmt::Match`, `TypedStmt::Loop`, `TypedLoopStmt`
 - `src/parser/mod.rs` — removed `Rule::match_stmt`/`Rule::loop_stmt` from `parse_stmt`; removed `parse_loop_stmt`; updated `parse_block` to dispatch `Rule::block_expr_stmt`
-- `tests/parsing/sources/11_block_expr_stmts.mln` — new parsing test covering all three constructs as block tails and as statement-position items
+- `tests/integration/sources/parsing/11_block_expr_stmts.mln` — new parsing test covering all three constructs as block tails and as statement-position items
 
 ## Consequences
 

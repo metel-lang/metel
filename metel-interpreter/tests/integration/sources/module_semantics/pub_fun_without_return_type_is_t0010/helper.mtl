@@ -1,0 +1,1 @@
+pub fun answer() { return 42; }

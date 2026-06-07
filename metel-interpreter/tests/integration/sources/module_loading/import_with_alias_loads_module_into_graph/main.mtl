@@ -1,0 +1,2 @@
+import helper::answer as compute;
+fun main() { }

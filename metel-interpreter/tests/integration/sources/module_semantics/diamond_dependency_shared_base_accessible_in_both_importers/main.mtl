@@ -1,0 +1,6 @@
+import left::left_answer;         
+import right::right_answer;         
+fun main() {         
+    assert(left_answer() == 42);         
+    assert(right_answer() == 43);         
+}

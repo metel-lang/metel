@@ -1,0 +1,6 @@
+runner = "load_program"
+[expect]
+status = "success"
+[program]
+imports = 0
+decls = 1

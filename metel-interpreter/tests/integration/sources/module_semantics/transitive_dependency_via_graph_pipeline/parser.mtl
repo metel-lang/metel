@@ -1,0 +1,2 @@
+import lexer::*;
+pub fun parse() -> i64 { return tokenize(); }

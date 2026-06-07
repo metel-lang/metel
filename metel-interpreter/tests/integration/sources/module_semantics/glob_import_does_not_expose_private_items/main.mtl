@@ -1,0 +1,2 @@
+import helper::*;
+fun main() -> i64 { return private_fn(); }

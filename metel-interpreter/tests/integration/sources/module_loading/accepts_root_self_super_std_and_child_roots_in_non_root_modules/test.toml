@@ -1,0 +1,5 @@
+runner = "load_graph"
+[expect]
+status = "success"
+[graph]
+module_count = 3

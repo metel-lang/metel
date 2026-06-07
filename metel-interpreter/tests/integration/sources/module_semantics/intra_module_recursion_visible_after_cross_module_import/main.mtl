@@ -1,0 +1,6 @@
+import recur::count_down;         
+fun main() {         
+    assert(count_down(0) == 0);         
+    assert(count_down(5) == 5);         
+    assert(count_down(10) == 10);         
+}

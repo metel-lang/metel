@@ -1,0 +1,2 @@
+import a::Thing;
+fun main() { }

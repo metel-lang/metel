@@ -1,0 +1,3 @@
+import a::*;
+import a::pub_a;
+fun main() -> i64 { return pub_a() + pub_b(); }

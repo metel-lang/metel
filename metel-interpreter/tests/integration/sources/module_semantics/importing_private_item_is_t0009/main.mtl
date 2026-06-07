@@ -1,0 +1,2 @@
+import helper::secret;
+fun main() -> i64 { return secret(); }

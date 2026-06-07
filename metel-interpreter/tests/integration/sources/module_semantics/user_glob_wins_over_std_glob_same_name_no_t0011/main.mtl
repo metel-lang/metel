@@ -1,0 +1,2 @@
+import a::*;
+fun main() -> i64 { return foo(); }

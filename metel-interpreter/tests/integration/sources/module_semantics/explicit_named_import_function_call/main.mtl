@@ -1,0 +1,2 @@
+import helper::answer;
+fun main() -> i64 { return answer(); }

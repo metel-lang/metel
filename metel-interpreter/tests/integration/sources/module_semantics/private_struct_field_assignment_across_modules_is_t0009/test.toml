@@ -1,0 +1,5 @@
+runner = "full_pipeline"
+prelude = "empty"
+[expect]
+status = "typecheck_error"
+code = "T0009"
