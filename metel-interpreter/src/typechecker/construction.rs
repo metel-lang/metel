@@ -732,7 +732,12 @@ fn construct_expr(
             Ok(TypedExpr::Array(typed, ty, span.clone()))
         }
         Expr::RepeatArray(elem, n, span) => {
-            let typed_elem = construct_expr(elem, None, ctx)?;
+            let elem_hint: Option<&Type> = match expected_ty {
+                Some(Type::SizedArray(elem_ty, _)) => Some(elem_ty.as_ref()),
+                Some(Type::Array(elem_ty)) => Some(elem_ty.as_ref()),
+                _ => None,
+            };
+            let typed_elem = construct_expr(elem, elem_hint, ctx)?;
             let elem_ty = typed_elem.ty().clone();
             let ty = Type::SizedArray(Box::new(elem_ty), *n);
             Ok(TypedExpr::RepeatArray(Box::new(typed_elem), *n, ty, span.clone()))
@@ -940,9 +945,22 @@ fn construct_expr(
                 infer_type_to_type(&instantiated, span)?
             };
 
-            let typed_args: Vec<TypedExpr> = args.iter()
-                .map(|a| construct_expr(a, None, ctx))
-                .collect::<Result<_, _>>()?;
+            // Use the non-self parameter types as hints so integer/float literals
+            // adopt the method's expected element type (e.g. List<i32>.push(5) → I32).
+            let typed_args: Vec<TypedExpr> = if let Type::Fun(ref params, _) = method_fun_ty {
+                // params[0] is self/receiver; the rest correspond to args.
+                let arg_params: Vec<Option<&Type>> = params.iter().skip(1)
+                    .map(Some)
+                    .chain(std::iter::repeat(None))
+                    .take(args.len())
+                    .collect();
+                args.iter()
+                    .zip(arg_params.iter())
+                    .map(|(a, hint)| construct_expr(a, *hint, ctx))
+                    .collect::<Result<_, _>>()?
+            } else {
+                args.iter().map(|a| construct_expr(a, None, ctx)).collect::<Result<_, _>>()?
+            };
             let ret_ty = match method_fun_ty {
                 Type::Fun(_, ret) => *ret,
                 _ => return Err(MetelError::internal("method type is not a function")),
@@ -1628,6 +1646,29 @@ fn construct_call(
         }
     };
 
+    // Re-construct args with the now-known concrete param types as hints if
+    // pre-construction defaulting diverged (e.g. unsuffixed integer literals in
+    // turbofish calls: clamp::<i32>(5, 0, 10) would have built I64 args).
+    let fun_ty_for_hints = match &fun_ty {
+        Type::Pointer(inner) | Type::MutPointer(inner)
+            if matches!(inner.as_ref(), Type::Fun(..)) => inner.as_ref(),
+        other => other,
+    };
+    let typed_args = if let Type::Fun(params, _) = fun_ty_for_hints {
+        if params.len() == typed_args.len()
+            && typed_args.iter().zip(params.iter()).any(|(a, p)| a.ty() != p)
+        {
+            args.iter()
+                .zip(params.iter())
+                .map(|(a, p)| construct_expr(a, Some(p), ctx))
+                .collect::<Result<_, _>>()?
+        } else {
+            typed_args
+        }
+    } else {
+        typed_args
+    };
+
     // Auto-deref: calling through a *Fun or *mut Fun is allowed.
     let fun_ty_inner = match &fun_ty {
         Type::Pointer(inner) | Type::MutPointer(inner)
@@ -2099,8 +2140,8 @@ fn assign_target_to_typed_place(
     ctx: &mut ConstructCtx<'_>,
 ) -> Result<TypedPlace, MetelError> {
     match target {
-        AssignTarget::Ident(name, _span) =>
-            Ok(TypedPlace::Ident(name.clone())),
+        AssignTarget::Ident(name, span) =>
+            Ok(TypedPlace::Ident(name.clone(), span.clone())),
         AssignTarget::Deref { object, span } =>
             Ok(TypedPlace::Deref {
                 object: Box::new(construct_expr(object, None, ctx)?),
@@ -2132,8 +2173,8 @@ fn assign_target_to_typed_place(
 
 fn expr_to_typed_place(expr: &Expr, ctx: &mut ConstructCtx<'_>) -> Result<TypedPlace, MetelError> {
     match expr {
-        Expr::Ident(name, _span) =>
-            Ok(TypedPlace::Ident(name.clone())),
+        Expr::Ident(name, span) =>
+            Ok(TypedPlace::Ident(name.clone(), span.clone())),
         Expr::FieldAccess { object, field, span } =>
             Ok(TypedPlace::Field {
                 object: Box::new(expr_to_typed_place(object, ctx)?),

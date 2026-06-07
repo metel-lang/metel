@@ -1,0 +1,180 @@
+// Integration: turbofish + generic functions + sized numeric types +
+// List<T> with non-default element types.
+
+fun clamp<T>(v: T, lo: T, hi: T) -> T {
+    if (v < lo) { lo }
+    else if (v > hi) { hi }
+    else { v }
+}
+
+fun map_to_list<T, U>(src: T[], f: (T) -> U) -> List<U> {
+    let mut out: List<U> = List::new();
+    for (let x in src) {
+        out.push(f(x));
+    }
+    out
+}
+
+fun all_positive_i32(lst: List<i32>) -> boolean {
+    let mut i: i64 = 0;
+    let len: i64 = lst.len();
+    while (i < len) {
+        match lst.get(i) {
+            Perhaps::Some { value } => {
+                if (value <= 0i32) {
+                    return false;
+                }
+            },
+            None => {},
+        };
+        i += 1;
+    }
+    true
+}
+
+fun zip_add_i32(a: List<i32>, b: List<i32>) -> List<i32> {
+    let len: i64 = if (a.len() < b.len()) { a.len() } else { b.len() };
+    let mut out: List<i32> = List::new();
+    let mut i: i64 = 0;
+    while (i < len) {
+        match a.get(i) {
+            Perhaps::Some { value } => {
+                let av = value;
+                match b.get(i) {
+                    Perhaps::Some { value } => out.push(av + value),
+                    None => {},
+                };
+            },
+            None => {},
+        };
+        i += 1;
+    }
+    out
+}
+
+fun main() {
+    // clamp with i32 — turbofish pins the type; literals now adopt i32 at construction.
+    assert(clamp::<i32>(5, 0, 10) == 5i32);
+    assert(clamp::<i32>(-3, 0, 10) == 0i32);
+    assert(clamp::<i32>(15, 0, 10) == 10i32);
+
+    // clamp with u8.
+    assert(clamp::<u8>(200, 0, 255) == 200u8);
+    assert(clamp::<u8>(100, 128, 255) == 128u8);
+
+    // clamp with f32.
+    assert(clamp::<f32>(1.5, 0.0, 1.0) == 1.0f32);
+    assert(clamp::<f32>(-0.5, 0.0, 1.0) == 0.0f32);
+    assert(clamp::<f32>(0.7, 0.0, 1.0) == 0.7f32);
+
+    // map_to_list: i32[] literal — element type propagated from annotation.
+    let src_i32: i32[] = [1, 2, 3, 4, 5];
+
+    // i32[] → List<i32> doubling each element.
+    let doubled = map_to_list::<i32, i32>(src_i32, (x: i32) -> i32 { x * 2i32 });
+    assert(doubled.len() == 5);
+    match doubled.get(0) {
+        Perhaps::Some { value } => assert(value == 2i32),
+        None => assert(false),
+    };
+    match doubled.get(4) {
+        Perhaps::Some { value } => assert(value == 10i32),
+        None => assert(false),
+    };
+
+    // map_to_list: i32[] → List<i64> widening cast.
+    let widened = map_to_list::<i32, i64>(src_i32, (x: i32) -> i64 { x as i64 });
+    assert(widened.len() == 5);
+    match widened.get(2) {
+        Perhaps::Some { value } => assert(value == 3),
+        None => assert(false),
+    };
+
+    // map_to_list: i32[] → List<boolean> via threshold.
+    let flags = map_to_list::<i32, boolean>(src_i32, (x: i32) -> boolean { x > 3i32 });
+    assert(flags.len() == 5);
+    match flags.get(3) {
+        Perhaps::Some { value } => assert(value == true),
+        None => assert(false),
+    };
+    match flags.get(1) {
+        Perhaps::Some { value } => assert(value == false),
+        None => assert(false),
+    };
+
+    // all_positive_i32: polymorphic literals pushed to List<i32> now adopt i32.
+    let mut pos: List<i32> = List::new();
+    pos.push(1);
+    pos.push(10);
+    pos.push(100);
+    assert(all_positive_i32(pos));
+
+    // all_positive_i32: contains zero.
+    let mut with_zero: List<i32> = List::new();
+    with_zero.push(5);
+    with_zero.push(0);
+    with_zero.push(3);
+    assert(!all_positive_i32(with_zero));
+
+    // zip_add_i32.
+    let mut a: List<i32> = List::new();
+    a.push(1); a.push(2); a.push(3);
+    let mut b: List<i32> = List::new();
+    b.push(10); b.push(20); b.push(30);
+    let zipped = zip_add_i32(a, b);
+    assert(zipped.len() == 3);
+    match zipped.get(0) {
+        Perhaps::Some { value } => assert(value == 11i32),
+        None => assert(false),
+    };
+    match zipped.get(2) {
+        Perhaps::Some { value } => assert(value == 33i32),
+        None => assert(false),
+    };
+
+    // List<u16> — polymorphic literals now adopt u16.
+    let mut u16_list: List<u16> = List::new();
+    u16_list.push(1000);
+    u16_list.push(2000);
+    u16_list.push(65535);
+    assert(u16_list.len() == 3);
+    match u16_list.get(2) {
+        Perhaps::Some { value } => assert(value == 65535u16),
+        None => assert(false),
+    };
+
+    // List<i8> — polymorphic literals adopt i8.
+    let mut i8_list: List<i8> = List::new();
+    i8_list.push(10);
+    i8_list.push(-5);
+    i8_list.push(127);
+    assert(i8_list.len() == 3);
+    match i8_list.get(1) {
+        Perhaps::Some { value } => assert(value == -5i8),
+        None => assert(false),
+    };
+
+    // Cross-sized cast inside a loop: accumulate u8 values into i64.
+    let bytes: u8[] = [10, 20, 30, 40, 50];
+    let mut acc: i64 = 0;
+    for (let b in bytes) {
+        acc += b as i64;
+    }
+    assert(acc == 150);
+
+    // Fixed-size repeat array — element type now propagated from annotation.
+    let zeros: [i32; 4] = [0; 4];
+    assert(zeros.len() == 4);
+    let z_slice: i32[] = zeros;
+    assert(z_slice[0] == 0i32);
+    assert(z_slice[3] == 0i32);
+
+    // Fixed-size array of i32 coerced to slice, then mapped.
+    let fixed: [i32; 3] = [100, 200, 300];
+    let fixed_slice: i32[] = fixed;
+    let mapped = map_to_list::<i32, i32>(fixed_slice, (x: i32) -> i32 { x / 100i32 });
+    assert(mapped.len() == 3);
+    match mapped.get(0) { Perhaps::Some { value } => assert(value == 1i32), None => assert(false) };
+    match mapped.get(1) { Perhaps::Some { value } => assert(value == 2i32), None => assert(false) };
+    match mapped.get(2) { Perhaps::Some { value } => assert(value == 3i32), None => assert(false) };
+}

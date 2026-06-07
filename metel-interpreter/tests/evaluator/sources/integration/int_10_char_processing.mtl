@@ -1,0 +1,127 @@
+// Integration: Char type + u32 conversions + List<Char> + sized numerics + Display.
+
+fun is_uppercase(c: Char) -> boolean {
+    let code: u32 = c as u32;
+    code >= 65u32 && code <= 90u32
+}
+
+fun is_lowercase(c: Char) -> boolean {
+    let code: u32 = c as u32;
+    code >= 97u32 && code <= 122u32
+}
+
+fun to_upper(c: Char) -> Char {
+    let code: u32 = c as u32;
+    if (is_lowercase(c)) {
+        (code - 32u32) as Char
+    } else {
+        c
+    }
+}
+
+fun to_lower(c: Char) -> Char {
+    let code: u32 = c as u32;
+    if (is_uppercase(c)) {
+        (code + 32u32) as Char
+    } else {
+        c
+    }
+}
+
+fun count_uppercase(chars: List<Char>) -> i64 {
+    let mut count = 0;
+    let sl = chars.as_slice();
+    for (let c in sl) {
+        if (is_uppercase(c)) {
+            count += 1;
+        }
+    }
+    count
+}
+
+fun main() {
+    // Basic Char properties.
+    let a = 'a';
+    let z = 'Z';
+    assert((a as u32) == 97u32);
+    assert((z as u32) == 90u32);
+    assert(is_lowercase(a));
+    assert(is_uppercase(z));
+    assert(!is_uppercase(a));
+    assert(!is_lowercase(z));
+
+    // Round-trip: Char → u32 → Char.
+    let code: u32 = 'M' as u32;
+    assert(code == 77u32);
+    let back = code as Char;
+    assert(back == 'M');
+
+    // Case conversion.
+    assert(to_upper('h') == 'H');
+    assert(to_upper('Z') == 'Z');
+    assert(to_lower('A') == 'a');
+    assert(to_lower('z') == 'z');
+
+    // Build a List<Char> from individual chars.
+    let mut chars: List<Char> = List::new();
+    chars.push('H');
+    chars.push('e');
+    chars.push('L');
+    chars.push('L');
+    chars.push('o');
+    assert(chars.len() == 5);
+
+    // Count uppercase letters.
+    assert(count_uppercase(chars) == 3);
+
+    // Uppercase all chars and verify.
+    let mut upper_chars: List<Char> = List::new();
+    let sl = chars.as_slice();
+    for (let c in sl) {
+        upper_chars.push(to_upper(c));
+    }
+    assert(count_uppercase(upper_chars) == 5);
+
+    // Lowercase all.
+    let mut lower_chars: List<Char> = List::new();
+    let usl = upper_chars.as_slice();
+    for (let c in usl) {
+        lower_chars.push(to_lower(c));
+    }
+    assert(count_uppercase(lower_chars) == 0);
+
+    // Char arithmetic via u32 — build a range 'a'..'e'.
+    let mut alphabet_slice: List<Char> = List::new();
+    let mut code_i: u32 = 'a' as u32;
+    while (code_i <= ('e' as u32)) {
+        alphabet_slice.push(code_i as Char);
+        code_i += 1u32;
+    }
+    assert(alphabet_slice.len() == 5);
+    match alphabet_slice.get(0) {
+        Perhaps::Some { value } => assert(value == 'a'),
+        None => assert(false),
+    };
+    match alphabet_slice.get(4) {
+        Perhaps::Some { value } => assert(value == 'e'),
+        None => assert(false),
+    };
+
+    // Char Display (to_string).
+    assert('A'.to_string() == "A");
+    assert('z'.to_string() == "z");
+
+    // Sized u32 arithmetic with Char codes.
+    let gap: u32 = ('z' as u32) - ('a' as u32);
+    assert(gap == 25u32);
+    let mid_code: u32 = ('a' as u32) + (gap / 2u32);
+    let mid_char = mid_code as Char;
+    assert(mid_char == 'm');    // 'a'(97) + 12 = 109 = 'm'
+
+    // Char comparison.
+    assert('a' < 'z');
+    assert('A' < 'a');
+    assert('Z' < 'a');
+    assert('m' == 'm');
+    assert('x' != 'y');
+}

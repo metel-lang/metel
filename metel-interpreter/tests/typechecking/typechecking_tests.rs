@@ -196,6 +196,12 @@ fun load() -> Result<i64, AppError> {
     fn stage4_neg_index_assign_type_mismatch() { check("functions/stage4_neg_04_index_assign_type_mismatch.mtl"); }
 
     #[test]
+    fn stage4_neg_compound_assign_to_let() { check("functions/stage4_neg_05_compound_assign_to_let.mtl"); }
+
+    #[test]
+    fn stage4_neg_compound_assign_undeclared() { check("functions/stage4_neg_06_compound_assign_undeclared.mtl"); }
+
+    #[test]
     fn ref_mut_receiver_requires_mutable_binding() {
         let source = r#"
 struct Counter {

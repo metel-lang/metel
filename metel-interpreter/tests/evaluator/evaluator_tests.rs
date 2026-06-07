@@ -249,6 +249,9 @@ mod tests {
     fn assign() { check("functions/21_assign.mtl"); }
 
     #[test]
+    fn assign_typed_idents() { check("functions/72_assign_typed_idents.mtl"); }
+
+    #[test]
     fn misc() { check("functions/22_misc.mtl"); }
 
     #[test]
@@ -532,4 +535,13 @@ mod tests {
 
     #[test]
     fn int_std_core_paths() { check("integration/int_08_std_core_paths.mtl"); }
+
+    #[test]
+    fn int_numeric_pipeline() { check("integration/int_09_numeric_pipeline.mtl"); }
+
+    #[test]
+    fn int_char_processing() { check("integration/int_10_char_processing.mtl"); }
+
+    #[test]
+    fn int_generic_sized() { check("integration/int_11_generic_sized.mtl"); }
 }
