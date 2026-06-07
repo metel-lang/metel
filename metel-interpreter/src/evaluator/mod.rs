@@ -173,6 +173,8 @@ pub struct RuntimeRegistry {
     pattern_methods: HashMap<RuntimeTypePattern, HashMap<String, RuntimeMethod>>,
 }
 
+type FieldWriteback = (Rc<RefCell<Value>>, Vec<String>, Rc<RefCell<Value>>);
+
 impl RuntimeRegistry {
     pub fn new() -> Self {
         Self::default()
@@ -676,7 +678,7 @@ fn std_core_lookup(name: &str, runtime: &RuntimeRegistry) -> Option<Value> {
 fn lvalue_field_cell(
     receiver: &crate::typed_ast::TypedExpr,
     env: &Environment,
-) -> Option<(Rc<RefCell<Value>>, Vec<String>, Rc<RefCell<Value>>)> {
+) -> Option<FieldWriteback> {
     use crate::typed_ast::TypedExpr;
     fn walk_path(expr: &TypedExpr, path: &mut Vec<String>) -> Option<String> {
         match expr {
@@ -702,7 +704,7 @@ fn lvalue_field_cell(
     };
     let leaf_val = {
         let borrowed = struct_cell.borrow();
-        let mut cur: &Value = &*borrowed;
+        let mut cur: &Value = &borrowed;
         for seg in &path {
             match cur {
                 Value::Struct { fields, .. } | Value::Enum { fields, .. } => {
@@ -1016,11 +1018,8 @@ fn run_passes(
     env.type_ctx = type_ctx.clone();
     // Pass 1a
     for decl in decls {
-        match decl {
-            TypedDecl::Fun(f) => {
-                env.define(&f.name, Value::Unit);
-            }
-            _ => {}
+        if let TypedDecl::Fun(f) = decl {
+            env.define(&f.name, Value::Unit);
         }
     }
 
@@ -1078,20 +1077,18 @@ fn run_passes(
                                 &method.name,
                                 runtime_method,
                             );
+                        } else if runtime_method.receiver.is_none() {
+                            runtime.register_type_value(
+                                type_name,
+                                &method.name,
+                                runtime_method,
+                            );
                         } else {
-                            if runtime_method.receiver.is_none() {
-                                runtime.register_type_value(
-                                    type_name,
-                                    &method.name,
-                                    runtime_method,
-                                );
-                            } else {
-                                runtime.register_inherent_method(
-                                    type_name,
-                                    &method.name,
-                                    runtime_method,
-                                );
-                            }
+                            runtime.register_inherent_method(
+                                type_name,
+                                &method.name,
+                                runtime_method,
+                            );
                         }
                     }
                 }
@@ -2085,11 +2082,7 @@ pub fn eval_expr(
                     // inside the parent struct's HashMap.  Instead we clone the leaf value
                     // into a fresh cell, call through it, then write the (possibly mutated)
                     // value back into the parent struct.
-                    let mut field_writeback: Option<(
-                        Rc<RefCell<Value>>,
-                        Vec<String>,
-                        Rc<RefCell<Value>>,
-                    )> = None;
+                    let mut field_writeback: Option<FieldWriteback> = None;
 
                     let receiver_binding = match receiver.as_ref() {
                         TypedExpr::Ident(name, _, _) => {
@@ -2134,7 +2127,7 @@ pub fn eval_expr(
                         let last = path.last().unwrap();
                         let prefix = &path[..path.len() - 1];
                         let mut borrow = struct_cell.borrow_mut();
-                        let mut cur: &mut Value = &mut *borrow;
+                        let mut cur: &mut Value = &mut borrow;
                         for seg in prefix {
                             match cur {
                                 Value::Struct { fields, .. } | Value::Enum { fields, .. } => {

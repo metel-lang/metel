@@ -277,40 +277,37 @@ pub(super) fn build_registry(
     // skipped here — they contain T-typed params that need TypeVars, not Named("T",[]).
     // infer_impl_method in inference.rs registers them correctly as polymorphic schemes.
     for decl in &program.decls {
-        match decl {
-            Decl::Impl(ib) => {
-                let target_name = match &ib.target_type {
-                    TypeExpr::Named(name, _) => name.clone(),
-                    _ => continue,
-                };
-                if registry.raw_struct_type_params().contains_key(target_name.as_str()) {
-                    // Generic struct — method bodies inferred by infer_impl_method with TypeVars.
-                    // Only register aspect membership; skip method type registration.
-                } else {
-                    register_impl_methods(ib.methods.iter(), &target_name, gen, &mut registry);
-                    register_default_aspect_methods(ib, &target_name, gen, &mut registry);
-                }
-                // Track which aspects this type implements (with concrete type args).
-                // TODO(generic-impl): Once impl<T> syntax is added, type args that are generic
-                // params will arrive as Named("T",[]) here and be stored verbatim, causing
-                // has_from_impl / iterable_elem_type lookups to fail. At that point this
-                // conversion must be made generic-param-aware (e.g. wildcard sentinel or
-                // a separate generic-impl registry).
-                if let Some(aspect_name) = &ib.aspect_name {
-                    let type_args: Vec<crate::types::Type> = ib.aspect_type_args.iter()
-                        .filter_map(|te| {
-                            use super::conversions::type_expr_to_infer;
-                            match type_expr_to_infer(te) {
-                                InferType::Concrete(t) => Some(t),
-                                InferType::Named(n, _) => Some(crate::types::Type::Named(n, vec![])),
-                                _ => None,
-                            }
-                        })
-                        .collect();
-                    registry.register_aspect_impl(target_name.clone(), aspect_name.clone(), type_args);
-                }
+        if let Decl::Impl(ib) = decl {
+            let target_name = match &ib.target_type {
+                TypeExpr::Named(name, _) => name.clone(),
+                _ => continue,
+            };
+            if registry.raw_struct_type_params().contains_key(target_name.as_str()) {
+                // Generic struct — method bodies inferred by infer_impl_method with TypeVars.
+                // Only register aspect membership; skip method type registration.
+            } else {
+                register_impl_methods(ib.methods.iter(), &target_name, gen, &mut registry);
+                register_default_aspect_methods(ib, &target_name, gen, &mut registry);
             }
-            _ => {}
+            // Track which aspects this type implements (with concrete type args).
+            // TODO(generic-impl): Once impl<T> syntax is added, type args that are generic
+            // params will arrive as Named("T",[]) here and be stored verbatim, causing
+            // has_from_impl / iterable_elem_type lookups to fail. At that point this
+            // conversion must be made generic-param-aware (e.g. wildcard sentinel or
+            // a separate generic-impl registry).
+            if let Some(aspect_name) = &ib.aspect_name {
+                let type_args: Vec<crate::types::Type> = ib.aspect_type_args.iter()
+                    .filter_map(|te| {
+                        use super::conversions::type_expr_to_infer;
+                        match type_expr_to_infer(te) {
+                            InferType::Concrete(t) => Some(t),
+                            InferType::Named(n, _) => Some(crate::types::Type::Named(n, vec![])),
+                            _ => None,
+                        }
+                    })
+                    .collect();
+                registry.register_aspect_impl(target_name.clone(), aspect_name.clone(), type_args);
+            }
         }
     }
 

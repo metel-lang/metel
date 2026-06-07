@@ -1,14 +1,14 @@
-/// Path normalization pass (#185).
-///
-/// Rewrites `Expr::Path` nodes with module qualifiers to `Expr::ResolvedPath`.
-/// Single-segment paths and type member accesses (e.g. `Color::Red`) are left as-is.
-///
-/// A path `[s1, s2, ...]` is considered module-qualified when `s1` is:
-/// - the reserved keyword `"root"`, `"self"`, or `"super"`, or
-/// - the name of a loaded module in the `ModuleGraph`.
-///
-/// Everything else (e.g. `Color::Red` where Color is a struct/enum) passes through
-/// unchanged so the typechecker's existing type-member handling works unmodified.
+//! Path normalization pass (#185).
+//!
+//! Rewrites `Expr::Path` nodes with module qualifiers to `Expr::ResolvedPath`.
+//! Single-segment paths and type member accesses (e.g. `Color::Red`) are left as-is.
+//!
+//! A path `[s1, s2, ...]` is considered module-qualified when `s1` is:
+//! - the reserved keyword `"root"`, `"self"`, or `"super"`, or
+//! - the name of a loaded module in the `ModuleGraph`.
+//!
+//! Everything else (e.g. `Color::Red` where Color is a struct/enum) passes through
+//! unchanged so the typechecker's existing type-member handling works unmodified.
 
 use std::collections::HashSet;
 
@@ -279,7 +279,7 @@ fn try_resolve_path(
     // Accept if `first` is either a loaded module name OR the first segment of a glob path
     // (handles virtual modules like `std` that have no physical file).
     let is_known_prefix = module_names.contains(first.as_str())
-        || scope.map_or(false, |s| s.globs.iter().any(|(_, g)| g.first().map(|s| s.as_str()) == Some(first.as_str())));
+        || scope.is_some_and(|s| s.globs.iter().any(|(_, g)| g.first().map(|s| s.as_str()) == Some(first.as_str())));
 
     if !is_known_prefix {
         return None; // e.g. Color::Red — Color is a type, not a module
@@ -321,7 +321,7 @@ fn try_normalize_struct_path(
     let first = &path[0];
     // Only process if the first segment looks like a module, not a type.
     let is_known_prefix = module_names.contains(first.as_str())
-        || scope.map_or(false, |s| s.globs.iter().any(|(_, g)| g.first().map(|s| s.as_str()) == Some(first.as_str())));
+        || scope.is_some_and(|s| s.globs.iter().any(|(_, g)| g.first().map(|s| s.as_str()) == Some(first.as_str())));
     if !is_known_prefix {
         return None;
     }
@@ -332,7 +332,7 @@ fn try_normalize_struct_path(
     for (_, glob_module) in &s.globs {
         if path.starts_with(glob_module.as_slice()) && path.len() > glob_module.len() {
             let len = glob_module.len();
-            if best.map_or(true, |b| len > b) {
+            if best.is_none_or(|b| len > b) {
                 best = Some(len);
             }
         }

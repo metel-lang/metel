@@ -1111,21 +1111,15 @@ impl InferContext {
     pub fn default_literal_vars(&self, subst: &Substitution) -> Substitution {
         let mut extended = subst.clone();
         for &var in &self.integer_literal_vars {
-            match extended.apply(&InferType::Var(var)) {
-                InferType::Var(final_var) => {
-                    extended.bind(final_var, InferType::int());
-                    extended.bind(var, InferType::int());
-                }
-                _ => {} // already bound to a concrete type
+            if let InferType::Var(final_var) = extended.apply(&InferType::Var(var)) {
+                extended.bind(final_var, InferType::int());
+                extended.bind(var, InferType::int());
             }
         }
         for &var in &self.float_literal_vars {
-            match extended.apply(&InferType::Var(var)) {
-                InferType::Var(final_var) => {
-                    extended.bind(final_var, InferType::float());
-                    extended.bind(var, InferType::float());
-                }
-                _ => {}
+            if let InferType::Var(final_var) = extended.apply(&InferType::Var(var)) {
+                extended.bind(final_var, InferType::float());
+                extended.bind(var, InferType::float());
             }
         }
         extended

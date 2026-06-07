@@ -40,7 +40,7 @@ pub fn load_root(path: impl AsRef<Path>) -> Result<ModuleGraph, MetelError> {
 pub fn load_program(path: impl AsRef<Path>) -> Result<Program, MetelError> {
     let path = canonicalize_existing(path.as_ref())?;
     let source = fs::read_to_string(&path)
-        .map_err(|e| MetelError::internal(&format!("could not read {}: {e}", path.display())))?;
+        .map_err(|e| MetelError::internal(format!("could not read {}: {e}", path.display())))?;
     let filename = path.file_name().unwrap_or_default().to_string_lossy();
     crate::parser::parse(&source, &filename)
 }
@@ -167,11 +167,11 @@ fn resolve_import_module(
     let parent_dir = parent_file.parent().unwrap_or_else(|| Path::new("."));
 
     match root {
-        PathRoot::Std => return Ok(None),
+        PathRoot::Std => Ok(None),
 
         PathRoot::Root => {
             let segs = import_tree_segments(tree);
-            return resolve_in_dir(root_dir, &segs, parent_file);
+            resolve_in_dir(root_dir, &segs, parent_file)
         }
 
         PathRoot::Super => {
@@ -181,18 +181,18 @@ fn resolve_import_module(
                 parent_dir.parent().unwrap_or(parent_dir).to_path_buf()
             };
             let segs = import_tree_segments(tree);
-            return resolve_in_dir(&super_dir, &segs, parent_file);
+            resolve_in_dir(&super_dir, &segs, parent_file)
         }
 
         PathRoot::Self_ => {
             let segs = import_tree_segments(tree);
-            return resolve_in_dir(parent_dir, &segs, parent_file);
+            resolve_in_dir(parent_dir, &segs, parent_file)
         }
 
         PathRoot::Name(name) => {
             let mut segs = vec![name.clone()];
             segs.extend(import_tree_segments(tree));
-            return resolve_in_dir(parent_dir, &segs, parent_file);
+            resolve_in_dir(parent_dir, &segs, parent_file)
         }
     }
 }

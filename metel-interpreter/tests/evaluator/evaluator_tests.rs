@@ -1,13 +1,13 @@
-/// Integration tests for the evaluator.
-/// All Metel source files live in tests/evaluator/sources/<feature>/.
-///
-/// Positive files are self-asserting:
-///   `let _ok = match (actual == expected) { true => 0, };`
-///   If the condition is false no arm matches → runtime panic → test fails.
-///
-/// Negative files carry one annotation on any line:
-///   `// RUNTIME_ERROR[substring]`   — program typechecks but fails at runtime
-///   `// TYPECHECK_ERROR[substring]` — program is rejected at typecheck time
+//! Integration tests for the evaluator.
+//! All Metel source files live in tests/evaluator/sources/<feature>/.
+//!
+//! Positive files are self-asserting:
+//!   `let _ok = match (actual == expected) { true => 0, };`
+//!   If the condition is false no arm matches → runtime panic → test fails.
+//!
+//! Negative files carry one annotation on any line:
+//!   `// RUNTIME_ERROR[substring]`   — program typechecks but fails at runtime
+//!   `// TYPECHECK_ERROR[substring]` — program is rejected at typecheck time
 
 #[cfg(test)]
 mod tests {

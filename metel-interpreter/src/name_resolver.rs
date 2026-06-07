@@ -91,7 +91,7 @@ pub fn resolve(graph: &ModuleGraph) -> Result<ResolvedNames, MetelError> {
     let mut pub_surface: HashMap<Vec<String>, HashSet<String>> = graph.modules.iter()
         .map(|m| {
             let names = m.program.decls.iter()
-                .filter_map(|d| decl_pub_name(d))
+                .filter_map(decl_pub_name)
                 .collect();
             (m.module_path.clone(), names)
         })
@@ -100,7 +100,7 @@ pub fn resolve(graph: &ModuleGraph) -> Result<ResolvedNames, MetelError> {
     let declared_names: HashMap<Vec<String>, HashSet<String>> = graph.modules.iter()
         .map(|m| {
             let names = m.program.decls.iter()
-                .filter_map(|d| decl_any_name(d))
+                .filter_map(decl_any_name)
                 .collect();
             (m.module_path.clone(), names)
         })
@@ -175,7 +175,7 @@ fn resolve_module(
 
     for import in &loaded.program.imports {
         let base = absolute_base(&import.path.root, &loaded.module_path);
-        process_tree(&base, &import.path.tree, known_modules, pub_surface, path_aliases, &mut scope, &import.span)?;
+        process_tree(&base, &import.path.tree, known_modules, path_aliases, &mut scope, &import.span)?;
     }
 
     // Auto-import std::core at lowest (Std) priority — RFC-0030. See ADR-0026 (glob tiers)
@@ -290,7 +290,6 @@ fn process_tree(
     base: &[String],
     tree: &ImportTree,
     known_modules: &HashSet<Vec<String>>,
-    pub_items: &HashMap<Vec<String>, HashSet<String>>,
     path_aliases: &HashMap<Vec<String>, Vec<String>>,
     scope: &mut ModuleScope,
     import_span: &Span,
@@ -330,12 +329,12 @@ fn process_tree(
         ImportTree::Path { name, tree } => {
             let mut new_base = base.to_vec();
             new_base.push(name.clone());
-            process_tree(&new_base, tree, known_modules, pub_items, path_aliases, scope, import_span)?;
+            process_tree(&new_base, tree, known_modules, path_aliases, scope, import_span)?;
         }
 
         ImportTree::Group(items) => {
             for item in items {
-                process_tree(base, item, known_modules, pub_items, path_aliases, scope, import_span)?;
+                process_tree(base, item, known_modules, path_aliases, scope, import_span)?;
             }
         }
     }

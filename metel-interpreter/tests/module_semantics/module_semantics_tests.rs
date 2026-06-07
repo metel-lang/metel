@@ -1,5 +1,5 @@
-/// Integration tests for the v0.6.0 module semantics pipeline:
-/// `load_root → resolve → normalize → check_graph → evaluate_graph`
+//! Integration tests for the v0.6.0 module semantics pipeline:
+//! `load_root → resolve → normalize → check_graph → evaluate_graph`
 
 use std::fs;
 use std::path::{Path, PathBuf};

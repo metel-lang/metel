@@ -15,6 +15,7 @@ mod inference;
 mod registry;
 
 type SchemeEnv = HashMap<String, TypeScheme>;
+type DeferredGlobConflicts = HashMap<String, Vec<Vec<String>>>;
 
 // ── ScopedEnv ─────────────────────────────────────────────────────────────────
 
@@ -59,25 +60,27 @@ impl StdPrelude {
         Self { schemes: HashMap::new() }
     }
 
-    /// All built-in function schemes (print, assert, List::new, …).
-    /// This is the canonical list — nothing else should register builtins.
-    ///
-    /// The generator starts at 10000 so that prelude TypeVars never collide
-    /// with the registry TypeVars allocated by `build_registry` (which starts
-    /// at 0 and typically allocates fewer than 100 vars).  See ADR-0027.
-    pub fn default() -> Self {
-        let mut schemes = HashMap::new();
-        let mut gen = TypeVarGenerator::with_counter(10000);
-        registry::populate_std_schemes(&mut schemes, &mut gen);
-        Self { schemes }
-    }
-
     pub(super) fn schemes(&self) -> &SchemeEnv {
         &self.schemes
     }
 
     pub(super) fn contains(&self, name: &str) -> bool {
         self.schemes.contains_key(name)
+    }
+}
+
+impl Default for StdPrelude {
+    /// All built-in function schemes (print, assert, List::new, …).
+    /// This is the canonical list — nothing else should register builtins.
+    ///
+    /// The generator starts at 10000 so that prelude TypeVars never collide
+    /// with the registry TypeVars allocated by `build_registry` (which starts
+    /// at 0 and typically allocates fewer than 100 vars). See ADR-0027.
+    fn default() -> Self {
+        let mut schemes = HashMap::new();
+        let mut gen = TypeVarGenerator::with_counter(10000);
+        registry::populate_std_schemes(&mut schemes, &mut gen);
+        Self { schemes }
     }
 }
 
@@ -273,7 +276,7 @@ fn build_import_schemes(
     names: &ResolvedNames,
     global_exports: &GlobalExports,
     graph: &NormalizedModuleGraph,
-) -> Result<(SchemeEnv, HashMap<String, Vec<Vec<String>>>), MetelError> {
+) -> Result<(SchemeEnv, DeferredGlobConflicts), MetelError> {
     let mut env: SchemeEnv = HashMap::new();
     let mut deferred_conflicts: HashMap<String, Vec<Vec<String>>> = HashMap::new();
     let Some(scope) = names.scopes.get(&loaded.module_path) else { return Ok((env, deferred_conflicts)) };
@@ -320,7 +323,7 @@ fn build_import_schemes(
             // No function scheme — check if it is a public struct/enum/aspect (type-only import).
             let is_pub_type = names.pub_surface
                 .get(&binding.source_module)
-                .map_or(false, |surface| surface.contains(binding.source_name.as_str()));
+                .is_some_and(|surface| surface.contains(binding.source_name.as_str()));
             if is_pub_type {
                 // Valid public struct/enum/aspect import — no scheme needed; type registry
                 // handles these via type_context. Skip silently.
@@ -333,7 +336,7 @@ fn build_import_schemes(
                 let span = find_import_span(loaded, &binding.source_module, &binding.source_name);
                 let name_exists = names.declared_names
                     .get(&binding.source_module)
-                    .map_or(false, |s| s.contains(binding.source_name.as_str()));
+                    .is_some_and(|s| s.contains(binding.source_name.as_str()));
                 if name_exists {
                     return Err(MetelError::type_error(
                         TypeErrorCode::T0009,
@@ -384,7 +387,7 @@ fn find_import_span(
     for import in &loaded.program.imports {
         let root_matches = match &import.path.root {
             PathRoot::Name(n) => source_module.first().map(|s| s == n).unwrap_or(false),
-            PathRoot::Self_ => source_module == &loaded.module_path,
+            PathRoot::Self_ => source_module == loaded.module_path,
             PathRoot::Root | PathRoot::Super => true,
             PathRoot::Std => false,
         };

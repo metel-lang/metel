@@ -1,5 +1,5 @@
-/// Test suite for the type inference system.
-/// Tests are organized by phase/component matching the task breakdown.
+//! Test suite for the type inference system.
+//! Tests are organized by phase/component matching the task breakdown.
 
 #[cfg(test)]
 mod phase_1_type_variables {

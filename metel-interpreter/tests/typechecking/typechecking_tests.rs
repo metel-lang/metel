@@ -1,6 +1,6 @@
-/// Integration tests for the full typechecker pipeline.
-/// Tests the complete flow from parsing through type checking.
-/// Source files are organized by language feature under tests/typechecking/sources/<feature>/.
+//! Integration tests for the full typechecker pipeline.
+//! Tests the complete flow from parsing through type checking.
+//! Source files are organized by language feature under tests/typechecking/sources/<feature>/.
 
 #[cfg(test)]
 mod tests {

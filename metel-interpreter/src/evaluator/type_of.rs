@@ -49,7 +49,7 @@ pub(super) fn value_to_type(value: &Value) -> Type {
         Value::MutFieldPointer { root, path } => {
             // Approximate: read the leaf type from the current root value.
             let root_val = root.borrow();
-            let mut cur_type = value_to_type(&*root_val);
+            let mut cur_type = value_to_type(&root_val);
             for seg in path {
                 cur_type = match (seg, cur_type) {
                     (super::PathSegment::Field(f), Type::Named(name, _)) => {

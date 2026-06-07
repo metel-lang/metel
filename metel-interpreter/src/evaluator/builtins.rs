@@ -311,7 +311,7 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &["numeric"],
             Some("i64"),
             builtin_value("i64::from", |args, _span| {
-                match args.first().and_then(|v| numeric_as_i128(v)) {
+                match args.first().and_then(numeric_as_i128) {
                     Some(n) => Ok(Value::I64(n as i64)),
                     None => Err(MetelError::internal("i64::from: expected numeric")),
                 }
@@ -327,7 +327,7 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &["numeric"],
             Some("f64"),
             builtin_value("f64::from", |args, _span| {
-                match args.first().and_then(|v| numeric_as_f64_val(v)) {
+                match args.first().and_then(numeric_as_f64_val) {
                     Some(f) => Ok(Value::F64(f)),
                     None => Err(MetelError::internal("f64::from: expected numeric")),
                 }

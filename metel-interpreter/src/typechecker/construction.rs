@@ -16,12 +16,15 @@ use super::conversions::{
     type_to_infer,
 };
 
+type ConcreteFields = Vec<(String, Type, Span)>;
+type ConcreteStructEnv = HashMap<String, ConcreteFields>;
+
 /// Build the concrete (fully-resolved `Type`) struct field map from inference results.
 /// Generic structs are excluded — they are resolved per-use-site during construction.
 pub(super) fn build_concrete_struct_env(
     registry: &TypeDefinitionRegistry,
     subst:    &Substitution,
-) -> Result<HashMap<String, Vec<(String, Type, Span)>>, MetelError> {
+) -> Result<ConcreteStructEnv, MetelError> {
     registry.raw_struct_env().iter()
         .filter(|(name, _)| !registry.raw_struct_type_params().contains_key(name.as_str()))
         .map(|(name, fields)| {
@@ -72,7 +75,7 @@ struct ConstructCtx<'a> {
     scheme_env:   &'a SchemeEnv,
     env:          Vec<HashMap<String, Type>>,
     /// Stack of concrete struct field maps (name → fields with spans), innermost last.
-    struct_scopes: Vec<HashMap<String, Vec<(String, Type, Span)>>>,
+    struct_scopes: Vec<ConcreteStructEnv>,
     /// Unified registry — source of truth for type definitions across all passes. See ADR-0025.
     registry:     &'a TypeDefinitionRegistry,
     method_env:   HashMap<String, HashMap<String, Type>>,
@@ -213,7 +216,7 @@ pub(super) fn construct_generic_body(
     // but evaluation correctness is unaffected — runtime dispatch goes by value kind.
     let all_free: std::collections::HashSet<_> = param_infertypes.iter()
         .chain(std::iter::once(&*ret_infertype))
-        .flat_map(|it| typeinference::free_vars(it))
+        .flat_map(typeinference::free_vars)
         .collect();
     for v in all_free {
         if subst.lookup(v).is_none() {
@@ -1205,7 +1208,7 @@ fn find_break_in_expr(expr: &TypedExpr) -> Option<Type> {
     match expr {
         TypedExpr::If { then_branch, else_branch, .. } => {
             find_loop_break_type(then_branch)
-                .or_else(|| else_branch.as_ref().and_then(|b| find_loop_break_type(b)))
+                .or_else(|| else_branch.as_ref().and_then(find_loop_break_type))
         }
         // break inside a nested loop exits the inner loop, not the outer
         TypedExpr::Loop { .. } => None,
@@ -1766,7 +1769,7 @@ fn instantiate_scheme_for_call(
 
     let mut subst = Substitution::new();
     for (param, arg_ty) in params.iter().zip(arg_types.iter()) {
-        let arg_infer = type_to_infer(*arg_ty);
+        let arg_infer = type_to_infer(arg_ty);
         let applied = subst.apply(param);
         let s = unify(&applied, &arg_infer).map_err(|_| {
             MetelError::type_error(TypeErrorCode::T0001, "argument type mismatch", span)
@@ -1835,7 +1838,7 @@ fn instantiate_scheme_with_expected_ret(
     let mut subst = Substitution::new();
     for (param, arg_ty) in params.iter().zip(arg_types.iter()) {
         let applied = subst.apply(param);
-        let s = typeinference::unify(&applied, &type_to_infer(*arg_ty)).map_err(|_| {
+        let s = typeinference::unify(&applied, &type_to_infer(arg_ty)).map_err(|_| {
             MetelError::type_error(TypeErrorCode::T0001, "argument type mismatch", span)
         })?;
         subst = subst.compose(&s);
