@@ -70,30 +70,21 @@ For every language-visible change in the sprint, verify the spec reflects it:
 
 1. Check `docs/public/spec/runtime.md` builtin table against `src/typechecker/registry.rs` — every `ctx.bind_poly(...)` call must have a matching row.
 2. Check `docs/public/spec/` for each new grammar construct — it must be described in the appropriate section (expressions, declarations, etc.).
-3. Check each RFC implemented this sprint — its frontmatter `status` must be `incorporated`.
+3. Check each RFC explicitly referenced by sprint work items — its frontmatter `status` must be `incorporated`.
 4. Check `docs/public/changelog.md` — the current version milestone must have an entry listing the sprint's shipped features.
-
-**RFC staleness sweep (full scan — not just this sprint):**
-
-Read every file in `docs/internal/rfcs/`. For each RFC with `status: accepted`:
-- Find its target version in the `## Decision` section (`**Target:** vX.Y.0`).
-- Compare the target version against the sprint's milestone version.
-- If the target version is less than or equal to the current sprint's milestone (i.e. it should have shipped already), this RFC is stale — it was implemented but never marked `incorporated`.
-
-Report all stale RFCs as a Gate 4 failure. For each stale RFC, set `status: incorporated` in its frontmatter before the sprint can close.
-
-```bash
-grep -l "status: accepted" docs/internal/rfcs/*.md
-```
 
 Report any spec/code divergence found.
 
-### Gate 5: Spec completeness
+### Gate 5: Spec completeness (scoped to sprint changes)
 
-Read `docs/public/spec.md` and every section it links to. Verify:
-- No section refers to a feature that was removed or renamed this sprint without updating the reference.
-- No `TODO`, `TBD`, or `(coming soon)` markers were introduced by sprint work.
-- All cross-references between spec sections are still valid.
+For each file under `docs/public/spec/` that was modified by the sprint diff:
+```bash
+git diff main..HEAD --name-only -- docs/public/spec/
+```
+
+Verify in those files only:
+- No reference to a feature that was removed or renamed this sprint without updating the reference.
+- No `TODO`, `TBD`, or `(coming soon)` markers introduced by sprint work.
 
 ### Gate 6: Internal doc accuracy
 
@@ -106,39 +97,6 @@ For every component touched during the sprint, check:
 | Parser / grammar | `metel-interpreter/docs/architecture.md` — pipeline diagram still accurate |
 
 Report any internal doc that is stale or missing.
-
-### Gate 7: Architectural decision records
-
-Review every commit on the sprint branch:
-```bash
-git log main..HEAD --oneline
-```
-
-For each commit, ask: did this change involve a non-obvious architectural decision? Use the criteria from AGENTS.md § Decision Records. Examples of what qualifies:
-- A choice between two plausible designs with real trade-offs
-- A deliberate deviation from a prior decision record or RFC
-- A constraint or invariant that future contributors must know to avoid breaking the design
-- A workaround for a language or library limitation that isn't obvious from the code
-
-For each qualifying decision, verify a decision record exists in `metel-interpreter/docs/decisions/`. If any are missing, create them now — before proceeding.
-
-List every qualifying decision found and whether a record exists or was created.
-
-### Gate 8: ADR links in code
-
-For every ADR written or referenced this sprint, check whether the code it governs carries an inline comment linking back to it. Use the criteria from AGENTS.md § Linking decisions to code:
-
-- Code that looks wrong but is intentional (a workaround, a deliberate shortcut, a known limitation) **must** have a comment explaining the reason and citing the ADR.
-- A load-bearing invariant the ADR documents **must** have a comment at the enforcement point.
-- Routine code that simply implements a spec rule does **not** need a link.
-
-```bash
-grep -rn "ADR-\|adr-" metel-interpreter/src/
-```
-
-For each ADR written this sprint: read it, identify the specific code it governs, and verify the comment is present and informative (not just `// see ADR-NNNN`). Add comments where missing.
-
-List each ADR, the file(s) it governs, and whether a comment was present or added.
 
 ---
 
@@ -217,7 +175,7 @@ Provide a sprint summary inline (not as a separate issue or PR):
 ## Sprint $ARGUMENTS — <theme> — CLOSED ✅
 
 **Version:** v<X.Y.Z>
-**Quality gate:** All 8 gates passed.
+**Quality gate:** All 6 gates passed.
 
 ### Completed
 - METEL-N: <title>
@@ -231,10 +189,6 @@ Provide a sprint summary inline (not as a separate issue or PR):
 - <file>: <what changed>
 ...
 
-### ADRs written this sprint
-- ADR-NNNN: <title> — governs <file(s)>
-...
-
 ### Integration tests (if applicable)
 N tests written, M failures found, K fixed.
 ```
@@ -242,7 +196,7 @@ N tests written, M failures found, K fixed.
 Then instruct the user:
 
 > **`main` is up to date. Before tagging:**
-> 1. Mark all accepted RFCs whose target version matches this sprint's milestone as `incorporated` in their frontmatter — any missed by Gate 4 must be caught now.
+> 1. Mark all accepted RFCs whose target version matches this sprint's milestone as `incorporated` in their frontmatter.
 > 2. Create the release tag:
 > ```bash
 > git tag -a v<X.Y.Z> -m "v<X.Y.Z>: <sprint theme>" && git push origin v<X.Y.Z>
@@ -251,7 +205,6 @@ Then instruct the user:
 
 **The tag must be created on `main` after the rebase — never on the sprint branch.**
 The tag name must match the version in `docs/public/changelog.md`.
-Once the tag is pushed, any RFC with `status: accepted` and a target version ≤ the tagged version is automatically stale — the Gate 4 sweep will catch this on the next sprint.
 
 ---
 
@@ -260,5 +213,5 @@ Once the tag is pushed, any RFC with `status: accepted` and a target version ≤
 - Do not push `main` until every quality gate passes.
 - Do not create the release tag — instruct the user to create it after verifying the push.
 - A sprint with 0 completed items still produces a summary — record why in Completed.
-- If spec ambiguities surfaced (visible in Gate 5 or Spec Notes), prompt the user to open a `/new-rfc`.
+- If spec ambiguities surfaced, prompt the user to open a `/new-rfc`.
 - All Plane state changes during sprint-end must use the sprint's milestone.
