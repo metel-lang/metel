@@ -618,7 +618,6 @@ mod tests {
     fn facade_re_exports_item_for_callers() {
         // parser.mln: export ast::Ast;
         // Caller can import parser::Ast even though Ast is defined in ast.
-        use crate::ast::ExportDecl;
         let ast_module_prog = make_program_with_pubs(vec![], &["Ast"]);
         let parser_prog = Program {
             imports: vec![],
@@ -653,7 +652,6 @@ mod tests {
     #[test]
     fn re_export_alias_is_visible_not_original() {
         // parser.mln: export ast::Ast as Tree;
-        use crate::ast::ExportDecl;
         let ast_module_prog = make_program_with_pubs(vec![], &["Ast"]);
         let parser_prog = Program {
             imports: vec![],
@@ -678,7 +676,6 @@ mod tests {
     #[test]
     fn rejects_re_export_of_private_item() {
         // parser.mln: export ast::Hidden; where Hidden is private in ast
-        use crate::ast::ExportDecl;
         let ast_module_prog = make_program(vec![]); // no pub declarations
         let parser_prog = Program {
             imports: vec![],
@@ -703,7 +700,6 @@ mod tests {
     #[test]
     fn glob_re_export_includes_all_public_names() {
         // parser.mln: export ast::*;
-        use crate::ast::ExportDecl;
         let ast_module_prog = make_program_with_pubs(vec![], &["Ast", "Token"]);
         let parser_prog = Program {
             imports: vec![],

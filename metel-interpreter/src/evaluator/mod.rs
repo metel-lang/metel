@@ -246,12 +246,6 @@ impl RuntimeRegistry {
         self.modules.get(module_path)?.values.get(name).cloned()
     }
 
-    pub fn std_core_values(&self) -> Option<&HashMap<String, Value>> {
-        self.modules
-            .get(&vec!["std".to_string(), "core".to_string()])
-            .map(|entry| &entry.values)
-    }
-
     pub fn get_type_value(&self, type_name: &str, name: &str) -> Option<Value> {
         let type_entry = self.types.get(type_name)?;
         type_entry

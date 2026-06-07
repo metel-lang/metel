@@ -291,6 +291,11 @@ fn infer_impl_method(
     };
 
     // Include struct TypeVars in self type so call-site unification resolves correctly.
+    // TODO(named-concrete): For primitive types (i64, f64, ...) this produces Named("i64",[])
+    // but call sites produce Concrete(Type::I64). The unifier has no Named↔Concrete case, so
+    // impl blocks on primitive types parsed from source would fail to typecheck. Fix: use
+    // type_expr_to_infer(TypeExpr::Named(target_name,[])) here so primitives get Concrete.
+    // Deferred until the synthetic stdlib refactor requires impl blocks on primitives.
     let self_ty = if struct_tvars_ordered.is_empty() {
         InferType::Named(target_name.to_string(), vec![])
     } else {
@@ -369,6 +374,7 @@ fn infer_default_aspect_method(
         }
     };
 
+    // TODO(named-concrete): same issue as infer_impl_method — see comment there.
     let self_ty = InferType::Named(target_name.to_string(), vec![]);
     let param_types: Vec<InferType> = method.params.iter().map(|p| {
         if p.name == "self" {

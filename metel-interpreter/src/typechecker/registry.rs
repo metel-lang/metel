@@ -291,6 +291,11 @@ pub(super) fn build_registry(
                     register_default_aspect_methods(ib, &target_name, gen, &mut registry);
                 }
                 // Track which aspects this type implements (with concrete type args).
+                // TODO(generic-impl): Once impl<T> syntax is added, type args that are generic
+                // params will arrive as Named("T",[]) here and be stored verbatim, causing
+                // has_from_impl / iterable_elem_type lookups to fail. At that point this
+                // conversion must be made generic-param-aware (e.g. wildcard sentinel or
+                // a separate generic-impl registry).
                 if let Some(aspect_name) = &ib.aspect_name {
                     let type_args: Vec<crate::types::Type> = ib.aspect_type_args.iter()
                         .filter_map(|te| {

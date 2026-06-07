@@ -2099,7 +2099,7 @@ fn assign_target_to_typed_place(
     ctx: &mut ConstructCtx<'_>,
 ) -> Result<TypedPlace, MetelError> {
     match target {
-        AssignTarget::Ident(name, span) =>
+        AssignTarget::Ident(name, _span) =>
             Ok(TypedPlace::Ident(name.clone())),
         AssignTarget::Deref { object, span } =>
             Ok(TypedPlace::Deref {
@@ -2132,7 +2132,7 @@ fn assign_target_to_typed_place(
 
 fn expr_to_typed_place(expr: &Expr, ctx: &mut ConstructCtx<'_>) -> Result<TypedPlace, MetelError> {
     match expr {
-        Expr::Ident(name, span) =>
+        Expr::Ident(name, _span) =>
             Ok(TypedPlace::Ident(name.clone())),
         Expr::FieldAccess { object, field, span } =>
             Ok(TypedPlace::Field {

@@ -1,7 +1,9 @@
 use crate::error::{MetelError, RuntimeErrorCode};
 
 use super::display::{format_float, format_value, value_to_display_string};
-use super::{RuntimeCallable, RuntimeMethod, RuntimeRegistry, RuntimeSignature, RuntimeTypeRef, Value};
+use super::{
+    RuntimeCallable, RuntimeMethod, RuntimeRegistry, RuntimeSignature, RuntimeTypeRef, Value,
+};
 
 fn numeric_as_i128(v: &Value) -> Option<i128> {
     match v {
@@ -176,11 +178,11 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &[],
             Some("String"),
             builtin_value("i64::to_string", |args, _span| {
-            match args.first() {
-                Some(Value::I64(n)) => Ok(Value::Str(n.to_string())),
-                _ => Err(MetelError::internal("i64::to_string: expected i64")),
-            }
-        }),
+                match args.first() {
+                    Some(Value::I64(n)) => Ok(Value::Str(n.to_string())),
+                    _ => Err(MetelError::internal("i64::to_string: expected i64")),
+                }
+            }),
         )
     );
     register_aspect!(
@@ -194,11 +196,11 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &[],
             Some("String"),
             builtin_value("f64::to_string", |args, _span| {
-            match args.first() {
-                Some(Value::F64(f)) => Ok(Value::Str(format_float(*f))),
-                _ => Err(MetelError::internal("f64::to_string: expected f64")),
-            }
-        }),
+                match args.first() {
+                    Some(Value::F64(f)) => Ok(Value::Str(format_float(*f))),
+                    _ => Err(MetelError::internal("f64::to_string: expected f64")),
+                }
+            }),
         )
     );
     register_aspect!(
@@ -212,13 +214,13 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &[],
             Some("String"),
             builtin_value("boolean::to_string", |args, _span| {
-            match args.first() {
-                Some(Value::Boolean(b)) => {
-                    Ok(Value::Str(if *b { "true" } else { "false" }.to_string()))
+                match args.first() {
+                    Some(Value::Boolean(b)) => {
+                        Ok(Value::Str(if *b { "true" } else { "false" }.to_string()))
+                    }
+                    _ => Err(MetelError::internal("boolean::to_string: expected boolean")),
                 }
-                _ => Err(MetelError::internal("boolean::to_string: expected boolean")),
-            }
-        }),
+            }),
         )
     );
     register_aspect!(
@@ -232,11 +234,11 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &[],
             Some("String"),
             builtin_value("Char::to_string", |args, _span| {
-            match args.first() {
-                Some(Value::Char(c)) => Ok(Value::Str(c.to_string())),
-                _ => Err(MetelError::internal("Char::to_string: expected Char")),
-            }
-        }),
+                match args.first() {
+                    Some(Value::Char(c)) => Ok(Value::Str(c.to_string())),
+                    _ => Err(MetelError::internal("Char::to_string: expected Char")),
+                }
+            }),
         )
     );
     register_aspect!(
@@ -250,11 +252,11 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &[],
             Some("String"),
             builtin_value("String::to_string", |args, _span| {
-            match args.first() {
-                Some(Value::Str(s)) => Ok(Value::Str(s.clone())),
-                _ => Err(MetelError::internal("String::to_string: expected String")),
-            }
-        }),
+                match args.first() {
+                    Some(Value::Str(s)) => Ok(Value::Str(s.clone())),
+                    _ => Err(MetelError::internal("String::to_string: expected String")),
+                }
+            }),
         )
     );
 
@@ -269,11 +271,11 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &["numeric"],
             Some("i64"),
             builtin_value("i64::from", |args, _span| {
-            match args.first().and_then(|v| numeric_as_i128(v)) {
-                Some(n) => Ok(Value::I64(n as i64)),
-                None => Err(MetelError::internal("i64::from: expected numeric")),
-            }
-        }),
+                match args.first().and_then(|v| numeric_as_i128(v)) {
+                    Some(n) => Ok(Value::I64(n as i64)),
+                    None => Err(MetelError::internal("i64::from: expected numeric")),
+                }
+            }),
         )
     );
     register_inherent!(
@@ -285,11 +287,11 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &["numeric"],
             Some("f64"),
             builtin_value("f64::from", |args, _span| {
-            match args.first().and_then(|v| numeric_as_f64_val(v)) {
-                Some(f) => Ok(Value::F64(f)),
-                None => Err(MetelError::internal("f64::from: expected numeric")),
-            }
-        }),
+                match args.first().and_then(|v| numeric_as_f64_val(v)) {
+                    Some(f) => Ok(Value::F64(f)),
+                    None => Err(MetelError::internal("f64::from: expected numeric")),
+                }
+            }),
         )
     );
 
@@ -304,12 +306,20 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
                     None,
                     &[$source],
                     Some($target),
-                    builtin_value(concat!($target, "::From<", $source, ">::from"), |args, _span| {
-                    match args.first().and_then(|v| numeric_as_i128(v)) {
-                        Some(n) => Ok($out(n)),
-                        None => Err(MetelError::internal(concat!($target, "::From<", $source, ">::from: unexpected argument"))),
-                    }
-                }),
+                    builtin_value(
+                        concat!($target, "::From<", $source, ">::from"),
+                        |args, _span| {
+                            match args.first().and_then(|v| numeric_as_i128(v)) {
+                                Some(n) => Ok($out(n)),
+                                None => Err(MetelError::internal(concat!(
+                                    $target,
+                                    "::From<",
+                                    $source,
+                                    ">::from: unexpected argument"
+                                ))),
+                            }
+                        }
+                    ),
                 )
             );
         };
@@ -324,269 +334,115 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
                     None,
                     &[$source],
                     Some($target),
-                    builtin_value(concat!($target, "::From<", $source, ">::from"), |args, _span| {
-                    match args.first().and_then(|v| numeric_as_f64_val(v)) {
-                        Some(f) => Ok($out(f)),
-                        None => Err(MetelError::internal(concat!($target, "::From<", $source, ">::from: unexpected argument"))),
-                    }
-                }),
+                    builtin_value(
+                        concat!($target, "::From<", $source, ">::from"),
+                        |args, _span| {
+                            match args.first().and_then(|v| numeric_as_f64_val(v)) {
+                                Some(f) => Ok($out(f)),
+                                None => Err(MetelError::internal(concat!(
+                                    $target,
+                                    "::From<",
+                                    $source,
+                                    ">::from: unexpected argument"
+                                ))),
+                            }
+                        }
+                    ),
                 )
             );
         };
     }
 
     // i8
-    from_int!("i8", "i16", |n: i128| Value::I8(
-        n as i8
-    ));
-    from_int!("i8", "i32", |n: i128| Value::I8(
-        n as i8
-    ));
-    from_int!("i8", "i64", |n: i128| Value::I8(
-        n as i8
-    ));
-    from_int!("i8", "u8", |n: i128| Value::I8(
-        n as i8
-    ));
-    from_int!("i8", "u16", |n: i128| Value::I8(
-        n as i8
-    ));
-    from_int!("i8", "u32", |n: i128| Value::I8(
-        n as i8
-    ));
-    from_int!("i8", "u64", |n: i128| Value::I8(
-        n as i8
-    ));
-    from_int!("i8", "f32", |n: i128| Value::I8(
-        n as i8
-    ));
-    from_int!("i8", "f64", |n: i128| Value::I8(
-        n as i8
-    ));
+    from_int!("i8", "i16", |n: i128| Value::I8(n as i8));
+    from_int!("i8", "i32", |n: i128| Value::I8(n as i8));
+    from_int!("i8", "i64", |n: i128| Value::I8(n as i8));
+    from_int!("i8", "u8", |n: i128| Value::I8(n as i8));
+    from_int!("i8", "u16", |n: i128| Value::I8(n as i8));
+    from_int!("i8", "u32", |n: i128| Value::I8(n as i8));
+    from_int!("i8", "u64", |n: i128| Value::I8(n as i8));
+    from_int!("i8", "f32", |n: i128| Value::I8(n as i8));
+    from_int!("i8", "f64", |n: i128| Value::I8(n as i8));
     // i16
-    from_int!("i16", "i8", |n: i128| Value::I16(
-        n as i16
-    ));
-    from_int!("i16", "i32", |n: i128| Value::I16(
-        n as i16
-    ));
-    from_int!("i16", "i64", |n: i128| Value::I16(
-        n as i16
-    ));
-    from_int!("i16", "u8", |n: i128| Value::I16(
-        n as i16
-    ));
-    from_int!("i16", "u16", |n: i128| Value::I16(
-        n as i16
-    ));
-    from_int!("i16", "u32", |n: i128| Value::I16(
-        n as i16
-    ));
-    from_int!("i16", "u64", |n: i128| Value::I16(
-        n as i16
-    ));
-    from_int!("i16", "f32", |n: i128| Value::I16(
-        n as i16
-    ));
-    from_int!("i16", "f64", |n: i128| Value::I16(
-        n as i16
-    ));
+    from_int!("i16", "i8", |n: i128| Value::I16(n as i16));
+    from_int!("i16", "i32", |n: i128| Value::I16(n as i16));
+    from_int!("i16", "i64", |n: i128| Value::I16(n as i16));
+    from_int!("i16", "u8", |n: i128| Value::I16(n as i16));
+    from_int!("i16", "u16", |n: i128| Value::I16(n as i16));
+    from_int!("i16", "u32", |n: i128| Value::I16(n as i16));
+    from_int!("i16", "u64", |n: i128| Value::I16(n as i16));
+    from_int!("i16", "f32", |n: i128| Value::I16(n as i16));
+    from_int!("i16", "f64", |n: i128| Value::I16(n as i16));
     // i32
-    from_int!("i32", "i8", |n: i128| Value::I32(
-        n as i32
-    ));
-    from_int!("i32", "i16", |n: i128| Value::I32(
-        n as i32
-    ));
-    from_int!("i32", "i64", |n: i128| Value::I32(
-        n as i32
-    ));
-    from_int!("i32", "u8", |n: i128| Value::I32(
-        n as i32
-    ));
-    from_int!("i32", "u16", |n: i128| Value::I32(
-        n as i32
-    ));
-    from_int!("i32", "u32", |n: i128| Value::I32(
-        n as i32
-    ));
-    from_int!("i32", "u64", |n: i128| Value::I32(
-        n as i32
-    ));
-    from_int!("i32", "f32", |n: i128| Value::I32(
-        n as i32
-    ));
-    from_int!("i32", "f64", |n: i128| Value::I32(
-        n as i32
-    ));
+    from_int!("i32", "i8", |n: i128| Value::I32(n as i32));
+    from_int!("i32", "i16", |n: i128| Value::I32(n as i32));
+    from_int!("i32", "i64", |n: i128| Value::I32(n as i32));
+    from_int!("i32", "u8", |n: i128| Value::I32(n as i32));
+    from_int!("i32", "u16", |n: i128| Value::I32(n as i32));
+    from_int!("i32", "u32", |n: i128| Value::I32(n as i32));
+    from_int!("i32", "u64", |n: i128| Value::I32(n as i32));
+    from_int!("i32", "f32", |n: i128| Value::I32(n as i32));
+    from_int!("i32", "f64", |n: i128| Value::I32(n as i32));
     // i64
-    from_int!("i64", "i8", |n: i128| Value::I64(
-        n as i64
-    ));
-    from_int!("i64", "i16", |n: i128| Value::I64(
-        n as i64
-    ));
-    from_int!("i64", "i32", |n: i128| Value::I64(
-        n as i64
-    ));
-    from_int!("i64", "u8", |n: i128| Value::I64(
-        n as i64
-    ));
-    from_int!("i64", "u16", |n: i128| Value::I64(
-        n as i64
-    ));
-    from_int!("i64", "u32", |n: i128| Value::I64(
-        n as i64
-    ));
-    from_int!("i64", "u64", |n: i128| Value::I64(
-        n as i64
-    ));
-    from_int!("i64", "f32", |n: i128| Value::I64(
-        n as i64
-    ));
-    from_int!("i64", "f64", |n: i128| Value::I64(
-        n as i64
-    ));
+    from_int!("i64", "i8", |n: i128| Value::I64(n as i64));
+    from_int!("i64", "i16", |n: i128| Value::I64(n as i64));
+    from_int!("i64", "i32", |n: i128| Value::I64(n as i64));
+    from_int!("i64", "u8", |n: i128| Value::I64(n as i64));
+    from_int!("i64", "u16", |n: i128| Value::I64(n as i64));
+    from_int!("i64", "u32", |n: i128| Value::I64(n as i64));
+    from_int!("i64", "u64", |n: i128| Value::I64(n as i64));
+    from_int!("i64", "f32", |n: i128| Value::I64(n as i64));
+    from_int!("i64", "f64", |n: i128| Value::I64(n as i64));
     // u8
-    from_int!("u8", "i8", |n: i128| Value::U8(
-        n as u8
-    ));
-    from_int!("u8", "i16", |n: i128| Value::U8(
-        n as u8
-    ));
-    from_int!("u8", "i32", |n: i128| Value::U8(
-        n as u8
-    ));
-    from_int!("u8", "i64", |n: i128| Value::U8(
-        n as u8
-    ));
-    from_int!("u8", "u16", |n: i128| Value::U8(
-        n as u8
-    ));
-    from_int!("u8", "u32", |n: i128| Value::U8(
-        n as u8
-    ));
-    from_int!("u8", "u64", |n: i128| Value::U8(
-        n as u8
-    ));
-    from_int!("u8", "f32", |n: i128| Value::U8(
-        n as u8
-    ));
-    from_int!("u8", "f64", |n: i128| Value::U8(
-        n as u8
-    ));
+    from_int!("u8", "i8", |n: i128| Value::U8(n as u8));
+    from_int!("u8", "i16", |n: i128| Value::U8(n as u8));
+    from_int!("u8", "i32", |n: i128| Value::U8(n as u8));
+    from_int!("u8", "i64", |n: i128| Value::U8(n as u8));
+    from_int!("u8", "u16", |n: i128| Value::U8(n as u8));
+    from_int!("u8", "u32", |n: i128| Value::U8(n as u8));
+    from_int!("u8", "u64", |n: i128| Value::U8(n as u8));
+    from_int!("u8", "f32", |n: i128| Value::U8(n as u8));
+    from_int!("u8", "f64", |n: i128| Value::U8(n as u8));
     // u16
-    from_int!("u16", "i8", |n: i128| Value::U16(
-        n as u16
-    ));
-    from_int!("u16", "i16", |n: i128| Value::U16(
-        n as u16
-    ));
-    from_int!("u16", "i32", |n: i128| Value::U16(
-        n as u16
-    ));
-    from_int!("u16", "i64", |n: i128| Value::U16(
-        n as u16
-    ));
-    from_int!("u16", "u8", |n: i128| Value::U16(
-        n as u16
-    ));
-    from_int!("u16", "u32", |n: i128| Value::U16(
-        n as u16
-    ));
-    from_int!("u16", "u64", |n: i128| Value::U16(
-        n as u16
-    ));
-    from_int!("u16", "f32", |n: i128| Value::U16(
-        n as u16
-    ));
-    from_int!("u16", "f64", |n: i128| Value::U16(
-        n as u16
-    ));
+    from_int!("u16", "i8", |n: i128| Value::U16(n as u16));
+    from_int!("u16", "i16", |n: i128| Value::U16(n as u16));
+    from_int!("u16", "i32", |n: i128| Value::U16(n as u16));
+    from_int!("u16", "i64", |n: i128| Value::U16(n as u16));
+    from_int!("u16", "u8", |n: i128| Value::U16(n as u16));
+    from_int!("u16", "u32", |n: i128| Value::U16(n as u16));
+    from_int!("u16", "u64", |n: i128| Value::U16(n as u16));
+    from_int!("u16", "f32", |n: i128| Value::U16(n as u16));
+    from_int!("u16", "f64", |n: i128| Value::U16(n as u16));
     // u32
-    from_int!("u32", "i8", |n: i128| Value::U32(
-        n as u32
-    ));
-    from_int!("u32", "i16", |n: i128| Value::U32(
-        n as u32
-    ));
-    from_int!("u32", "i32", |n: i128| Value::U32(
-        n as u32
-    ));
-    from_int!("u32", "i64", |n: i128| Value::U32(
-        n as u32
-    ));
-    from_int!("u32", "u8", |n: i128| Value::U32(
-        n as u32
-    ));
-    from_int!("u32", "u16", |n: i128| Value::U32(
-        n as u32
-    ));
-    from_int!("u32", "u64", |n: i128| Value::U32(
-        n as u32
-    ));
-    from_int!("u32", "f32", |n: i128| Value::U32(
-        n as u32
-    ));
-    from_int!("u32", "f64", |n: i128| Value::U32(
-        n as u32
-    ));
+    from_int!("u32", "i8", |n: i128| Value::U32(n as u32));
+    from_int!("u32", "i16", |n: i128| Value::U32(n as u32));
+    from_int!("u32", "i32", |n: i128| Value::U32(n as u32));
+    from_int!("u32", "i64", |n: i128| Value::U32(n as u32));
+    from_int!("u32", "u8", |n: i128| Value::U32(n as u32));
+    from_int!("u32", "u16", |n: i128| Value::U32(n as u32));
+    from_int!("u32", "u64", |n: i128| Value::U32(n as u32));
+    from_int!("u32", "f32", |n: i128| Value::U32(n as u32));
+    from_int!("u32", "f64", |n: i128| Value::U32(n as u32));
     // u64
-    from_int!("u64", "i8", |n: i128| Value::U64(
-        n as u64
-    ));
-    from_int!("u64", "i16", |n: i128| Value::U64(
-        n as u64
-    ));
-    from_int!("u64", "i32", |n: i128| Value::U64(
-        n as u64
-    ));
-    from_int!("u64", "i64", |n: i128| Value::U64(
-        n as u64
-    ));
-    from_int!("u64", "u8", |n: i128| Value::U64(
-        n as u64
-    ));
-    from_int!("u64", "u16", |n: i128| Value::U64(
-        n as u64
-    ));
-    from_int!("u64", "u32", |n: i128| Value::U64(
-        n as u64
-    ));
-    from_int!("u64", "f32", |n: i128| Value::U64(
-        n as u64
-    ));
-    from_int!("u64", "f64", |n: i128| Value::U64(
-        n as u64
-    ));
+    from_int!("u64", "i8", |n: i128| Value::U64(n as u64));
+    from_int!("u64", "i16", |n: i128| Value::U64(n as u64));
+    from_int!("u64", "i32", |n: i128| Value::U64(n as u64));
+    from_int!("u64", "i64", |n: i128| Value::U64(n as u64));
+    from_int!("u64", "u8", |n: i128| Value::U64(n as u64));
+    from_int!("u64", "u16", |n: i128| Value::U64(n as u64));
+    from_int!("u64", "u32", |n: i128| Value::U64(n as u64));
+    from_int!("u64", "f32", |n: i128| Value::U64(n as u64));
+    from_int!("u64", "f64", |n: i128| Value::U64(n as u64));
     // f32
-    from_float!("f32", "i8", |f: f64| Value::F32(
-        f as f32
-    ));
-    from_float!("f32", "i16", |f: f64| Value::F32(
-        f as f32
-    ));
-    from_float!("f32", "i32", |f: f64| Value::F32(
-        f as f32
-    ));
-    from_float!("f32", "i64", |f: f64| Value::F32(
-        f as f32
-    ));
-    from_float!("f32", "u8", |f: f64| Value::F32(
-        f as f32
-    ));
-    from_float!("f32", "u16", |f: f64| Value::F32(
-        f as f32
-    ));
-    from_float!("f32", "u32", |f: f64| Value::F32(
-        f as f32
-    ));
-    from_float!("f32", "u64", |f: f64| Value::F32(
-        f as f32
-    ));
-    from_float!("f32", "f64", |f: f64| Value::F32(
-        f as f32
-    ));
+    from_float!("f32", "i8", |f: f64| Value::F32(f as f32));
+    from_float!("f32", "i16", |f: f64| Value::F32(f as f32));
+    from_float!("f32", "i32", |f: f64| Value::F32(f as f32));
+    from_float!("f32", "i64", |f: f64| Value::F32(f as f32));
+    from_float!("f32", "u8", |f: f64| Value::F32(f as f32));
+    from_float!("f32", "u16", |f: f64| Value::F32(f as f32));
+    from_float!("f32", "u32", |f: f64| Value::F32(f as f32));
+    from_float!("f32", "u64", |f: f64| Value::F32(f as f32));
+    from_float!("f32", "f64", |f: f64| Value::F32(f as f32));
     // f64
     from_float!("f64", "i8", |f: f64| Value::F64(f));
     from_float!("f64", "i16", |f: f64| Value::F64(f));
@@ -607,11 +463,11 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &["Char"],
             Some("u32"),
             builtin_value("u32::From<Char>::from", |args, _span| {
-            match args.first() {
-                Some(Value::Char(c)) => Ok(Value::U32(*c as u32)),
-                _ => Err(MetelError::internal("u32::From<Char>::from: expected Char")),
-            }
-        }),
+                match args.first() {
+                    Some(Value::Char(c)) => Ok(Value::U32(*c as u32)),
+                    _ => Err(MetelError::internal("u32::From<Char>::from: expected Char")),
+                }
+            }),
         )
     );
     register_from!(
@@ -623,17 +479,17 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &["u32"],
             Some("Char"),
             builtin_value("Char::From<u32>::from", |args, span| {
-            match args.first() {
-                Some(Value::U32(n)) => char::from_u32(*n).map(Value::Char).ok_or_else(|| {
-                    MetelError::panic(
-                        RuntimeErrorCode::R0009,
-                        format!("u32 value {n} is not a valid Unicode scalar"),
-                        span,
-                    )
-                }),
-                _ => Err(MetelError::internal("Char::From<u32>::from: expected u32")),
-            }
-        }),
+                match args.first() {
+                    Some(Value::U32(n)) => char::from_u32(*n).map(Value::Char).ok_or_else(|| {
+                        MetelError::panic(
+                            RuntimeErrorCode::R0009,
+                            format!("u32 value {n} is not a valid Unicode scalar"),
+                            span,
+                        )
+                    }),
+                    _ => Err(MetelError::internal("Char::From<u32>::from: expected u32")),
+                }
+            }),
         )
     );
 
@@ -674,18 +530,18 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &[],
             Some("List<T>"),
             builtin_value("List::new", |_args, _span| {
-            use std::cell::RefCell;
-            use std::rc::Rc;
-            let mut fields = std::collections::HashMap::new();
-            fields.insert(
-                "inner".to_string(),
-                Value::Array(Rc::new(RefCell::new(vec![]))),
-            );
-            Ok(Value::Struct {
-                name: "List".to_string(),
-                fields,
-            })
-        }),
+                use std::cell::RefCell;
+                use std::rc::Rc;
+                let mut fields = std::collections::HashMap::new();
+                fields.insert(
+                    "inner".to_string(),
+                    Value::Array(Rc::new(RefCell::new(vec![]))),
+                );
+                Ok(Value::Struct {
+                    name: "List".to_string(),
+                    fields,
+                })
+            }),
         )
     );
 
@@ -698,24 +554,24 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &["T[]"],
             Some("List<T>"),
             builtin_value("List::from", |args, _span| {
-            use std::cell::RefCell;
-            use std::rc::Rc;
-            match args.first() {
-                Some(Value::Array(src)) => {
-                    let copy = src.borrow().clone();
-                    let mut fields = std::collections::HashMap::new();
-                    fields.insert(
-                        "inner".to_string(),
-                        Value::Array(Rc::new(RefCell::new(copy))),
-                    );
-                    Ok(Value::Struct {
-                        name: "List".to_string(),
-                        fields,
-                    })
+                use std::cell::RefCell;
+                use std::rc::Rc;
+                match args.first() {
+                    Some(Value::Array(src)) => {
+                        let copy = src.borrow().clone();
+                        let mut fields = std::collections::HashMap::new();
+                        fields.insert(
+                            "inner".to_string(),
+                            Value::Array(Rc::new(RefCell::new(copy))),
+                        );
+                        Ok(Value::Struct {
+                            name: "List".to_string(),
+                            fields,
+                        })
+                    }
+                    _ => Err(MetelError::internal("List::from: expected array argument")),
                 }
-                _ => Err(MetelError::internal("List::from: expected array argument")),
-            }
-        }),
+            }),
         )
     );
 
@@ -730,18 +586,18 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &["T"],
             Some("()"),
             builtin_value("List::push", |args, _span| {
-            match (args.first(), args.get(1)) {
-                (Some(Value::Struct { name, fields }), Some(val)) if name == "List" => {
-                    if let Some(Value::Array(arr)) = fields.get("inner") {
-                        arr.borrow_mut().push(val.clone());
-                        Ok(Value::Unit)
-                    } else {
-                        Err(MetelError::internal("List::push: missing inner field"))
+                match (args.first(), args.get(1)) {
+                    (Some(Value::Struct { name, fields }), Some(val)) if name == "List" => {
+                        if let Some(Value::Array(arr)) = fields.get("inner") {
+                            arr.borrow_mut().push(val.clone());
+                            Ok(Value::Unit)
+                        } else {
+                            Err(MetelError::internal("List::push: missing inner field"))
+                        }
                     }
+                    _ => Err(MetelError::internal("List::push: expected (List, T)")),
                 }
-                _ => Err(MetelError::internal("List::push: expected (List, T)")),
-            }
-        }),
+            }),
         )
     );
 
@@ -754,36 +610,36 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &[],
             Some("Perhaps<T>"),
             builtin_value("List::pop", |args, span| {
-            match args.first() {
-                Some(Value::Struct { name, fields }) if name == "List" => {
-                    if let Some(Value::Array(arr)) = fields.get("inner") {
-                        match arr.borrow_mut().pop() {
-                            Some(val) => {
-                                let mut f = std::collections::HashMap::new();
-                                f.insert("value".to_string(), val);
-                                Ok(Value::Enum {
+                match args.first() {
+                    Some(Value::Struct { name, fields }) if name == "List" => {
+                        if let Some(Value::Array(arr)) = fields.get("inner") {
+                            match arr.borrow_mut().pop() {
+                                Some(val) => {
+                                    let mut f = std::collections::HashMap::new();
+                                    f.insert("value".to_string(), val);
+                                    Ok(Value::Enum {
+                                        name: "Perhaps".to_string(),
+                                        variant: "Some".to_string(),
+                                        fields: f,
+                                    })
+                                }
+                                None => Ok(Value::Enum {
                                     name: "Perhaps".to_string(),
-                                    variant: "Some".to_string(),
-                                    fields: f,
-                                })
+                                    variant: "None".to_string(),
+                                    fields: std::collections::HashMap::new(),
+                                }),
                             }
-                            None => Ok(Value::Enum {
-                                name: "Perhaps".to_string(),
-                                variant: "None".to_string(),
-                                fields: std::collections::HashMap::new(),
-                            }),
+                        } else {
+                            Err(MetelError::internal("List::pop: missing inner field"))
                         }
-                    } else {
-                        Err(MetelError::internal("List::pop: missing inner field"))
                     }
+                    _ => Err(MetelError::panic(
+                        RuntimeErrorCode::R0009,
+                        "List::pop: expected List",
+                        span,
+                    )),
                 }
-                _ => Err(MetelError::panic(
-                    RuntimeErrorCode::R0009,
-                    "List::pop: expected List",
-                    span,
-                )),
-            }
-        }),
+            }),
         )
     );
 
@@ -796,17 +652,17 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &[],
             Some("i64"),
             builtin_value("List::len", |args, _span| {
-            match args.first() {
-                Some(Value::Struct { name, fields }) if name == "List" => {
-                    if let Some(Value::Array(arr)) = fields.get("inner") {
-                        Ok(Value::I64(arr.borrow().len() as i64))
-                    } else {
-                        Err(MetelError::internal("List::len: missing inner field"))
+                match args.first() {
+                    Some(Value::Struct { name, fields }) if name == "List" => {
+                        if let Some(Value::Array(arr)) = fields.get("inner") {
+                            Ok(Value::I64(arr.borrow().len() as i64))
+                        } else {
+                            Err(MetelError::internal("List::len: missing inner field"))
+                        }
                     }
+                    _ => Err(MetelError::internal("List::len: expected List")),
                 }
-                _ => Err(MetelError::internal("List::len: expected List")),
-            }
-        }),
+            }),
         )
     );
 
@@ -819,32 +675,34 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &["i64"],
             Some("Perhaps<T>"),
             builtin_value("List::get", |args, _span| {
-            match (args.first(), args.get(1)) {
-                (Some(Value::Struct { name, fields }), Some(Value::I64(idx))) if name == "List" => {
-                    if let Some(Value::Array(arr)) = fields.get("inner") {
-                        match arr.borrow().get(*idx as usize).cloned() {
-                            Some(val) => {
-                                let mut f = std::collections::HashMap::new();
-                                f.insert("value".to_string(), val);
-                                Ok(Value::Enum {
+                match (args.first(), args.get(1)) {
+                    (Some(Value::Struct { name, fields }), Some(Value::I64(idx)))
+                        if name == "List" =>
+                    {
+                        if let Some(Value::Array(arr)) = fields.get("inner") {
+                            match arr.borrow().get(*idx as usize).cloned() {
+                                Some(val) => {
+                                    let mut f = std::collections::HashMap::new();
+                                    f.insert("value".to_string(), val);
+                                    Ok(Value::Enum {
+                                        name: "Perhaps".to_string(),
+                                        variant: "Some".to_string(),
+                                        fields: f,
+                                    })
+                                }
+                                None => Ok(Value::Enum {
                                     name: "Perhaps".to_string(),
-                                    variant: "Some".to_string(),
-                                    fields: f,
-                                })
+                                    variant: "None".to_string(),
+                                    fields: std::collections::HashMap::new(),
+                                }),
                             }
-                            None => Ok(Value::Enum {
-                                name: "Perhaps".to_string(),
-                                variant: "None".to_string(),
-                                fields: std::collections::HashMap::new(),
-                            }),
+                        } else {
+                            Err(MetelError::internal("List::get: missing inner field"))
                         }
-                    } else {
-                        Err(MetelError::internal("List::get: missing inner field"))
                     }
+                    _ => Err(MetelError::internal("List::get: expected (List, i64)")),
                 }
-                _ => Err(MetelError::internal("List::get: expected (List, i64)")),
-            }
-        }),
+            }),
         )
     );
 
@@ -857,17 +715,17 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             &[],
             Some("T[]"),
             builtin_value("List::as_slice", |args, _span| {
-            match args.first() {
-                Some(Value::Struct { name, fields }) if name == "List" => {
-                    if let Some(arr) = fields.get("inner") {
-                        Ok(arr.clone())
-                    } else {
-                        Err(MetelError::internal("List::as_slice: missing inner field"))
+                match args.first() {
+                    Some(Value::Struct { name, fields }) if name == "List" => {
+                        if let Some(arr) = fields.get("inner") {
+                            Ok(arr.clone())
+                        } else {
+                            Err(MetelError::internal("List::as_slice: missing inner field"))
+                        }
                     }
+                    _ => Err(MetelError::internal("List::as_slice: expected List")),
                 }
-                _ => Err(MetelError::internal("List::as_slice: expected List")),
-            }
-        }),
+            }),
         )
     );
 
