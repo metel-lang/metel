@@ -86,7 +86,6 @@ pub(super) fn eval_typed_place_value(
     place: &TypedPlace,
     env: &mut Environment,
     runtime: &RuntimeRegistry,
-    span: &Span,
 ) -> Result<Value, MetelError> {
     match place {
         TypedPlace::Ident(name, ident_span) => env.get(name).ok_or_else(|| {
@@ -115,7 +114,7 @@ pub(super) fn eval_typed_place_value(
             field,
             span: tspan,
         } => {
-            let parent = eval_typed_place_value(object, env, runtime, tspan)?;
+            let parent = eval_typed_place_value(object, env, runtime)?;
             match parent {
                 Value::Struct { fields, .. } | Value::Enum { fields, .. } => {
                     fields.get(field).cloned().ok_or_else(|| {
@@ -136,7 +135,7 @@ pub(super) fn eval_typed_place_value(
             index,
             span: tspan,
         } => {
-            let arr = eval_typed_place_value(object, env, runtime, tspan)?;
+            let arr = eval_typed_place_value(object, env, runtime)?;
             let idx = eval_expr(index, env, runtime)?.into_value();
             let i: i64 = match idx {
                 Value::U64(u) => {

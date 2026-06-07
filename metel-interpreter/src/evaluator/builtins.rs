@@ -2,7 +2,8 @@ use crate::error::{MetelError, RuntimeErrorCode};
 
 use super::display::{format_float, format_value, value_to_display_string};
 use super::{
-    RuntimeCallable, RuntimeMethod, RuntimeRegistry, RuntimeSignature, RuntimeTypeRef, Value,
+    RuntimeCallable, RuntimeMethod, RuntimeRegistry, RuntimeSignature, RuntimeTypePattern,
+    RuntimeTypeRef, Value,
 };
 
 fn numeric_as_i128(v: &Value) -> Option<i128> {
@@ -110,6 +111,11 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
     macro_rules! register_inherent {
         ($type_name:expr, $method_name:expr, $value:expr) => {
             runtime.register_inherent_method($type_name, $method_name, $value);
+        };
+    }
+    macro_rules! register_pattern {
+        ($pattern:expr, $method_name:expr, $value:expr) => {
+            runtime.register_pattern_method($pattern, $method_name, $value);
         };
     }
     macro_rules! register_aspect {
@@ -255,6 +261,40 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
                 match args.first() {
                     Some(Value::Str(s)) => Ok(Value::Str(s.clone())),
                     _ => Err(MetelError::internal("String::to_string: expected String")),
+                }
+            }),
+        )
+    );
+
+    register_pattern!(
+        RuntimeTypePattern::Str,
+        "len",
+        method(
+            "String::len",
+            Some(crate::ast::ReceiverKind::Value),
+            &[],
+            Some("i64"),
+            builtin_value("String::len", |args, _span| {
+                match args.first() {
+                    Some(Value::Str(s)) => Ok(Value::I64(s.chars().count() as i64)),
+                    _ => Err(MetelError::internal("String::len: expected String")),
+                }
+            }),
+        )
+    );
+
+    register_pattern!(
+        RuntimeTypePattern::Array,
+        "len",
+        method(
+            "Array::len",
+            Some(crate::ast::ReceiverKind::Value),
+            &[],
+            Some("i64"),
+            builtin_value("Array::len", |args, _span| {
+                match args.first() {
+                    Some(Value::Array(arr)) => Ok(Value::I64(arr.borrow().len() as i64)),
+                    _ => Err(MetelError::internal("Array::len: expected array")),
                 }
             }),
         )

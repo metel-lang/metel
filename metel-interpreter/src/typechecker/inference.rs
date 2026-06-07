@@ -784,19 +784,12 @@ fn infer_expr(
                 recv_ty
             };
 
-            // T[]::len and [T; N]::len — built-in method on array types.
-            if matches!(&recv_ty, InferType::Array(_) | InferType::SizedArray(_, _)) {
-                let arg_tys: Vec<InferType> = args.iter()
-                    .map(|a| infer_expr(a, ctx, fun_generalizations))
-                    .collect::<Result<_, _>>()?;
-                if method == "len" && arg_tys.is_empty() {
-                    return Ok(InferType::int());
-                }
-                return Err(MetelError::type_error(
-                    TypeErrorCode::T0003,
-                    format!("no method `{method}` on array type; use `List<T>` for mutable collections"),
-                    span,
-                ));
+            let arg_tys: Vec<InferType> = args.iter()
+                .map(|a| infer_expr(a, ctx, fun_generalizations))
+                .collect::<Result<_, _>>()?;
+
+            if let Some(result) = builtin_pattern_method_type(&recv_ty, method, &arg_tys, span) {
+                return result;
             }
 
             // Fast path: concrete named type — look up method as usual.
@@ -840,9 +833,6 @@ fn infer_expr(
                     }
                 }
 
-                let arg_tys: Vec<InferType> = args.iter()
-                    .map(|a| infer_expr(a, ctx, fun_generalizations))
-                    .collect::<Result<_, _>>()?;
                 let ret_var = ctx.fresh_var();
                 let receiver_ty_for_method = match &recv_ty {
                     InferType::Pointer(inner) | InferType::MutPointer(inner) => *inner.clone(),
@@ -1161,6 +1151,26 @@ fn named_type_name(ty: &InferType) -> Option<String> {
         InferType::Concrete(Type::Char)   => Some("Char".to_string()),
         _ => None,
     }
+}
+
+fn builtin_pattern_method_type(
+    recv_ty: &InferType,
+    method: &str,
+    arg_tys: &[InferType],
+    span: &Span,
+) -> Option<Result<InferType, MetelError>> {
+    if matches!(recv_ty, InferType::Array(_) | InferType::SizedArray(_, _)) {
+        if method == "len" && arg_tys.is_empty() {
+            return Some(Ok(InferType::int()));
+        }
+        return Some(Err(MetelError::type_error(
+            TypeErrorCode::T0003,
+            format!("no method `{method}` on array type; use `List<T>` for mutable collections"),
+            span,
+        )));
+    }
+
+    None
 }
 
 fn infer_literal(lit: &Literal, ctx: &mut InferContext) -> InferType {

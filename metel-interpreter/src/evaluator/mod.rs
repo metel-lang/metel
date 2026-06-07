@@ -141,6 +141,13 @@ pub enum RuntimeTypeRef {
     Named(String),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum RuntimeTypePattern {
+    Str,
+    Array,
+    Primitive(String),
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct RuntimeSignature {
     #[allow(dead_code)] // stored for future diagnostics/reflection and System F transition work
@@ -163,6 +170,7 @@ pub struct RuntimeMethod {
 pub struct RuntimeRegistry {
     modules: HashMap<Vec<String>, RuntimeModuleEntry>,
     types: HashMap<String, RuntimeTypeEntry>,
+    pattern_methods: HashMap<RuntimeTypePattern, HashMap<String, RuntimeMethod>>,
 }
 
 impl RuntimeRegistry {
@@ -242,6 +250,18 @@ impl RuntimeRegistry {
         });
     }
 
+    pub fn register_pattern_method(
+        &mut self,
+        pattern: RuntimeTypePattern,
+        method_name: impl Into<String>,
+        value: RuntimeMethod,
+    ) {
+        self.pattern_methods
+            .entry(pattern)
+            .or_default()
+            .insert(method_name.into(), value);
+    }
+
     pub fn get_module_value(&self, module_path: &[String], name: &str) -> Option<Value> {
         self.modules.get(module_path)?.values.get(name).cloned()
     }
@@ -291,6 +311,20 @@ impl RuntimeRegistry {
                         .filter(|method| method.receiver.is_some())
                 })
         })
+    }
+
+    pub fn get_method_for_value(&self, value: &Value, method_name: &str) -> Option<RuntimeMethod> {
+        runtime_type_name(value)
+            .and_then(|type_name| self.get_regular_method(type_name, method_name))
+            .or_else(|| {
+                runtime_type_pattern(value).and_then(|pattern| {
+                    self.pattern_methods
+                        .get(&pattern)?
+                        .get(method_name)
+                        .cloned()
+                        .filter(|method| method.receiver.is_some())
+                })
+            })
     }
 
     pub fn get_from_method(&self, target: &str, source: &str) -> Option<RuntimeMethod> {
@@ -528,6 +562,26 @@ fn runtime_type_name(value: &Value) -> Option<&str> {
         Value::Char(_) => Some("Char"),
         Value::Boolean(_) => Some("boolean"),
         Value::Str(_) => Some("String"),
+        _ => None,
+    }
+}
+
+fn runtime_type_pattern(value: &Value) -> Option<RuntimeTypePattern> {
+    match value {
+        Value::Str(_) => Some(RuntimeTypePattern::Str),
+        Value::Array(_) => Some(RuntimeTypePattern::Array),
+        Value::I64(_) => Some(RuntimeTypePattern::Primitive("i64".to_string())),
+        Value::I8(_) => Some(RuntimeTypePattern::Primitive("i8".to_string())),
+        Value::I16(_) => Some(RuntimeTypePattern::Primitive("i16".to_string())),
+        Value::I32(_) => Some(RuntimeTypePattern::Primitive("i32".to_string())),
+        Value::U8(_) => Some(RuntimeTypePattern::Primitive("u8".to_string())),
+        Value::U16(_) => Some(RuntimeTypePattern::Primitive("u16".to_string())),
+        Value::U32(_) => Some(RuntimeTypePattern::Primitive("u32".to_string())),
+        Value::U64(_) => Some(RuntimeTypePattern::Primitive("u64".to_string())),
+        Value::F64(_) => Some(RuntimeTypePattern::Primitive("f64".to_string())),
+        Value::F32(_) => Some(RuntimeTypePattern::Primitive("f32".to_string())),
+        Value::Char(_) => Some(RuntimeTypePattern::Primitive("Char".to_string())),
+        Value::Boolean(_) => Some(RuntimeTypePattern::Primitive("boolean".to_string())),
         _ => None,
     }
 }
@@ -1853,9 +1907,9 @@ pub fn eval_expr(
                 TypedPlace::Index {
                     object,
                     index,
-                    span: tspan,
+                    span: _tspan,
                 } => {
-                    let arr_val = lvalue::eval_typed_place_value(object, env, runtime, tspan)?;
+                    let arr_val = lvalue::eval_typed_place_value(object, env, runtime)?;
                     let idx_val = eval_expr(index, env, runtime)?.into_value();
                     let i =
                         match idx_val {
@@ -2012,29 +2066,14 @@ pub fn eval_expr(
                 .map(|a| eval_expr(a, env, runtime).map(Signal::into_value))
                 .collect::<Result<_, _>>()?;
 
-            // Built-in type methods.
-            if let (Value::Str(s), "len") = (&recv_val, method.as_str()) {
-                return Ok(Signal::Value(Value::I64(s.chars().count() as i64)));
-            }
-            if let (Value::Array(arr), "len") = (&recv_val, method.as_str()) {
-                return Ok(Signal::Value(Value::I64(arr.borrow().len() as i64)));
-            }
-
             // Runtime methods are dispatched through the runtime registry, not lexical env.
             let recv_type_view = deref_value(&recv_val, span)?.unwrap_or_else(|| recv_val.clone());
-            let type_name = runtime_type_name(&recv_type_view).ok_or_else(|| {
-                MetelError::panic(
-                    RuntimeErrorCode::R0009,
-                    format!("method `{method}` not found on this value"),
-                    span,
-                )
-            })?;
             let method_entry = runtime
-                .get_regular_method(type_name, method)
+                .get_method_for_value(&recv_type_view, method)
                 .ok_or_else(|| {
                     MetelError::panic(
                         RuntimeErrorCode::R0009,
-                        format!("no method `{method}` on `{type_name}`"),
+                        format!("method `{method}` not found on this value"),
                         span,
                     )
                 })?;
@@ -2118,7 +2157,7 @@ pub fn eval_expr(
                 }
                 None => Err(MetelError::panic(
                     RuntimeErrorCode::R0009,
-                    format!("no receiver method `{method}` on `{type_name}`"),
+                    format!("runtime method `{method}` is not callable with a receiver"),
                     span,
                 )),
             }

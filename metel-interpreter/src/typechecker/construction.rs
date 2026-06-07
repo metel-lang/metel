@@ -849,6 +849,16 @@ fn construct_expr(
         }
         Expr::MethodCall { receiver, method, type_args, args, span } => {
             let typed_receiver = construct_expr(receiver, None, ctx)?;
+            if matches!(typed_receiver.ty(), Type::Array(_) | Type::SizedArray(_, _)) {
+                let typed_args: Vec<TypedExpr> = args.iter()
+                    .map(|arg| construct_expr(arg, None, ctx))
+                    .collect::<Result<_, _>>()?;
+                if let Some(result) =
+                    builtin_pattern_method_expr(typed_receiver.clone(), method, typed_args, span)
+                {
+                    return result;
+                }
+            }
             let (struct_name, receiver_type_args) = match typed_receiver.ty() {
                 Type::Named(name, targs) => (name.clone(), targs.clone()),
                 Type::Pointer(inner) | Type::MutPointer(inner) => match inner.as_ref() {
@@ -862,23 +872,8 @@ fn construct_expr(
                 Type::F64 => ("f64".to_string(), vec![]),
                 Type::Boolean  => ("boolean".to_string(),   vec![]),
                 Type::Char  => ("Char".to_string(),   vec![]),
-                Type::Array(_) | Type::SizedArray(_, _) => {
-                    if method == "len" && args.is_empty() {
-                        let typed_args: Vec<TypedExpr> = vec![];
-                        return Ok(TypedExpr::MethodCall {
-                            receiver: Box::new(typed_receiver),
-                            method:   method.clone(),
-                            args:     typed_args,
-                            ty:       Type::I64,
-                            span:     span.clone(),
-                        });
-                    }
-                    return Err(MetelError::type_error(
-                        TypeErrorCode::T0003,
-                        format!("no method `{method}` on array type; use `List<T>` for mutable collections"),
-                        span,
-                    ));
-                }
+                Type::Array(_) | Type::SizedArray(_, _) =>
+                    return Err(MetelError::internal("array pattern methods handled before nominal lookup")),
                 t => return Err(MetelError::internal(
                     format!("method call on non-struct type {t}")
                 )),
@@ -1157,6 +1152,32 @@ fn construct_expr(
             Ok(TypedExpr::Loop { body: typed_body, ty, span: span.clone() })
         }
     }
+}
+
+fn builtin_pattern_method_expr(
+    receiver: TypedExpr,
+    method: &str,
+    args: Vec<TypedExpr>,
+    span: &Span,
+) -> Option<Result<TypedExpr, MetelError>> {
+    if matches!(receiver.ty(), Type::Array(_) | Type::SizedArray(_, _)) {
+        if method == "len" && args.is_empty() {
+            return Some(Ok(TypedExpr::MethodCall {
+                receiver: Box::new(receiver),
+                method: method.to_string(),
+                args,
+                ty: Type::I64,
+                span: span.clone(),
+            }));
+        }
+        return Some(Err(MetelError::type_error(
+            TypeErrorCode::T0003,
+            format!("no method `{method}` on array type; use `List<T>` for mutable collections"),
+            span,
+        )));
+    }
+
+    None
 }
 
 fn find_loop_break_type(block: &TypedBlock) -> Option<Type> {
