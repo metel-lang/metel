@@ -591,7 +591,7 @@ fn infer_expr(
                 span,
             ))
         }
-        Expr::ResolvedPath { resolved, original, span } => {
+        Expr::ResolvedPath { resolved, symbol_id: _, original, span } => {
             if let Some(err) = ctx.check_glob_conflict(resolved, span) { return Err(err); }
             ctx.lookup(resolved).ok_or_else(|| MetelError::type_error(
                 TypeErrorCode::T0003,

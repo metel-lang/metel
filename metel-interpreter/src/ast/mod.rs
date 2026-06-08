@@ -1,4 +1,5 @@
 use crate::parser::Rule;
+use crate::symbols::SymbolId;
 
 // ── Span ──────────────────────────────────────────────────────────────────────
 
@@ -325,7 +326,12 @@ pub enum Expr {
     /// Produced by the path normalizer (#185). A multi-segment `Expr::Path` that
     /// has been resolved to a single bare name. `resolved` is the name the
     /// typechecker uses for lookup; `original` is retained for error messages.
-    ResolvedPath { resolved: String, original: Vec<String>, span: Span },
+    /// Produced by the path normalizer: a multi-segment module-qualified path rewritten to its
+    /// local alias. `resolved` is the local name used for lookup; `symbol_id` is the stable
+    /// identity of the underlying declaration (None for keyword-root paths like `root::` or
+    /// `self::`, and for glob-resolved names without an explicit binding).
+    /// `original` preserves the full source spelling for diagnostics.
+    ResolvedPath { resolved: String, symbol_id: Option<SymbolId>, original: Vec<String>, span: Span },
     Tuple(Vec<Expr>, Span),
     Array(Vec<Expr>, Span),
     RepeatArray(Box<Expr>, u64, Span),

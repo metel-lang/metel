@@ -266,7 +266,7 @@ pub(super) fn build_registry(
                 }
             }
             Decl::Aspect(ad) => {
-                register_aspect_decl(ad, &mut registry);
+                register_aspect_decl(ad, current_module_path, &mut registry);
             }
             _ => {}
         }
@@ -314,10 +314,11 @@ pub(super) fn build_registry(
     registry
 }
 
-fn register_aspect_decl(ad: &AspectDecl, registry: &mut TypeDefinitionRegistry) {
+fn register_aspect_decl(ad: &AspectDecl, declaring_module: &[String], registry: &mut TypeDefinitionRegistry) {
     let method_names = ad.methods.iter().map(|m| m.name.clone()).collect();
     registry.register_aspect(ad.name.clone(), method_names);
     registry.register_aspect_method_defs(ad.name.clone(), ad.methods.clone());
+    registry.register_aspect_declaring_module(ad.name.clone(), declaring_module.to_vec());
 }
 
 fn register_impl_methods<'a>(
@@ -432,9 +433,13 @@ pub(super) fn register_primitive_type_bindings(ctx: &mut InferContext, prelude: 
         InferType::Fun(vec![str_ty.clone()], Box::new(int_ty.clone())));
     // T[]::len — handled as a special case in the typechecker; no TypeVar needed here.
 
+    let std_core = vec!["std".to_string(), "core".to_string()];
     ctx.registry_mut().register_aspect("Display".into(),  vec!["to_string".into()]);
     ctx.registry_mut().register_aspect("Iterable".into(), vec!["next".into()]);
     ctx.registry_mut().register_aspect("From".into(),     vec!["from".into()]);
+    ctx.registry_mut().register_aspect_declaring_module("Display".into(),  std_core.clone());
+    ctx.registry_mut().register_aspect_declaring_module("Iterable".into(), std_core.clone());
+    ctx.registry_mut().register_aspect_declaring_module("From".into(),     std_core);
 }
 
 /// Add all built-in function schemes from `StdPrelude` to `scheme_env`.

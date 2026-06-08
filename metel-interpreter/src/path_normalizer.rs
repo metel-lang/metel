@@ -16,6 +16,7 @@ use crate::ast::{Block, Decl, Expr, ForInit, FunDecl, ImplBlock, LetDecl, MatchA
 use crate::error::MetelError;
 use crate::module_loader::{LoadedModule, ModuleGraph};
 use crate::name_resolver::{ModuleScope, ResolvedNames};
+use crate::symbols::SymbolId;
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -171,9 +172,9 @@ fn normalize_expr(
         Expr::Literal(_, _) | Expr::Ident(_, _) | Expr::ResolvedPath { .. } => Ok(()),
 
         Expr::Path(segments, span) => {
-            if let Some(resolved) = try_resolve_path(segments, scope, module_names) {
+            if let Some((resolved, symbol_id)) = try_resolve_path(segments, scope, module_names) {
                 let original = std::mem::take(segments);
-                *expr = Expr::ResolvedPath { resolved, original, span: span.clone() };
+                *expr = Expr::ResolvedPath { resolved, symbol_id, original, span: span.clone() };
             }
             Ok(())
         }
@@ -247,16 +248,16 @@ fn normalize_arm(
 
 // ── Path resolution logic ─────────────────────────────────────────────────────
 
-/// Try to resolve a multi-segment path to a bare local name.
+/// Try to resolve a multi-segment path to a bare local name and its stable symbol identity.
 ///
-/// Returns `Some(resolved_name)` if the path is module-qualified and can be
+/// Returns `Some((resolved_name, symbol_id))` if the path is module-qualified and can be
 /// rewritten. Returns `None` to leave the path unchanged (type member access,
 /// single-segment, or unresolvable).
 fn try_resolve_path(
     segments: &[String],
     scope: Option<&ModuleScope>,
     module_names: &HashSet<String>,
-) -> Option<String> {
+) -> Option<(String, Option<SymbolId>)> {
     if segments.len() < 2 {
         return None; // single-segment paths are already Ident
     }
@@ -266,14 +267,13 @@ fn try_resolve_path(
 
     // Keywords: root/self/super — the declared name is the last segment
     if first == "root" || first == "self" || first == "super" {
-        let name = declared_name.clone();
         // Check the scope for an alias, otherwise use the declared name
         if let Some(s) = scope {
-            if let Some((local, _)) = s.explicit.iter().find(|(_, b)| &b.source_name == declared_name) {
-                return Some(local.clone());
+            if let Some((local, binding)) = s.explicit.iter().find(|(_, b)| &b.source_name == declared_name) {
+                return Some((local.clone(), Some(binding.symbol_id)));
             }
         }
-        return Some(name);
+        return Some((declared_name.clone(), None));
     }
 
     // Accept if `first` is either a loaded module name OR the first segment of a glob path
@@ -292,19 +292,19 @@ fn try_resolve_path(
             if binding.source_module.first().map(|s| s.as_str()) == Some(first.as_str())
                 && &binding.source_name == declared_name
             {
-                return Some(local_name.clone());
+                return Some((local_name.clone(), Some(binding.symbol_id)));
             }
         }
         // 2. Glob import from this module — local name == source name
         let source_module: Vec<String> = segments[..segments.len() - 1].to_vec();
         if s.globs.iter().any(|(_, g)| g == &source_module || g.first().map(|s| s.as_str()) == Some(first.as_str())) {
-            return Some(declared_name.clone());
+            return Some((declared_name.clone(), None));
         }
     }
 
     // Module is known but no import binding found for this name — treat as bare name
     // (the typechecker will error if it's actually undefined)
-    Some(declared_name.clone())
+    Some((declared_name.clone(), None))
 }
 
 /// Resolve a struct-literal path by stripping a module prefix.

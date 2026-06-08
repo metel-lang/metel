@@ -4,6 +4,7 @@ use crate::ast::{Decl, ImportTree, PathRoot, Span, Visibility};
 use crate::error::{MetelError, TypeErrorCode};
 use crate::module_loader::{LoadedModule, ModuleGraph};
 use crate::module_paths::resolve_path_root;
+use crate::symbols::SymbolId;
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -26,6 +27,10 @@ pub struct ImportBinding {
     /// The name as declared in the source module.
     pub source_name: String,
     pub kind: BindingKind,
+    /// Stable identity for the `(source_module, source_name)` declaration.
+    /// Two bindings with the same `symbol_id` refer to the same declaration,
+    /// regardless of local alias or path spelling.
+    pub symbol_id: SymbolId,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,6 +66,35 @@ pub struct ResolvedNames {
     /// All top-level declared names per module, regardless of visibility.
     /// Used by the typechecker to distinguish T0009 (private) from T0003 (absent).
     pub declared_names: HashMap<Vec<String>, HashSet<String>>,
+    /// Canonical symbol table: `(source_module, source_name)` → stable `SymbolId`.
+    /// Every `ImportBinding` carries an id drawn from this table; two bindings with the
+    /// same id refer to the same declaration.
+    pub symbols: HashMap<(Vec<String>, String), SymbolId>,
+}
+
+// ── Symbol interning ──────────────────────────────────────────────────────────
+
+/// Mutable state threaded through name resolution to assign stable `SymbolId`s.
+struct SymbolTable {
+    map: HashMap<(Vec<String>, String), SymbolId>,
+    next_id: u32,
+}
+
+impl SymbolTable {
+    fn new() -> Self {
+        Self { map: HashMap::new(), next_id: 1 }
+    }
+
+    /// Return the existing `SymbolId` for `(source_module, source_name)`, or assign
+    /// a fresh one. Two calls with identical arguments always return the same id.
+    fn intern(&mut self, source_module: &[String], source_name: &str) -> SymbolId {
+        let key = (source_module.to_vec(), source_name.to_string());
+        *self.map.entry(key).or_insert_with(|| {
+            let id = SymbolId(self.next_id);
+            self.next_id += 1;
+            id
+        })
+    }
 }
 
 // ── Path alias dereferencing ──────────────────────────────────────────────────
@@ -106,10 +140,22 @@ pub fn resolve(graph: &ModuleGraph) -> Result<ResolvedNames, MetelError> {
         })
         .collect();
 
+    // Assign SymbolIds to all top-level declarations in their home modules.
+    // This ensures every declaration has a stable id even if it is never imported.
+    // The intern call is idempotent, so import-site ids (assigned below) will match.
+    let mut sym = SymbolTable::new();
+    for loaded in &graph.modules {
+        for decl in &loaded.program.decls {
+            if let Some(name) = decl_any_name(decl) {
+                sym.intern(&loaded.module_path, &name);
+            }
+        }
+    }
+
     // Second pass: process re-exports and extend pub_surface.
     // Simple single-pass (no support for transitive re-export chains; that's future work).
     for loaded in &graph.modules {
-        let re_exported = collect_re_exports(loaded, &known_modules, &pub_surface, path_aliases)?;
+        let re_exported = collect_re_exports(loaded, &known_modules, &pub_surface, path_aliases, &mut sym)?;
         pub_surface.entry(loaded.module_path.clone())
             .or_default()
             .extend(re_exported.keys().cloned());
@@ -118,7 +164,7 @@ pub fn resolve(graph: &ModuleGraph) -> Result<ResolvedNames, MetelError> {
     // Third pass: resolve imports using the final pub_surface.
     let mut scopes = HashMap::new();
     for loaded in &graph.modules {
-        let scope = resolve_module(loaded, &known_modules, &pub_surface, path_aliases)?;
+        let scope = resolve_module(loaded, &known_modules, &pub_surface, path_aliases, &mut sym)?;
         scopes.insert(loaded.module_path.clone(), scope);
     }
 
@@ -131,7 +177,7 @@ pub fn resolve(graph: &ModuleGraph) -> Result<ResolvedNames, MetelError> {
     ].iter().map(|s| s.to_string()).collect();
     pub_surface.insert(vec!["std".to_string(), "core".to_string()], std_core_surface);
 
-    Ok(ResolvedNames { scopes, pub_surface, declared_names })
+    Ok(ResolvedNames { scopes, pub_surface, declared_names, symbols: sym.map })
 }
 
 /// Returns the name of a declaration if it is public.
@@ -165,8 +211,9 @@ fn resolve_module(
     known_modules: &HashSet<Vec<String>>,
     pub_surface: &HashMap<Vec<String>, HashSet<String>>,
     path_aliases: &HashMap<Vec<String>, Vec<String>>,
+    sym: &mut SymbolTable,
 ) -> Result<ModuleScope, MetelError> {
-    let re_exports = collect_re_exports(loaded, known_modules, pub_surface, path_aliases)?;
+    let re_exports = collect_re_exports(loaded, known_modules, pub_surface, path_aliases, sym)?;
     let mut scope = ModuleScope {
         explicit: HashMap::new(),
         globs: Vec::new(),
@@ -175,7 +222,7 @@ fn resolve_module(
 
     for import in &loaded.program.imports {
         let base = absolute_base(&import.path.root, &loaded.module_path);
-        process_tree(&base, &import.path.tree, known_modules, path_aliases, &mut scope, &import.span)?;
+        process_tree(&base, &import.path.tree, known_modules, path_aliases, &mut scope, &import.span, sym)?;
     }
 
     // Auto-import std::core at lowest (Std) priority — RFC-0030. See ADR-0026 (glob tiers)
@@ -192,12 +239,13 @@ fn collect_re_exports(
     known_modules: &HashSet<Vec<String>>,
     pub_surface: &HashMap<Vec<String>, HashSet<String>>,
     path_aliases: &HashMap<Vec<String>, Vec<String>>,
+    sym: &mut SymbolTable,
 ) -> Result<HashMap<String, ImportBinding>, MetelError> {
     let mut re_exports: HashMap<String, ImportBinding> = HashMap::new();
 
     for export in &loaded.program.exports {
         let base = absolute_base(&export.path.root, &loaded.module_path);
-        process_export_tree(&base, &export.path.tree, known_modules, pub_surface, path_aliases, &mut re_exports, &export.span)?;
+        process_export_tree(&base, &export.path.tree, known_modules, pub_surface, path_aliases, &mut re_exports, &export.span, sym)?;
     }
 
     Ok(re_exports)
@@ -212,6 +260,7 @@ fn process_export_tree(
     path_aliases: &HashMap<Vec<String>, Vec<String>>,
     re_exports: &mut HashMap<String, ImportBinding>,
     export_span: &Span,
+    sym: &mut SymbolTable,
 ) -> Result<(), MetelError> {
     let canon_base = canonical_path(base, path_aliases);
     let base = canon_base.as_slice();
@@ -221,10 +270,12 @@ fn process_export_tree(
             // Re-export all public names from the base module.
             if let Some(names) = pub_surface.get(base) {
                 for name in names {
+                    let symbol_id = sym.intern(base, name);
                     re_exports.insert(name.clone(), ImportBinding {
                         source_module: base.to_vec(),
                         source_name: name.clone(),
                         kind: BindingKind::Item,
+                        symbol_id,
                     });
                 }
             }
@@ -237,10 +288,12 @@ fn process_export_tree(
 
             if known_modules.contains(&module_candidate) {
                 // Re-exporting a module handle (unusual but allowed).
+                let symbol_id = sym.intern(&module_candidate, name);
                 re_exports.insert(local, ImportBinding {
                     source_module: module_candidate,
                     source_name: name.clone(),
                     kind: BindingKind::Module,
+                    symbol_id,
                 });
             } else {
                 // Item re-export: verify it's public in the source module.
@@ -256,10 +309,12 @@ fn process_export_tree(
                         ));
                     }
                 }
+                let symbol_id = sym.intern(base, name);
                 re_exports.insert(local, ImportBinding {
                     source_module: base.to_vec(),
                     source_name: name.clone(),
                     kind: BindingKind::Item,
+                    symbol_id,
                 });
             }
         }
@@ -267,12 +322,12 @@ fn process_export_tree(
         ImportTree::Path { name, tree } => {
             let mut new_base = base.to_vec();
             new_base.push(name.clone());
-            process_export_tree(&new_base, tree, known_modules, pub_surface, path_aliases, re_exports, export_span)?;
+            process_export_tree(&new_base, tree, known_modules, pub_surface, path_aliases, re_exports, export_span, sym)?;
         }
 
         ImportTree::Group(items) => {
             for item in items {
-                process_export_tree(base, item, known_modules, pub_surface, path_aliases, re_exports, export_span)?;
+                process_export_tree(base, item, known_modules, pub_surface, path_aliases, re_exports, export_span, sym)?;
             }
         }
     }
@@ -293,6 +348,7 @@ fn process_tree(
     path_aliases: &HashMap<Vec<String>, Vec<String>>,
     scope: &mut ModuleScope,
     import_span: &Span,
+    sym: &mut SymbolTable,
 ) -> Result<(), MetelError> {
     let canon_base = canonical_path(base, path_aliases);
     let base = canon_base.as_slice();
@@ -319,22 +375,24 @@ fn process_tree(
                 (base.to_vec(), BindingKind::Item)
             };
 
+            let symbol_id = sym.intern(&source_module, name);
             add_explicit(scope, local, ImportBinding {
                 source_module,
                 source_name: name.clone(),
                 kind,
+                symbol_id,
             }, import_span)?;
         }
 
         ImportTree::Path { name, tree } => {
             let mut new_base = base.to_vec();
             new_base.push(name.clone());
-            process_tree(&new_base, tree, known_modules, path_aliases, scope, import_span)?;
+            process_tree(&new_base, tree, known_modules, path_aliases, scope, import_span, sym)?;
         }
 
         ImportTree::Group(items) => {
             for item in items {
-                process_tree(base, item, known_modules, path_aliases, scope, import_span)?;
+                process_tree(base, item, known_modules, path_aliases, scope, import_span, sym)?;
             }
         }
     }
@@ -727,5 +785,101 @@ mod tests {
         // root can import Ast from parser
         let root_scope = &names.scopes[&vec![]];
         assert!(root_scope.explicit.contains_key("Ast"));
+    }
+
+    // ── SymbolId consistency ──────────────────────────────────────────────────
+
+    #[test]
+    fn same_declaration_gets_same_symbol_id_regardless_of_importer() {
+        // root and other both import parser::Token (via absolute root:: path).
+        // Both must get the same SymbolId for parser::Token.
+        let root_prog = make_program(vec![
+            make_import(PathRoot::Root, ImportTree::Path {
+                name: "parser".into(),
+                tree: Box::new(ImportTree::Name { name: "Token".into(), alias: None }),
+            }),
+        ]);
+        let other_prog = make_program(vec![
+            make_import(PathRoot::Root, ImportTree::Path {
+                name: "parser".into(),
+                tree: Box::new(ImportTree::Name { name: "Token".into(), alias: None }),
+            }),
+        ]);
+        let graph = make_graph(vec![
+            (vec![], root_prog),
+            (vec!["other".into()], other_prog),
+            (vec!["parser".into()], make_program_with_pubs(vec![], &["Token"])),
+        ]);
+
+        let names = resolve(&graph).unwrap();
+        let root_id = names.scopes[&vec![]].explicit["Token"].symbol_id;
+        let other_id = names.scopes[&vec!["other".to_string()]].explicit["Token"].symbol_id;
+        assert_eq!(root_id, other_id, "same declaration must get same SymbolId in both importers");
+    }
+
+    #[test]
+    fn aliased_import_has_same_symbol_id_as_direct_import() {
+        // root imports parser::Token as Tok; other imports parser::Token directly.
+        // Both must resolve to the same SymbolId — alias must not change identity.
+        let root_prog = make_program(vec![
+            make_import(PathRoot::Root, ImportTree::Path {
+                name: "parser".into(),
+                tree: Box::new(ImportTree::Name { name: "Token".into(), alias: Some("Tok".into()) }),
+            }),
+        ]);
+        let other_prog = make_program(vec![
+            make_import(PathRoot::Root, ImportTree::Path {
+                name: "parser".into(),
+                tree: Box::new(ImportTree::Name { name: "Token".into(), alias: None }),
+            }),
+        ]);
+        let graph = make_graph(vec![
+            (vec![], root_prog),
+            (vec!["other".into()], other_prog),
+            (vec!["parser".into()], make_program_with_pubs(vec![], &["Token"])),
+        ]);
+
+        let names = resolve(&graph).unwrap();
+        let alias_id = names.scopes[&vec![]].explicit["Tok"].symbol_id;
+        let direct_id = names.scopes[&vec!["other".to_string()]].explicit["Token"].symbol_id;
+        assert_eq!(alias_id, direct_id, "aliased import should have same SymbolId as direct import");
+    }
+
+    #[test]
+    fn distinct_declarations_get_distinct_symbol_ids() {
+        // parser::Token and parser::Ast must have different SymbolIds.
+        let graph = make_graph(vec![
+            (vec![], make_program(vec![
+                make_import(PathRoot::Name("parser".into()), ImportTree::Group(vec![
+                    ImportTree::Name { name: "Token".into(), alias: None },
+                    ImportTree::Name { name: "Ast".into(), alias: None },
+                ])),
+            ])),
+            (vec!["parser".into()], make_program_with_pubs(vec![], &["Token", "Ast"])),
+        ]);
+
+        let names = resolve(&graph).unwrap();
+        let root_scope = &names.scopes[&vec![]];
+        let token_id = root_scope.explicit["Token"].symbol_id;
+        let ast_id = root_scope.explicit["Ast"].symbol_id;
+        assert_ne!(token_id, ast_id, "distinct declarations must have distinct SymbolIds");
+    }
+
+    #[test]
+    fn symbol_id_is_stable_in_symbol_table() {
+        // names.symbols should contain the same (module, name) → id mapping.
+        let graph = make_graph(vec![
+            (vec![], make_program(vec![
+                make_import(PathRoot::Name("parser".into()), ImportTree::Name {
+                    name: "Token".into(), alias: None,
+                }),
+            ])),
+            (vec!["parser".into()], make_program_with_pubs(vec![], &["Token"])),
+        ]);
+
+        let names = resolve(&graph).unwrap();
+        let binding_id = names.scopes[&vec![]].explicit["Token"].symbol_id;
+        let table_id = names.symbols[&(vec!["parser".to_string()], "Token".to_string())];
+        assert_eq!(binding_id, table_id, "SymbolId in binding must match entry in names.symbols");
     }
 }

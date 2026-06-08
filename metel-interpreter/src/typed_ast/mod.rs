@@ -8,8 +8,30 @@ use crate::ast::{
     Literal, BinOp, UnaryOp, AssignOp, Pattern, Span,
     Param, TypeExpr, FieldDef, GenericParam, AspectMethod, VariantDef, Block,
 };
+use crate::symbols::SymbolId;
 use crate::types::Type;
 use crate::typeinference::{TypeDefinitionRegistry, TypeScheme};
+
+/// How a method call is dispatched, resolved by the elaboration pass.
+#[derive(Debug, Clone, PartialEq)]
+pub enum MethodDispatch {
+    /// Dispatch could not be statically resolved; the evaluator falls back to runtime lookup.
+    Dynamic,
+    /// Direct method call on the concrete receiver type (not through an aspect).
+    Inherent,
+    /// Dispatches through a named aspect. `aspect_id` is the stable identity of the aspect.
+    Aspect { aspect_id: SymbolId },
+}
+
+/// A resolved import entry: the stable source location and symbol identity of an imported name.
+#[derive(Debug, Clone)]
+pub struct ResolvedImportRef {
+    pub source_module: Vec<String>,
+    pub canonical_name: String,
+    /// Stable cross-module identity assigned by the name resolver. `None` for
+    /// glob-resolved names that have no explicit binding (e.g. std auto-imports).
+    pub symbol_id: Option<SymbolId>,
+}
 
 // ── Program ───────────────────────────────────────────────────────────────────
 
@@ -25,9 +47,9 @@ pub struct TypedModule {
     /// Alias → canonical name for imports declared `import mod::name as alias`.
     /// The evaluator registers these so that `alias` resolves to the same value as `name`.
     pub import_aliases: HashMap<String, String>,
-    /// Every explicitly imported name: local_name → (source_module_path, canonical_name).
+    /// Every explicitly imported name: local_name → resolved import reference.
     /// Used by `evaluate_graph` to seed each module's environment from its dependencies.
-    pub imported_names: HashMap<String, (Vec<String>, String)>,
+    pub imported_names: HashMap<String, ResolvedImportRef>,
     /// The full type-scheme environment produced by the typechecker for this module.
     /// Used at runtime to run `construct_block` for generic function bodies
     /// (`ClosureBody::Untyped`) without a separate untyped evaluator pipeline.
@@ -268,6 +290,7 @@ pub enum TypedExpr {
         method: String,
         args: Vec<TypedExpr>,
         ty: Type,
+        dispatch: MethodDispatch,
         span: Span,
     },
     FieldAccess {

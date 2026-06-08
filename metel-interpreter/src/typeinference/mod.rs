@@ -578,6 +578,8 @@ pub struct TypeDefinitionRegistry {
     /// aspect name → ordered list of method names the aspect declares.
     /// Used to verify impl blocks are complete.
     aspect_env:  HashMap<String, Vec<String>>,
+    /// aspect name → declaring module path.
+    aspect_decl_modules: HashMap<String, Vec<String>>,
     /// aspect name → full declared methods, including default bodies.
     aspect_method_defs: HashMap<String, Vec<AspectMethod>>,
     /// (target_type_name, aspect_name) → list of type-arg vectors, one per registered impl.
@@ -600,8 +602,9 @@ impl TypeDefinitionRegistry {
             method_receiver_env: HashMap::new(),
             enum_env:           HashMap::new(),
             enum_decl_modules:  HashMap::new(),
-            aspect_env:         HashMap::new(),
-            aspect_method_defs: HashMap::new(),
+            aspect_env:          HashMap::new(),
+            aspect_decl_modules: HashMap::new(),
+            aspect_method_defs:  HashMap::new(),
             impl_aspect_env:    HashMap::new(),
         }
     }
@@ -736,12 +739,33 @@ impl TypeDefinitionRegistry {
         self.aspect_env.insert(name, methods);
     }
 
+    pub fn register_aspect_declaring_module(&mut self, name: String, module: Vec<String>) {
+        self.aspect_decl_modules.insert(name, module);
+    }
+
+    pub fn aspect_declaring_module(&self, name: &str) -> Option<&Vec<String>> {
+        self.aspect_decl_modules.get(name)
+    }
+
     pub fn register_aspect_method_defs(&mut self, name: String, methods: Vec<AspectMethod>) {
         self.aspect_method_defs.insert(name, methods);
     }
 
     pub fn aspect_method_defs(&self, name: &str) -> Option<&Vec<AspectMethod>> {
         self.aspect_method_defs.get(name)
+    }
+
+    /// Returns the name of the aspect that declares `method_name`, if any.
+    pub fn aspect_owning_method(&self, method_name: &str) -> Option<&str> {
+        self.aspect_env
+            .iter()
+            .find_map(|(aspect, methods)| {
+                if methods.iter().any(|m| m == method_name) {
+                    Some(aspect.as_str())
+                } else {
+                    None
+                }
+            })
     }
 
     pub fn register_aspect_impl(&mut self, target: String, aspect: String, type_args: Vec<Type>) {
@@ -822,6 +846,9 @@ impl TypeDefinitionRegistry {
         }
         for (k, v) in &other.aspect_env {
             self.aspect_env.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+        for (k, v) in &other.aspect_decl_modules {
+            self.aspect_decl_modules.entry(k.clone()).or_insert_with(|| v.clone());
         }
         for (k, v) in &other.aspect_method_defs {
             self.aspect_method_defs.entry(k.clone()).or_insert_with(|| v.clone());

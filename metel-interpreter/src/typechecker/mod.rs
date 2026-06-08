@@ -6,7 +6,7 @@ use crate::module_loader::LoadedModule;
 use crate::name_resolver::{GlobTier, ResolvedNames};
 use crate::path_normalizer::NormalizedModuleGraph;
 use crate::error::TypeErrorCode;
-use crate::typed_ast::{TypedDecl, TypedModule, TypedModuleGraph, TypedProgram};
+use crate::typed_ast::{ResolvedImportRef, TypedDecl, TypedModule, TypedModuleGraph, TypedProgram};
 use crate::typeinference::*;
 
 mod construction;
@@ -220,7 +220,7 @@ pub fn check_graph(
                     .map(|(local, binding)| (local.clone(), binding.source_name.clone()))
                     .collect();
 
-                let mut imports: HashMap<String, (Vec<String>, String)> = HashMap::new();
+                let mut imports: HashMap<String, ResolvedImportRef> = HashMap::new();
 
                 // Glob imports (lower priority — added first so explicit can override).
                 // Process Std then User, mirroring build_import_schemes tier ordering.
@@ -232,14 +232,22 @@ pub fn check_graph(
                 for (_, glob_module) in ordered_globs {
                     let Some(pub_schemes) = global_exports.all_pub_schemes(glob_module) else { continue };
                     for name in pub_schemes.keys() {
-                        imports.insert(name.clone(), (glob_module.clone(), name.clone()));
+                        imports.insert(name.clone(), ResolvedImportRef {
+                            source_module: glob_module.clone(),
+                            canonical_name: name.clone(),
+                            symbol_id: None,
+                        });
                     }
                 }
 
                 // Explicit imports (higher priority — overwrite globs).
                 for (local, binding) in &scope.explicit {
                     if binding.kind == crate::name_resolver::BindingKind::Item {
-                        imports.insert(local.clone(), (binding.source_module.clone(), binding.source_name.clone()));
+                        imports.insert(local.clone(), ResolvedImportRef {
+                            source_module: binding.source_module.clone(),
+                            canonical_name: binding.source_name.clone(),
+                            symbol_id: Some(binding.symbol_id),
+                        });
                     }
                 }
 
