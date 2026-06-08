@@ -20,6 +20,19 @@ use crate::typed_ast::{
 use crate::types::Type;
 
 /// Proof that the elaboration pass has run over a `TypedModuleGraph`.
+///
+/// ## Environment responsibilities after elaboration
+///
+/// | Artifact | Owner | Responsibility |
+/// |---|---|---|
+/// | `TypeDefinitionRegistry` | `TypedModuleGraph::type_registry` | Type/aspect/method definitions; the elaboration-facing `aspect_declaring_module` lookup |
+/// | `ResolvedNames::symbols` | Caller-supplied to `elaborate` | Stable `SymbolId` intern table; elaboration reads but does not write it |
+/// | `MethodDispatch` per call site | `TypedExpr::MethodCall::dispatch` | Resolved during elaboration; evaluator reads, does not re-derive |
+/// | `TypedImplBlock::aspect_id` | `TypedImplBlock` | Set during typechecker construction pass (Pass 2) using the same symbol table |
+///
+/// After `elaborate` returns, `MethodDispatch::Dynamic` sites are those whose receiver type
+/// had no aspect-method registration in the registry (e.g. calls on `fn` or tuple types).
+/// All others are `Inherent` or `Aspect { aspect_id }`.
 pub struct ElaboratedModuleGraph(pub TypedModuleGraph);
 
 /// Run elaboration over `graph` and return an `ElaboratedModuleGraph`.

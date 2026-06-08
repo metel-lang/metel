@@ -545,6 +545,17 @@ pub struct EnumInfo {
 /// derive their type information from this registry instead of maintaining parallel
 /// copies. Fields and variant payloads carry their declaration `Span` so that
 /// downstream errors can point back to the source location.
+///
+/// ## Elaboration interface
+///
+/// The elaboration pass (`elaborator::elaborate`) uses two methods on this registry:
+///
+/// - `aspect_declaring_module(name)` — returns the module path that declared `name` as an
+///   aspect; used to look up the aspect's `SymbolId` in the name-resolver's symbol table.
+///
+/// That SymbolId is the key stored in `TypedImplBlock::aspect_id` and in
+/// `RuntimeAspectImpl::aspect_id`.  The elaboration pass has no other dependency on this
+/// registry; it does not read or write inference-phase state.
 #[derive(Debug, Clone)]
 pub struct TypeDefinitionRegistry {
     /// struct name → fields with declaration spans.
@@ -739,10 +750,18 @@ impl TypeDefinitionRegistry {
         self.aspect_env.insert(name, methods);
     }
 
+    /// Record that aspect `name` was declared in `module`. Called once per `AspectDecl`
+    /// during registry construction and once per builtin aspect in
+    /// `typechecker::registry::register_primitive_type_bindings`.
     pub fn register_aspect_declaring_module(&mut self, name: String, module: Vec<String>) {
         self.aspect_decl_modules.insert(name, module);
     }
 
+    /// Return the module path that declared aspect `name`.
+    ///
+    /// Used by the **elaboration pass** to look up the aspect's `SymbolId` in the
+    /// name-resolver symbol table — the only link between the string-keyed registry and the
+    /// stable `SymbolId` world.
     pub fn aspect_declaring_module(&self, name: &str) -> Option<&Vec<String>> {
         self.aspect_decl_modules.get(name)
     }
@@ -753,19 +772,6 @@ impl TypeDefinitionRegistry {
 
     pub fn aspect_method_defs(&self, name: &str) -> Option<&Vec<AspectMethod>> {
         self.aspect_method_defs.get(name)
-    }
-
-    /// Returns the name of the aspect that declares `method_name`, if any.
-    pub fn aspect_owning_method(&self, method_name: &str) -> Option<&str> {
-        self.aspect_env
-            .iter()
-            .find_map(|(aspect, methods)| {
-                if methods.iter().any(|m| m == method_name) {
-                    Some(aspect.as_str())
-                } else {
-                    None
-                }
-            })
     }
 
     pub fn register_aspect_impl(&mut self, target: String, aspect: String, type_args: Vec<Type>) {

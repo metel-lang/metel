@@ -1,0 +1,45 @@
+// Regression: two aspects declare the same method name `label`.
+// The elaboration dispatch map is keyed by (receiver_type, method_name) so that
+// Dog::label calls Sayable::label and Cat::label calls Greetable::label without confusion.
+
+aspect Sayable {
+    fun label(self) -> String;
+    fun greet(self) -> String;
+}
+
+aspect Greetable {
+    fun label(self) -> String;
+    fun farewell(self) -> String;
+}
+
+struct Dog { name: String }
+struct Cat { name: String }
+
+impl Sayable for Dog {
+    fun label(self) -> String { string_concat("dog:", self.name) }
+    fun greet(self) -> String { string_concat("woof from ", self.name) }
+}
+
+impl Greetable for Cat {
+    fun label(self) -> String { string_concat("cat:", self.name) }
+    fun farewell(self) -> String { string_concat("purr from ", self.name) }
+}
+
+fun main() {
+    let d = Dog { name: "Rex" };
+    let c = Cat { name: "Mia" };
+
+    // Both call a method named `label` — dispatch must reach the correct impl.
+    assert(d.label() == "dog:Rex");
+    assert(c.label() == "cat:Mia");
+
+    // Methods unique to each aspect also work.
+    assert(d.greet() == "woof from Rex");
+    assert(c.farewell() == "purr from Mia");
+
+    // Second instances
+    let d2 = Dog { name: "Buddy" };
+    let c2 = Cat { name: "Luna" };
+    assert(d2.label() == "dog:Buddy");
+    assert(c2.label() == "cat:Luna");
+}

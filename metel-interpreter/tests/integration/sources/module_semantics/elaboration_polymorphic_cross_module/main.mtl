@@ -1,0 +1,19 @@
+import utils::*;
+
+// Regression: polymorphic calls from an imported module must survive the elaboration pass
+// without being mistakenly rewritten as aspect calls or losing their type information.
+
+fun main() {
+    // identity is generic: verify it works for i64, String, and boolean
+    assert(identity(42) == 42);
+    assert(identity("hello") == "hello");
+    assert(identity(true) == true);
+
+    // first returns the first argument for multiple types
+    assert(first(10, 20) == 10);
+    assert(first("a", "b") == "a");
+
+    // swap_and_first returns the second argument (verifies distinct monomorphizations)
+    assert(swap_and_first(1, 99) == 99);
+    assert(swap_and_first("x", "y") == "y");
+}

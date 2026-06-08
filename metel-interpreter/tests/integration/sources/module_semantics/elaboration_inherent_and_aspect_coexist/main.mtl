@@ -1,0 +1,50 @@
+// Regression: a type has both inherent methods and aspect methods.
+// Elaboration must mark the aspect call as Aspect{..} and the inherent call as Inherent,
+// so the evaluator routes each to the right impl without one shadowing the other.
+
+aspect Printable {
+    fun summary(self) -> String;
+}
+
+struct Counter {
+    value: i64,
+    step: i64,
+}
+
+impl Counter {
+    // Inherent constructor and methods
+    fun new(start: i64, step: i64) -> Counter {
+        Counter { value: start, step: step }
+    }
+    fun tick(&mut self) {
+        self.value = self.value + self.step;
+    }
+    fun value(self) -> i64 { self.value }
+}
+
+impl Printable for Counter {
+    // Aspect method — must not conflict with the inherent `value` method above.
+    fun summary(self) -> String {
+        string_concat("Counter(", string_concat(self.value.to_string(),
+            string_concat(", step=", string_concat(self.step.to_string(), ")"))))
+    }
+}
+
+fun main() {
+    let mut c = Counter::new(0, 3);
+
+    // Inherent methods work
+    assert(c.value() == 0);
+    c.tick();
+    assert(c.value() == 3);
+    c.tick();
+    assert(c.value() == 6);
+
+    // Aspect method works alongside inherent methods
+    assert(c.summary() == "Counter(6, step=3)");
+
+    // Both still work after another tick
+    c.tick();
+    assert(c.value() == 9);
+    assert(c.summary() == "Counter(9, step=3)");
+}
