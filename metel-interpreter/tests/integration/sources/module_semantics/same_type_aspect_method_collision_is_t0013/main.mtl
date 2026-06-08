@@ -1,0 +1,26 @@
+// Regression: two distinct aspects define the same method name on the same receiver type.
+// Static dispatch must reject the ambiguous call at compile time instead of silently
+// picking whichever impl elaboration visits first.
+
+aspect A {
+    fun label(self) -> i64;
+}
+
+aspect B {
+    fun label(self) -> i64;
+}
+
+struct S { value: i64 }
+
+impl A for S {
+    fun label(self) -> i64 { 1 }
+}
+
+impl B for S {
+    fun label(self) -> i64 { 2 }
+}
+
+fun main() {
+    let s = S { value: 0 };
+    let _n = s.label();
+}

@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 
 use crate::ast::TypeExpr;
-use crate::error::MetelError;
+use crate::error::{MetelError, TypeErrorCode};
 use crate::name_resolver::ResolvedNames;
 use crate::symbols::SymbolId;
 use crate::typed_ast::{
@@ -43,7 +43,7 @@ pub fn elaborate(
     mut graph: TypedModuleGraph,
     names: &ResolvedNames,
 ) -> Result<ElaboratedModuleGraph, MetelError> {
-    let aspect_method_map = build_aspect_method_map(&graph, names);
+    let aspect_method_map = build_aspect_method_map(&graph, names)?;
 
     for module in &mut graph.modules {
         for decl in &mut module.decls {
@@ -57,16 +57,16 @@ pub fn elaborate(
 // ── Dispatch map ─────────────────────────────────────────────────────────────
 
 /// Maps `(concrete_type_name, method_name)` → `SymbolId` of the aspect that owns
-/// that method for that type.  Keying by receiver type avoids false matches when two
+/// that method for that type. Keying by receiver type avoids false matches when two
 /// unrelated aspects from different modules both declare a method with the same name.
 ///
-/// Built from `TypedDecl::Impl` blocks: every aspect impl pairs a concrete type with
-/// exactly the methods of one aspect, so we never conflate two aspects.
+/// If two distinct aspects define the same method name on the same receiver type,
+/// elaboration rejects the program with T0013 rather than silently picking one.
 fn build_aspect_method_map(
     graph: &TypedModuleGraph,
     names: &ResolvedNames,
-) -> HashMap<(String, String), SymbolId> {
-    let mut map = HashMap::new();
+) -> Result<HashMap<(String, String), AspectDispatchOwner>, MetelError> {
+    let mut map: HashMap<(String, String), AspectDispatchOwner> = HashMap::new();
     let registry = &graph.type_registry;
 
     for module in &graph.modules {
@@ -78,13 +78,34 @@ fn build_aspect_method_map(
                 let Some(declaring_module) = registry.aspect_declaring_module(aspect_name) else { continue };
                 let Some(&id) = names.symbols.get(&(declaring_module.clone(), aspect_name.clone())) else { continue };
                 for method in &block.methods {
-                    map.entry((type_name.clone(), method.name.clone())).or_insert(id);
+                    let key = (type_name.clone(), method.name.clone());
+                    let owner = AspectDispatchOwner {
+                        aspect_id: id,
+                        aspect_name: aspect_name.clone(),
+                    };
+                    if let Some(existing_owner) = map.get(&key) {
+                        if existing_owner.aspect_id != id {
+                            return Err(MetelError::type_error(
+                                TypeErrorCode::T0013,
+                                format!(
+                                    "ambiguous aspect method `{}` on type `{}`: both `{}` and `{}` provide this method; use distinct method names or remove one impl",
+                                    method.name,
+                                    type_name,
+                                    aspect_name,
+                                    existing_owner.aspect_name,
+                                ),
+                                &method.span,
+                            ));
+                        }
+                    } else {
+                        map.insert(key, owner);
+                    }
                 }
             }
         }
     }
 
-    map
+    Ok(map)
 }
 
 /// Extract the outermost named type from a `TypeExpr` — the part used as the registry key.
@@ -123,7 +144,13 @@ fn receiver_type_name(ty: &Type) -> Option<String> {
 
 // ── Recursive elaboration ─────────────────────────────────────────────────────
 
-type DispatchMap = HashMap<(String, String), SymbolId>;
+#[derive(Clone)]
+struct AspectDispatchOwner {
+    aspect_id: SymbolId,
+    aspect_name: String,
+}
+
+type DispatchMap = HashMap<(String, String), AspectDispatchOwner>;
 
 fn elaborate_decl(decl: &mut TypedDecl, map: &DispatchMap) {
     match decl {
@@ -295,7 +322,9 @@ fn resolve_dispatch(recv_type: Option<&str>, method: &str, map: &DispatchMap) ->
         return MethodDispatch::Inherent;
     };
     match map.get(&(type_name.to_string(), method.to_string())) {
-        Some(&id) => MethodDispatch::Aspect { aspect_id: id },
+        Some(owner) => MethodDispatch::Aspect {
+            aspect_id: owner.aspect_id,
+        },
         None => MethodDispatch::Inherent,
     }
 }
@@ -307,10 +336,17 @@ mod tests {
     use super::*;
     use crate::symbols::SYM_ASPECT_DISPLAY;
 
+    fn display_owner() -> AspectDispatchOwner {
+        AspectDispatchOwner {
+            aspect_id: SYM_ASPECT_DISPLAY,
+            aspect_name: "Display".to_string(),
+        }
+    }
+
     #[test]
     fn resolve_dispatch_aspect_returns_aspect_variant() {
         let mut map = HashMap::new();
-        map.insert(("Foo".to_string(), "to_string".to_string()), SYM_ASPECT_DISPLAY);
+        map.insert(("Foo".to_string(), "to_string".to_string()), display_owner());
         assert_eq!(
             resolve_dispatch(Some("Foo"), "to_string", &map),
             MethodDispatch::Aspect { aspect_id: SYM_ASPECT_DISPLAY }
@@ -320,7 +356,7 @@ mod tests {
     #[test]
     fn resolve_dispatch_wrong_type_returns_inherent() {
         let mut map = HashMap::new();
-        map.insert(("Foo".to_string(), "to_string".to_string()), SYM_ASPECT_DISPLAY);
+        map.insert(("Foo".to_string(), "to_string".to_string()), display_owner());
         // Same method name but different receiver type → Inherent, not an aspect call.
         assert_eq!(
             resolve_dispatch(Some("Bar"), "to_string", &map),
@@ -331,7 +367,7 @@ mod tests {
     #[test]
     fn resolve_dispatch_no_type_returns_inherent() {
         let mut map = HashMap::new();
-        map.insert(("Foo".to_string(), "to_string".to_string()), SYM_ASPECT_DISPLAY);
+        map.insert(("Foo".to_string(), "to_string".to_string()), display_owner());
         assert_eq!(resolve_dispatch(None, "to_string", &map), MethodDispatch::Inherent);
     }
 
@@ -344,7 +380,7 @@ mod tests {
     #[test]
     fn resolve_dispatch_non_aspect_method_returns_inherent() {
         let mut map = HashMap::new();
-        map.insert(("Foo".to_string(), "to_string".to_string()), SYM_ASPECT_DISPLAY);
+        map.insert(("Foo".to_string(), "to_string".to_string()), display_owner());
         assert_eq!(resolve_dispatch(Some("Foo"), "push", &map), MethodDispatch::Inherent);
     }
 }

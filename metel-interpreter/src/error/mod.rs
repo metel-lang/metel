@@ -33,6 +33,7 @@ pub enum TypeErrorCode {
     T0010, // Unannotated pub declaration
     T0011, // Import name conflict
     T0012, // Aspect bound not satisfied
+    T0013, // Ambiguous aspect method resolution
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

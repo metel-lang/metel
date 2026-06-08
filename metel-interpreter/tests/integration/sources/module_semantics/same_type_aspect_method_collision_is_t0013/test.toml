@@ -1,0 +1,6 @@
+runner = "full_pipeline"
+prelude = "empty"
+[expect]
+status = "typecheck_error"
+code = "T0013"
+contains = "ambiguous aspect method `label` on type `S`"
