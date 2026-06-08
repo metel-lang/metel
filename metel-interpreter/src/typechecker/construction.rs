@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::ast::*;
 use crate::error::{TypeErrorCode, MetelError};
+use crate::symbols::SymbolId;
 use crate::typed_ast::*;
 use crate::typeinference::{self, *};
 use crate::types::Type;
@@ -88,6 +89,9 @@ struct ConstructCtx<'a> {
     /// Generic type param name → fresh TypeVar; populated during construction-at-call-time
     /// so type annotations like `T[]` in a generic body resolve to concrete types.
     generic_params: HashMap<String, TypeVar>,
+    /// Symbol intern table from the name resolver; used to populate `TypedImplBlock::aspect_id`.
+    /// `None` for single-module pipelines that don't go through `check_graph`.
+    symbols: Option<&'a HashMap<(Vec<String>, String), SymbolId>>,
 }
 
 impl<'a> ConstructCtx<'a> {
@@ -96,6 +100,7 @@ impl<'a> ConstructCtx<'a> {
         scheme_env: &'a SchemeEnv,
         registry:   &'a TypeDefinitionRegistry,
         gen:        TypeVarGenerator,
+        symbols:    Option<&'a HashMap<(Vec<String>, String), SymbolId>>,
     ) -> Result<Self, MetelError> {
         let concrete_struct_env = build_concrete_struct_env(registry, subst)?;
         let method_env = build_concrete_method_env(registry, subst)?;
@@ -108,6 +113,7 @@ impl<'a> ConstructCtx<'a> {
             current_return_ty: None,
             current_break_ty:  None,
             generic_params: HashMap::new(),
+            symbols,
         };
         // Derive concrete types for all monomorphic entries in scheme_env.
         // Both builtins and user functions are populated here — no second registration site.
@@ -231,6 +237,7 @@ pub(super) fn construct_generic_body(
         &type_ctx.scheme_env,
         &type_ctx.registry,
         gen,
+        None,
     )?;
 
     // Build name → fresh TypeVar mapping so type annotations like `T[]` in the body
@@ -266,8 +273,9 @@ pub(super) fn construct_program(
     scheme_env: &SchemeEnv,
     registry:   &TypeDefinitionRegistry,
     gen:        TypeVarGenerator,
+    symbols:    Option<&HashMap<(Vec<String>, String), SymbolId>>,
 ) -> Result<TypedProgram, MetelError> {
-    let mut ctx = ConstructCtx::new(subst, scheme_env, registry, gen)?;
+    let mut ctx = ConstructCtx::new(subst, scheme_env, registry, gen, symbols)?;
 
     let mut out = vec![];
     for decl in &program.decls {
@@ -387,8 +395,16 @@ fn construct_impl_decl(ib: &ImplBlock, ctx: &mut ConstructCtx) -> Result<TypedDe
         .map(|m| construct_impl_method(m, &target_name, ctx))
         .collect::<Result<Vec<_>, _>>()?;
     methods.extend(construct_default_aspect_methods(ib, &target_name, ctx)?);
+
+    // Resolve aspect_id from the symbol table when available.
+    let aspect_id = ib.aspect_name.as_deref().and_then(|aspect_name| {
+        let declaring_module = ctx.registry.aspect_declaring_module(aspect_name)?;
+        ctx.symbols?.get(&(declaring_module.clone(), aspect_name.to_string())).copied()
+    });
+
     Ok(TypedDecl::Impl(TypedImplBlock {
         aspect_name:      ib.aspect_name.clone(),
+        aspect_id,
         aspect_type_args: ib.aspect_type_args.clone(),
         target_type:      ib.target_type.clone(),
         methods,

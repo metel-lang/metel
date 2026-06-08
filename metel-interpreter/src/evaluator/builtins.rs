@@ -123,6 +123,7 @@ pub(super) fn register_builtins(runtime: &mut RuntimeRegistry) {
             runtime.register_aspect_method(
                 $type_name,
                 $aspect_name,
+                None,
                 vec![$($type_arg.to_string()),*],
                 $method_name,
                 $value,

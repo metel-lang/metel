@@ -39,6 +39,7 @@ pub(super) fn attach_stack(err: MetelError) -> MetelError {
 }
 use crate::ast::Block;
 use crate::elaborator::ElaboratedModuleGraph;
+use crate::symbols::SymbolId;
 use crate::typed_ast::{
     FunBody, MethodDispatch, ResolvedImportRef, TypedBlock, TypedDecl, TypedExpr, TypedForInit,
     TypedProgram, TypedStmt,
@@ -133,6 +134,9 @@ pub struct RuntimeTypeEntry {
 #[derive(Debug, Clone, Default)]
 pub struct RuntimeAspectImpl {
     aspect_name: String,
+    /// Stable identity of the aspect; `None` when aspect was registered via the old
+    /// string-only path (builtins / single-module pipeline without name resolver).
+    aspect_id: Option<SymbolId>,
     type_args: Vec<String>,
     methods: HashMap<String, RuntimeMethod>,
 }
@@ -228,6 +232,7 @@ impl RuntimeRegistry {
         &mut self,
         type_name: impl Into<String>,
         aspect_name: impl Into<String>,
+        aspect_id: Option<SymbolId>,
         type_args: Vec<String>,
         method_name: impl Into<String>,
         value: RuntimeMethod,
@@ -240,6 +245,10 @@ impl RuntimeRegistry {
             .iter_mut()
             .find(|aspect_impl| aspect_impl.aspect_name == aspect_name && aspect_impl.type_args == type_args)
         {
+            // Update aspect_id if we now have one (a later registration may have the id).
+            if aspect_impl.aspect_id.is_none() {
+                aspect_impl.aspect_id = aspect_id;
+            }
             aspect_impl.methods.insert(method_name, value);
             return;
         }
@@ -248,9 +257,34 @@ impl RuntimeRegistry {
         methods.insert(method_name, value);
         entry.aspect_impls.push(RuntimeAspectImpl {
             aspect_name,
+            aspect_id,
             type_args,
             methods,
         });
+    }
+
+    /// Look up a method that belongs to a specific aspect (by stable SymbolId).
+    /// Falls back to string-name lookup when `aspect_id` has no registered entry
+    /// (e.g. builtins registered before the elaboration pass ran).
+    pub fn get_aspect_method_by_id(
+        &self,
+        type_name: &str,
+        aspect_id: SymbolId,
+        method_name: &str,
+    ) -> Option<RuntimeMethod> {
+        let entry = self.types.get(type_name)?;
+        // Prefer exact SymbolId match.
+        if let Some(method) = entry.aspect_impls.iter().rev().find_map(|ai| {
+            if ai.aspect_id == Some(aspect_id) {
+                ai.methods.get(method_name).cloned().filter(|m| m.receiver.is_some())
+            } else {
+                None
+            }
+        }) {
+            return Some(method);
+        }
+        // Fall back to string-based search (covers builtins without a SymbolId).
+        self.get_aspect_method(type_name, method_name)
     }
 
     pub fn register_pattern_method(
@@ -1092,6 +1126,7 @@ fn run_passes(
                             runtime.register_aspect_method(
                                 type_name,
                                 aspect_name,
+                                impl_block.aspect_id,
                                 aspect_type_args,
                                 &method.name,
                                 runtime_method,
@@ -2086,11 +2121,11 @@ pub fn eval_expr(
             // Runtime methods are dispatched through the runtime registry, not lexical env.
             let recv_type_view = deref_value(&recv_val, span)?.unwrap_or_else(|| recv_val.clone());
             let method_entry = match dispatch {
-                // Elaboration resolved this as an aspect call: skip inherent methods and search
-                // only aspect_impls so that an inherent method of the same name is not used.
-                MethodDispatch::Aspect { .. } => {
+                // Elaboration resolved this as an aspect call: dispatch by stable SymbolId,
+                // falling back to string search for builtins that lack a SymbolId.
+                MethodDispatch::Aspect { aspect_id } => {
                     runtime_type_name(&recv_type_view)
-                        .and_then(|tn| runtime.get_aspect_method(tn, method))
+                        .and_then(|tn| runtime.get_aspect_method_by_id(tn, *aspect_id, method))
                         .or_else(|| runtime.get_method_for_value(&recv_type_view, method))
                 }
                 // Inherent or unresolved: use the full lookup (inherent is tried first).

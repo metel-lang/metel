@@ -6,6 +6,7 @@ use crate::module_loader::LoadedModule;
 use crate::name_resolver::{GlobTier, ResolvedNames};
 use crate::path_normalizer::NormalizedModuleGraph;
 use crate::error::TypeErrorCode;
+use crate::symbols::SymbolId;
 use crate::typed_ast::{ResolvedImportRef, TypedDecl, TypedModule, TypedModuleGraph, TypedProgram};
 use crate::typeinference::*;
 
@@ -203,6 +204,7 @@ pub fn check_graph(
                 &type_registry,
                 &std_prelude,
                 &loaded.module_path,
+                Some(&names.symbols),
             )?;
         type_registry = next_registry;
 
@@ -450,6 +452,7 @@ pub fn check(program: Program) -> Result<TypedProgram, MetelError> {
         &TypeDefinitionRegistry::new(),
         &StdPrelude::default(),
         &[],
+        None,
     )?;
     Ok(decls)
 }
@@ -468,6 +471,7 @@ pub fn check_with_ctx(
         &TypeDefinitionRegistry::new(),
         &std_prelude,
         &[],
+        None,
     )?;
     let mut full_scheme_env = scheme_env;
     registry::register_builtin_schemes(&mut full_scheme_env, &std_prelude);
@@ -507,6 +511,7 @@ fn check_impl(
     base_registry: &TypeDefinitionRegistry,
     std_prelude: &StdPrelude,
     current_module_path: &[String],
+    symbols: Option<&HashMap<(Vec<String>, String), SymbolId>>,
 ) -> Result<(Vec<TypedDecl>, SchemeEnv, TypeDefinitionRegistry), MetelError> {
     // Lowering pass: desugar `impl Aspect` params to fresh anonymous type params.
     let program = inference::lower_impl_aspects_in_program(program.clone());
@@ -556,6 +561,7 @@ fn check_impl(
         &scheme_env,
         ctx.registry(),
         gen,
+        symbols,
     )?;
 
     // Return only user-defined names. Builtins (from StdPrelude) are available to

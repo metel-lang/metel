@@ -154,6 +154,9 @@ pub struct TypedEnumDecl {
 #[derive(Debug, Clone)]
 pub struct TypedImplBlock {
     pub aspect_name:      Option<String>,
+    /// Stable identity of the aspect this impl satisfies.  `None` for inherent impls.
+    /// Populated by the typechecker construction pass when `names.symbols` is available.
+    pub aspect_id:        Option<SymbolId>,
     pub aspect_type_args: Vec<TypeExpr>,
     pub target_type:      TypeExpr,
     pub methods:          Vec<TypedFunDecl>,
