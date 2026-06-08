@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use metel::error::MetelError;
-use metel::{evaluator, module_loader, name_resolver, parser, path_normalizer, typechecker};
+use metel::{elaborator, evaluator, module_loader, name_resolver, parser, path_normalizer, typechecker};
 
 use super::fixture::{main_source_path, ExpectStatus, FixtureConfig, GraphChecks, ProgramChecks, StdPreludeMode};
 
@@ -91,7 +91,8 @@ fn run_full_pipeline(path: &Path, prelude_mode: StdPreludeMode, checks: &GraphCh
     let names = name_resolver::resolve(&graph)?;
     let normalized = path_normalizer::normalize(graph, &names)?;
     let typed = typechecker::check_graph(normalized, &names, std_prelude(prelude_mode))?;
-    evaluator::evaluate_graph(typed)
+    let elaborated = elaborator::elaborate(typed, &names)?;
+    evaluator::evaluate_graph(elaborated)
 }
 
 fn std_prelude(mode: StdPreludeMode) -> typechecker::StdPrelude {

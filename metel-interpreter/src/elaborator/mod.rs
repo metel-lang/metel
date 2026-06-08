@@ -1,0 +1,337 @@
+/// The elaboration pass: walks the typed AST and resolves `MethodDispatch` for every
+/// `TypedExpr::MethodCall`. After elaboration the caller holds an `ElaboratedModuleGraph`,
+/// a proof that this pass has run.
+///
+/// For the tree-walk interpreter, elaboration pre-resolves whether each method call goes
+/// through an aspect (and which one) or is a direct inherent call, so the evaluator can
+/// skip the runtime aspect-registry lookup for statically-known sites.
+
+use std::collections::HashMap;
+
+use crate::ast::TypeExpr;
+use crate::error::MetelError;
+use crate::name_resolver::ResolvedNames;
+use crate::symbols::SymbolId;
+use crate::typed_ast::{
+    FunBody, MethodDispatch, TypedBlock, TypedDecl, TypedExpr, TypedForInit,
+    TypedImplBlock, TypedMatchArm, TypedMatchExpr, TypedPlace, TypedStmt,
+    TypedModuleGraph,
+};
+use crate::types::Type;
+
+/// Proof that the elaboration pass has run over a `TypedModuleGraph`.
+pub struct ElaboratedModuleGraph(pub TypedModuleGraph);
+
+/// Run elaboration over `graph` and return an `ElaboratedModuleGraph`.
+///
+/// Each `MethodCall::dispatch` field starts as `Dynamic`; this pass upgrades it to
+/// `Aspect { aspect_id }` or `Inherent` where the target can be statically determined.
+pub fn elaborate(
+    mut graph: TypedModuleGraph,
+    names: &ResolvedNames,
+) -> Result<ElaboratedModuleGraph, MetelError> {
+    let aspect_method_map = build_aspect_method_map(&graph, names);
+
+    for module in &mut graph.modules {
+        for decl in &mut module.decls {
+            elaborate_decl(decl, &aspect_method_map);
+        }
+    }
+
+    Ok(ElaboratedModuleGraph(graph))
+}
+
+// ── Dispatch map ─────────────────────────────────────────────────────────────
+
+/// Maps `(concrete_type_name, method_name)` → `SymbolId` of the aspect that owns
+/// that method for that type.  Keying by receiver type avoids false matches when two
+/// unrelated aspects from different modules both declare a method with the same name.
+///
+/// Built from `TypedDecl::Impl` blocks: every aspect impl pairs a concrete type with
+/// exactly the methods of one aspect, so we never conflate two aspects.
+fn build_aspect_method_map(
+    graph: &TypedModuleGraph,
+    names: &ResolvedNames,
+) -> HashMap<(String, String), SymbolId> {
+    let mut map = HashMap::new();
+    let registry = &graph.type_registry;
+
+    for module in &graph.modules {
+        for decl in &module.decls {
+            if let TypedDecl::Impl(block) = decl {
+                let Some(aspect_name) = &block.aspect_name else { continue };
+                let Some(type_name) = type_expr_outer_name(&block.target_type) else { continue };
+                // Resolve the aspect's SymbolId via its declaring module.
+                let Some(declaring_module) = registry.aspect_declaring_module(aspect_name) else { continue };
+                let Some(&id) = names.symbols.get(&(declaring_module.clone(), aspect_name.clone())) else { continue };
+                for method in &block.methods {
+                    map.entry((type_name.clone(), method.name.clone())).or_insert(id);
+                }
+            }
+        }
+    }
+
+    map
+}
+
+/// Extract the outermost named type from a `TypeExpr` — the part used as the registry key.
+/// `List<i32>` → `"List"`, `Foo` → `"Foo"`, everything else → `None`.
+fn type_expr_outer_name(te: &TypeExpr) -> Option<String> {
+    match te {
+        TypeExpr::Named(name, _) => Some(name.clone()),
+        _ => None,
+    }
+}
+
+/// Map a resolved `Type` to the string used in the runtime registry.
+/// Mirrors `runtime_type_name` in the evaluator.  Returns `None` for types
+/// (arrays, tuples, fn pointers) that don't have a named registry entry.
+fn receiver_type_name(ty: &Type) -> Option<String> {
+    match ty {
+        Type::Named(name, _) => Some(name.clone()),
+        Type::Boolean    => Some("boolean".to_string()),
+        Type::Str        => Some("String".to_string()),
+        Type::Char       => Some("Char".to_string()),
+        Type::I8         => Some("i8".to_string()),
+        Type::I16        => Some("i16".to_string()),
+        Type::I32        => Some("i32".to_string()),
+        Type::I64        => Some("i64".to_string()),
+        Type::U8         => Some("u8".to_string()),
+        Type::U16        => Some("u16".to_string()),
+        Type::U32        => Some("u32".to_string()),
+        Type::U64        => Some("u64".to_string()),
+        Type::F32        => Some("f32".to_string()),
+        Type::F64        => Some("f64".to_string()),
+        // Pointers: dispatch through the pointee type (deref_value unwraps them at runtime).
+        Type::Pointer(inner) | Type::MutPointer(inner) => receiver_type_name(inner),
+        _ => None,
+    }
+}
+
+// ── Recursive elaboration ─────────────────────────────────────────────────────
+
+type DispatchMap = HashMap<(String, String), SymbolId>;
+
+fn elaborate_decl(decl: &mut TypedDecl, map: &DispatchMap) {
+    match decl {
+        TypedDecl::Fun(f) => elaborate_fun_body(&mut f.body, map),
+        TypedDecl::Let(l) => elaborate_expr(&mut l.value, map),
+        TypedDecl::Mut(m) => elaborate_expr(&mut m.value, map),
+        TypedDecl::Impl(block) => elaborate_impl_block(block, map),
+        // Struct / Enum / Aspect carry no executable bodies.
+        TypedDecl::Struct(_) | TypedDecl::Enum(_) | TypedDecl::Aspect(_) => {}
+        TypedDecl::Stmt(stmt) => elaborate_stmt(stmt, map),
+    }
+}
+
+fn elaborate_fun_body(body: &mut FunBody, map: &DispatchMap) {
+    if let FunBody::Typed(block) = body {
+        elaborate_block(block, map);
+    }
+    // FunBody::Generic bodies are re-evaluated at call sites; skip here.
+}
+
+fn elaborate_impl_block(block: &mut TypedImplBlock, map: &DispatchMap) {
+    for method in &mut block.methods {
+        elaborate_fun_body(&mut method.body, map);
+    }
+}
+
+fn elaborate_block(block: &mut TypedBlock, map: &DispatchMap) {
+    for decl in &mut block.stmts {
+        elaborate_decl(decl, map);
+    }
+    if let Some(tail) = &mut block.tail {
+        elaborate_expr(tail, map);
+    }
+}
+
+fn elaborate_stmt(stmt: &mut TypedStmt, map: &DispatchMap) {
+    match stmt {
+        TypedStmt::Expr(e) => elaborate_expr(e, map),
+        TypedStmt::Return(r) => {
+            if let Some(v) = &mut r.value {
+                elaborate_expr(v, map);
+            }
+        }
+        TypedStmt::Break(b) => {
+            if let Some(v) = &mut b.value {
+                elaborate_expr(v, map);
+            }
+        }
+        TypedStmt::Continue(_) => {}
+        TypedStmt::While(w) => {
+            elaborate_expr(&mut w.condition, map);
+            elaborate_block(&mut w.body, map);
+        }
+        TypedStmt::For(f) => {
+            if let Some(init) = &mut f.init {
+                match init {
+                    TypedForInit::Let(l) => elaborate_expr(&mut l.value, map),
+                    TypedForInit::Mut(m) => elaborate_expr(&mut m.value, map),
+                    TypedForInit::Expr(e) => elaborate_expr(e, map),
+                }
+            }
+            if let Some(cond) = &mut f.condition {
+                elaborate_expr(cond, map);
+            }
+            if let Some(step) = &mut f.step {
+                elaborate_expr(step, map);
+            }
+            elaborate_block(&mut f.body, map);
+        }
+        TypedStmt::ForIn(fi) => {
+            elaborate_expr(&mut fi.iterable, map);
+            elaborate_block(&mut fi.body, map);
+        }
+    }
+}
+
+fn elaborate_place(place: &mut TypedPlace, map: &DispatchMap) {
+    match place {
+        TypedPlace::Ident(..) => {}
+        TypedPlace::Deref { object, .. } => elaborate_expr(object, map),
+        TypedPlace::Field { object, .. } => elaborate_place(object, map),
+        TypedPlace::Index { object, index, .. } => {
+            elaborate_place(object, map);
+            elaborate_expr(index, map);
+        }
+    }
+}
+
+fn elaborate_expr(expr: &mut TypedExpr, map: &DispatchMap) {
+    match expr {
+        TypedExpr::MethodCall { method, dispatch, receiver, args, .. } => {
+            if *dispatch == MethodDispatch::Dynamic {
+                let recv_type = receiver_type_name(receiver.ty());
+                *dispatch = resolve_dispatch(recv_type.as_deref(), method, map);
+            }
+            elaborate_expr(receiver, map);
+            for arg in args.iter_mut() {
+                elaborate_expr(arg, map);
+            }
+        }
+        TypedExpr::Call { callee, args, .. } => {
+            elaborate_expr(callee, map);
+            for arg in args.iter_mut() {
+                elaborate_expr(arg, map);
+            }
+        }
+        TypedExpr::BinOp(lhs, _, rhs, ..) => {
+            elaborate_expr(lhs, map);
+            elaborate_expr(rhs, map);
+        }
+        TypedExpr::UnaryOp(_, operand, ..) => elaborate_expr(operand, map),
+        TypedExpr::Tuple(elems, ..) | TypedExpr::Array(elems, ..) => {
+            for e in elems.iter_mut() {
+                elaborate_expr(e, map);
+            }
+        }
+        TypedExpr::RepeatArray(elem, ..) => elaborate_expr(elem, map),
+        TypedExpr::Assign { target, value, .. } => {
+            elaborate_place(target, map);
+            elaborate_expr(value, map);
+        }
+        TypedExpr::FieldAccess { object, .. } | TypedExpr::TupleAccess { object, .. } => {
+            elaborate_expr(object, map);
+        }
+        TypedExpr::Index { object, index, .. } => {
+            elaborate_expr(object, map);
+            elaborate_expr(index, map);
+        }
+        TypedExpr::Cast { expr: inner, .. } => elaborate_expr(inner, map),
+        TypedExpr::If { condition, then_branch, else_branch, .. } => {
+            elaborate_expr(condition, map);
+            elaborate_block(then_branch, map);
+            if let Some(b) = else_branch {
+                elaborate_block(b, map);
+            }
+        }
+        TypedExpr::Loop { body, .. } => elaborate_block(body, map),
+        TypedExpr::Closure { body, .. } => elaborate_block(body, map),
+        TypedExpr::GenericClosure { .. } => {}
+        TypedExpr::Match(m) => elaborate_match(m, map),
+        TypedExpr::StructLiteral { fields, .. } => {
+            for (_, e) in fields.iter_mut() {
+                elaborate_expr(e, map);
+            }
+        }
+        TypedExpr::Literal(..) | TypedExpr::Ident(..) | TypedExpr::Path(..) => {}
+    }
+}
+
+fn elaborate_match(m: &mut TypedMatchExpr, map: &DispatchMap) {
+    elaborate_expr(&mut m.scrutinee, map);
+    for arm in &mut m.arms {
+        elaborate_match_arm(arm, map);
+    }
+}
+
+fn elaborate_match_arm(arm: &mut TypedMatchArm, map: &DispatchMap) {
+    if let Some(guard) = &mut arm.guard {
+        elaborate_expr(guard, map);
+    }
+    elaborate_block(&mut arm.body, map);
+}
+
+/// Resolve dispatch for a single call site.
+/// `recv_type` is `None` when the receiver has no nameable type (array, tuple, fn);
+/// those calls are always `Inherent` since aspects only apply to named types.
+fn resolve_dispatch(recv_type: Option<&str>, method: &str, map: &DispatchMap) -> MethodDispatch {
+    let Some(type_name) = recv_type else {
+        return MethodDispatch::Inherent;
+    };
+    match map.get(&(type_name.to_string(), method.to_string())) {
+        Some(&id) => MethodDispatch::Aspect { aspect_id: id },
+        None => MethodDispatch::Inherent,
+    }
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::symbols::SYM_ASPECT_DISPLAY;
+
+    #[test]
+    fn resolve_dispatch_aspect_returns_aspect_variant() {
+        let mut map = HashMap::new();
+        map.insert(("Foo".to_string(), "to_string".to_string()), SYM_ASPECT_DISPLAY);
+        assert_eq!(
+            resolve_dispatch(Some("Foo"), "to_string", &map),
+            MethodDispatch::Aspect { aspect_id: SYM_ASPECT_DISPLAY }
+        );
+    }
+
+    #[test]
+    fn resolve_dispatch_wrong_type_returns_inherent() {
+        let mut map = HashMap::new();
+        map.insert(("Foo".to_string(), "to_string".to_string()), SYM_ASPECT_DISPLAY);
+        // Same method name but different receiver type → Inherent, not an aspect call.
+        assert_eq!(
+            resolve_dispatch(Some("Bar"), "to_string", &map),
+            MethodDispatch::Inherent
+        );
+    }
+
+    #[test]
+    fn resolve_dispatch_no_type_returns_inherent() {
+        let mut map = HashMap::new();
+        map.insert(("Foo".to_string(), "to_string".to_string()), SYM_ASPECT_DISPLAY);
+        assert_eq!(resolve_dispatch(None, "to_string", &map), MethodDispatch::Inherent);
+    }
+
+    #[test]
+    fn resolve_dispatch_unknown_method_returns_inherent() {
+        let map = HashMap::new();
+        assert_eq!(resolve_dispatch(Some("Foo"), "len", &map), MethodDispatch::Inherent);
+    }
+
+    #[test]
+    fn resolve_dispatch_non_aspect_method_returns_inherent() {
+        let mut map = HashMap::new();
+        map.insert(("Foo".to_string(), "to_string".to_string()), SYM_ASPECT_DISPLAY);
+        assert_eq!(resolve_dispatch(Some("Foo"), "push", &map), MethodDispatch::Inherent);
+    }
+}

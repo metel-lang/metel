@@ -38,9 +38,10 @@ pub(super) fn attach_stack(err: MetelError) -> MetelError {
     err.with_stack(snapshot_stack())
 }
 use crate::ast::Block;
+use crate::elaborator::ElaboratedModuleGraph;
 use crate::typed_ast::{
-    FunBody, TypedBlock, TypedDecl, TypedExpr, TypedForInit, TypedModuleGraph, TypedProgram,
-    TypedStmt,
+    FunBody, MethodDispatch, ResolvedImportRef, TypedBlock, TypedDecl, TypedExpr, TypedForInit,
+    TypedProgram, TypedStmt,
 };
 
 // ── Runtime values ────────────────────────────────────────────────────────────
@@ -296,6 +297,22 @@ impl RuntimeRegistry {
             .get(method_name)
             .cloned()
             .filter(|method| method.receiver.is_some())
+    }
+
+    /// Look up a method that is known to come from an aspect impl, skipping inherent methods.
+    pub fn get_aspect_method(&self, type_name: &str, method_name: &str) -> Option<RuntimeMethod> {
+        self.types
+            .get(type_name)?
+            .aspect_impls
+            .iter()
+            .rev()
+            .find_map(|aspect_impl| {
+                aspect_impl
+                    .methods
+                    .get(method_name)
+                    .cloned()
+                    .filter(|method| method.receiver.is_some())
+            })
     }
 
     pub fn get_regular_method(&self, type_name: &str, method_name: &str) -> Option<RuntimeMethod> {
@@ -908,7 +925,8 @@ impl Environment {
 /// then cross-linked via the `imported_names` table populated by `check_graph`.
 /// Modules are processed in topological order (dependencies before dependents).
 /// See ADR-0029 for the isolation design and ADR-0019 for the superseded flat-merge approach.
-pub fn evaluate_graph(graph: TypedModuleGraph) -> Result<(), MetelError> {
+pub fn evaluate_graph(elaborated: ElaboratedModuleGraph) -> Result<(), MetelError> {
+    let graph = elaborated.0;
     CALL_STACK.with(|s| s.borrow_mut().clear());
     let mut runtime = builtins::runtime_registry();
 
@@ -926,7 +944,8 @@ pub fn evaluate_graph(graph: TypedModuleGraph) -> Result<(), MetelError> {
         let mut env = Environment::new();
 
         // Seed names imported from already-initialised dependency modules.
-        for (local_name, (source_module, canonical_name)) in &module.imported_names {
+        for (local_name, import_ref) in &module.imported_names {
+            let ResolvedImportRef { source_module, canonical_name, .. } = import_ref;
             if let Some(src_env) = module_envs.get(source_module) {
                 if let Some(val) = src_env.get(canonical_name) {
                     env.define(local_name, val);
@@ -2054,6 +2073,7 @@ pub fn eval_expr(
             receiver,
             method,
             args,
+            dispatch,
             span,
             ..
         } => {
@@ -2065,15 +2085,26 @@ pub fn eval_expr(
 
             // Runtime methods are dispatched through the runtime registry, not lexical env.
             let recv_type_view = deref_value(&recv_val, span)?.unwrap_or_else(|| recv_val.clone());
-            let method_entry = runtime
-                .get_method_for_value(&recv_type_view, method)
-                .ok_or_else(|| {
-                    MetelError::panic(
-                        RuntimeErrorCode::R0009,
-                        format!("method `{method}` not found on this value"),
-                        span,
-                    )
-                })?;
+            let method_entry = match dispatch {
+                // Elaboration resolved this as an aspect call: skip inherent methods and search
+                // only aspect_impls so that an inherent method of the same name is not used.
+                MethodDispatch::Aspect { .. } => {
+                    runtime_type_name(&recv_type_view)
+                        .and_then(|tn| runtime.get_aspect_method(tn, method))
+                        .or_else(|| runtime.get_method_for_value(&recv_type_view, method))
+                }
+                // Inherent or unresolved: use the full lookup (inherent is tried first).
+                MethodDispatch::Inherent | MethodDispatch::Dynamic => {
+                    runtime.get_method_for_value(&recv_type_view, method)
+                }
+            }
+            .ok_or_else(|| {
+                MetelError::panic(
+                    RuntimeErrorCode::R0009,
+                    format!("method `{method}` not found on this value"),
+                    span,
+                )
+            })?;
             let func = method_entry.body.clone();
             match method_entry.receiver {
                 Some(crate::ast::ReceiverKind::Ref | crate::ast::ReceiverKind::RefMut) => {

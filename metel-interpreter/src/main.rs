@@ -3,6 +3,7 @@ use std::process;
 use clap::Parser;
 
 mod ast;
+mod elaborator;
 mod error;
 mod evaluator;
 mod module_loader;
@@ -10,6 +11,7 @@ mod module_paths;
 mod name_resolver;
 mod parser;
 mod path_normalizer;
+mod symbols;
 mod typed_ast;
 mod typechecker;
 mod typeinference;
@@ -60,8 +62,11 @@ fn run(filename: &str, debug_ast: bool) -> Result<(), MetelError> {
     // 3. Typecheck
     let typed_graph = typechecker::check_graph(normalized, &names, StdPrelude::default())?;
 
-    // 4. Evaluate
-    evaluator::evaluate_graph(typed_graph)?;
+    // 4. Elaborate
+    let elaborated = elaborator::elaborate(typed_graph, &names)?;
+
+    // 5. Evaluate
+    evaluator::evaluate_graph(elaborated)?;
 
     Ok(())
 }
