@@ -4,4 +4,4 @@ pub fun identity<T>(x: T) -> T { x }
 
 pub fun first<T>(a: T, b: T) -> T { a }
 
-pub fun swap_and_first<T>(a: T, b: T) -> T { b }
+pub fun apply<T>(f: (T) -> T, x: T) -> T { f(x) }
