@@ -1,6 +1,6 @@
 # Typechecker Implementation Notes
 
-> Status: v0.6.0 complete — per-module `check_graph` pipeline (RFC-0031) shipped.
+> Status: v0.8.1 — elaboration support added (METEL-152): `check_graph` now threads `names.symbols` through `check_impl` → `construct_program` → `ConstructCtx` so that `construct_impl_decl` can populate `TypedImplBlock::aspect_id`.
 
 ---
 
@@ -49,9 +49,9 @@ Entry points:
 | File | Responsibility |
 |---|---|
 | `mod.rs` | `check()` / `check_graph()` entry points; `StdPrelude`, `GlobalExports`, `check_impl` |
-| `registry.rs` | `build_registry`, `register_builtins`, `build_concrete_*_env` |
+| `registry.rs` | `build_registry`, `register_builtins`, `build_concrete_*_env`; registers aspect declaring modules for elaboration |
 | `inference.rs` | Pass 1 — all `infer_*` functions |
-| `construction.rs` | Pass 2 — `ConstructCtx`, all `construct_*` functions, exhaustiveness checking |
+| `construction.rs` | Pass 2 — `ConstructCtx`, all `construct_*` functions, exhaustiveness checking; `ConstructCtx` carries `symbols: Option<&HashMap<(Vec<String>, String), SymbolId>>` threaded from `check_graph` so `construct_impl_decl` can set `TypedImplBlock::aspect_id` |
 | `conversions.rs` | `type_expr_to_infer`, `infer_type_to_type`, `resolved_to_type`, `type_to_infer` |
 
 The inference engine lives in `src/typeinference/` (type vars, unification, substitution, constraints, schemes). The typechecker modules in `src/typechecker/` walk the AST and drive that engine.
@@ -288,6 +288,15 @@ All type and impl data is stored in a single `TypeDefinitionRegistry` (owned by 
 | `impl_aspect_env` | `HashMap<(target, aspect), Vec<Vec<Type>>>` | aspect impl type-arg lists |
 
 `TypeDefinitionRegistry` is constructed in one pre-pass and injected into `InferContext::new`, consistent with [ADR-0001](decisions/adr-0001-typeregistry-structure-and-location.md).
+
+### Elaboration output: `TypedImplBlock::aspect_id`
+
+`TypedImplBlock` carries `aspect_id: Option<SymbolId>` (v0.8.1, METEL-152). It is populated at the end of `construct_impl_decl` by:
+
+1. Looking up the aspect's declaring module via `ctx.registry.aspect_declaring_module(aspect_name)`.
+2. Looking up the `SymbolId` for `(declaring_module, aspect_name)` in `ctx.symbols` (the name resolver's intern table, threaded from `check_graph`).
+
+`ctx.symbols` is `None` on the single-module pipeline (`check` / `check_with_ctx`), so `aspect_id` is `None` in that path. The elaborator (`elaborate`) consumes `aspect_id` and stores it in `RuntimeAspectImpl::aspect_id` for SymbolId-keyed dispatch.
 
 ---
 

@@ -1,20 +1,20 @@
 # Evaluator Implementation Notes
 
-> Status: PoC complete (v0.1).  
-> This evaluator is intentionally the simplest correct implementation. It will be rewritten before production use. Do not over-engineer it; open new issues for correctness gaps instead of adding complexity here.
+> Status: v0.8.1 — elaboration pipeline wired (METEL-151/152): evaluator now takes `ElaboratedModuleGraph` and dispatches aspect method calls by `SymbolId` rather than by string name.  
+> The evaluator is intentionally the simplest correct implementation. It will be rewritten before production use. Do not over-engineer it; open new issues for correctness gaps instead of adding complexity here.
 
 ---
 
 ## Pipeline Position
 
 ```
-TypedProgram      ──►  evaluate()       ──►  side effects / RuntimePanic  (legacy)
-TypedModuleGraph  ──►  evaluate_graph() ──►  side effects / RuntimePanic  (v0.6.0)
+TypedProgram           ──►  evaluate()       ──►  side effects / RuntimePanic  (legacy, single-module test path)
+ElaboratedModuleGraph  ──►  evaluate_graph() ──►  side effects / RuntimePanic  (v0.8.1, main pipeline)
 ```
 
 Entry points:
-- `evaluator::evaluate(program: TypedProgram) -> Result<(), MetelError>` — single-module legacy path; used by the evaluator test harness only, not called from the main pipeline
-- `evaluator::evaluate_graph(graph: TypedModuleGraph) -> Result<(), MetelError>` — multi-module path (v0.6.0): processes each `TypedModule` in topological order in its own isolated `Environment`, seeding imported names from already-evaluated dependency environments and sharing a process-wide `RuntimeRegistry` for `std::core` ownership plus type/aspect dispatch
+- `evaluator::evaluate(program: TypedProgram) -> Result<(), MetelError>` — single-module legacy path; used by the evaluator test harness only, not called from the main pipeline.
+- `evaluator::evaluate_graph(graph: ElaboratedModuleGraph) -> Result<(), MetelError>` — multi-module path (v0.6.0, updated v0.8.1): processes each `TypedModule` in topological order in its own isolated `Environment`, seeding imported names from already-evaluated dependency environments and sharing a process-wide `RuntimeRegistry` for `std::core` ownership plus type/aspect dispatch. The `ElaboratedModuleGraph` newtype is a proof that the elaboration pass has already run.
 
 The evaluator operates on the typed AST produced by the typechecker. It does not re-check types — if the evaluator panics on a type mismatch, that is a typechecker bug, not an evaluator limitation.
 
@@ -206,6 +206,30 @@ TypedPlace::Index { object, index }  — place[typed_expr]
 - `extract_typed_place_field_path` — walks a `Field` chain down to a root identifier and a list of field names
 
 Index mutation works by calling `eval_typed_place_value` on the receiver to get `Value::Array(rc)`, evaluating the index expression with `eval_expr`, then mutating through the shared `Rc<RefCell<Vec<Value>>>`. This preserves shared-reference semantics: if two bindings hold the same array Rc, mutation through either is visible via both.
+
+## Method Dispatch (v0.8.1)
+
+Every `TypedExpr::MethodCall` carries a `dispatch: MethodDispatch` field resolved by the elaboration pass:
+
+```rust
+pub enum MethodDispatch {
+    Dynamic,                        // unresolved (e.g. calls on fn/tuple receivers)
+    Inherent,                       // direct method on the concrete type
+    Aspect { aspect_id: SymbolId }, // routes through a specific aspect impl
+}
+```
+
+The evaluator branches on this field:
+
+| `dispatch` | Lookup used | Notes |
+|---|---|---|
+| `Aspect { aspect_id }` | `get_aspect_method_by_id(type_name, aspect_id, method)` | Matches `RuntimeAspectImpl::aspect_id == aspect_id`; falls back to string search for builtins registered without a `SymbolId` |
+| `Inherent` | `get_method_for_value(value, method)` | Checks inherent methods first, then aspect impls (string-based) |
+| `Dynamic` | `get_method_for_value(value, method)` | Same as Inherent; only occurs when receiver type has no named registry entry |
+
+`RuntimeAspectImpl` carries `aspect_id: Option<SymbolId>` alongside the existing `aspect_name: String`. Aspect impls registered during `run_passes` receive their `SymbolId` from `TypedImplBlock::aspect_id`. Builtins registered in `builtins.rs` use `None` and are found via the string fallback path.
+
+---
 
 ## Function Call Dispatch
 

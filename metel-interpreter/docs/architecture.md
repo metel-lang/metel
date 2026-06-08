@@ -14,9 +14,9 @@
        │  module_loader::ModuleGraph
        ▼
   ┌───────────────┐
-  │ Name Resolver │  per-module import scopes, pub_surface, re-exports
+  │ Name Resolver │  per-module import scopes, pub_surface, re-exports; assigns SymbolIds
   └───────────────┘
-       │  name_resolver::ResolvedNames
+       │  name_resolver::ResolvedNames  (carries symbols: HashMap<(module, name) → SymbolId>)
        ▼
   ┌─────────────────┐
   │ Path Normalizer │  rewrites qualified Expr::Path nodes to Expr::ResolvedPath
@@ -25,11 +25,17 @@
        ▼
   ┌──────────────┐
   │ Type Checker │  per-module HM inference + construction (errors reported here)
+  │              │  also populates TypedImplBlock::aspect_id via names.symbols
   └──────────────┘
        │  typed_ast::TypedModuleGraph
        ▼
   ┌─────────────┐
-  │  Evaluator  │  flattens TypedModuleGraph → program output  (tree-walking)
+  │  Elaborator │  resolves MethodDispatch per call site; wraps graph in ElaboratedModuleGraph
+  └─────────────┘
+       │  elaborator::ElaboratedModuleGraph
+       ▼
+  ┌─────────────┐
+  │  Evaluator  │  tree-walks ElaboratedModuleGraph → program output
   └─────────────┘
 ```
 
@@ -58,7 +64,9 @@ metel-interpreter/
     │   ├── inference.rs   — Pass 1: all infer_* functions
     │   ├── construction.rs— Pass 2: ConstructCtx, construct_* functions, exhaustiveness
     │   └── conversions.rs — type_expr_to_infer, infer_type_to_type, type_to_infer
-    ├── typed_ast/         — typed AST node definitions
+    ├── symbols.rs         — SymbolId type; reserved ID constants for builtins; SymbolTable intern
+    ├── typed_ast/         — typed AST node definitions (MethodDispatch, TypedImplBlock::aspect_id)
+    ├── elaborator/        — post-inference elaboration pass; resolves MethodDispatch, produces ElaboratedModuleGraph
     ├── evaluator/         — tree-walking evaluator, lexical env, runtime registry, runtime values
     │   ├── mod.rs         — core: Value, Signal, Environment, RuntimeRegistry, evaluate(), eval_block/stmt/expr
     │   ├── builtins.rs    — register_builtins/runtime_registry: std::core intrinsic values plus type-owned runtime methods with receiver/signature metadata
@@ -76,9 +84,10 @@ metel-interpreter/
 | Data | Type | Produced by | Consumed by |
 |------|------|-------------|-------------|
 | Module graph | `module_loader::ModuleGraph` | module loader | name resolver / path normalizer |
-| Resolved names | `name_resolver::ResolvedNames` | name resolver | path normalizer / typechecker |
+| Resolved names | `name_resolver::ResolvedNames` | name resolver | path normalizer / typechecker / elaborator |
 | Normalized graph | `path_normalizer::NormalizedModuleGraph` | path normalizer | typechecker |
-| Typed module graph | `typed_ast::TypedModuleGraph` | typechecker (`check_graph`) | evaluator (`evaluate_graph`) |
+| Typed module graph | `typed_ast::TypedModuleGraph` | typechecker (`check_graph`) | elaborator (`elaborate`) |
+| Elaborated module graph | `elaborator::ElaboratedModuleGraph` | elaborator (`elaborate`) | evaluator (`evaluate_graph`) |
 | Untyped program (single-file) | `ast::Program` | `load_program` (single-file shim) | typechecker (`check`) |
 | Typed program (single-file) | `typed_ast::TypedProgram` | typechecker (`check`) | evaluator (`evaluate`) |
 | Errors | `MetelError` | any stage | caller / CLI |
@@ -107,8 +116,10 @@ Type error codes: E0001–E0008. Runtime panics (`.yolo()` on `nope`, out-of-bou
 | Component | Notes |
 |-----------|-------|
 | Module Loader | `src/module_loader.rs` — `load_root` builds the topological `ModuleGraph`; `load_program` parses a single file (shim for single-file test harnesses) |
-| Name Resolver | `src/name_resolver.rs` — `resolve` produces per-module `ModuleScope`, `pub_surface`, and re-exports; wired into `check_graph` |
+| Name Resolver | `src/name_resolver.rs` — `resolve` produces per-module `ModuleScope`, `pub_surface`, and re-exports; also assigns a `SymbolId` to every top-level declaration and stores the intern table in `ResolvedNames::symbols` |
 | Path Normalizer | `src/path_normalizer.rs` — `normalize` rewrites qualified `Expr::Path` nodes to `Expr::ResolvedPath`; produces `NormalizedModuleGraph` |
+| Symbols | `src/symbols.rs` — `SymbolId` newtype; reserved ID constants for builtin types and aspects; `SymbolTable` intern helper |
+| Elaborator | `src/elaborator/mod.rs` — `elaborate(TypedModuleGraph, &ResolvedNames) -> ElaboratedModuleGraph`; resolves every `MethodDispatch::Dynamic` site to `Inherent` or `Aspect { aspect_id }`; see [decisions/adr-0037-elaboration-boundary.md](decisions/adr-0037-elaboration-boundary.md) |
 | Parser | `src/parser/`, `src/grammar.pest` |
 | Type Checker | [typechecker.md](typechecker.md) |
 | Evaluator | [evaluator.md](evaluator.md) |
